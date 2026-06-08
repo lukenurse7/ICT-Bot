@@ -9,6 +9,7 @@
 require('dotenv').config();
 const chalk = require('chalk');
 const cron  = require('node-cron');
+const { publishSignal, updateStatus, startServer } = require('./signal_server');
 
 // ─── XAUUSD engine ──────────────────────────────────────────────────────
 const { fetchAll: xauFetch }            = require('./data_xau');
@@ -81,6 +82,7 @@ async function scanXAU() {
 
       if (!dup) {
         printXauSignal(result.signal);
+        publishSignal(result.signal);   // → signal server → MT5 bridge
         s.lastTime = now;
         s.lastDir  = result.signal.direction;
       } else {
@@ -89,6 +91,8 @@ async function scanXAU() {
     } else {
       printWaiting(result.waitReason, result);
     }
+
+    updateStatus({ waitReason: result.waitReason, confluence: result.confluence?.score });
 
   } catch (err) {
     console.log(chalk.red(`  [XAU] ✗ ${err.message}`));
@@ -162,6 +166,7 @@ async function runCycle() {
   console.log(chalk.gray(`  Next scan in 60s — Ctrl+C to stop\n`));
 }
 
-// Kick off immediately, then every 60s
+// Start signal HTTP server, then begin scanning
+startServer();
 runCycle();
 setInterval(runCycle, 60 * 1000);
