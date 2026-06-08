@@ -4,7 +4,9 @@
   "description": "DJ30 ICT Signal Bot — NY Kill Zone 14:00–16:00 GMT",
   "main": "src/bot.js",
   "scripts": {
-    "start": "node src/bot.js",
+    "start": "node src/main.js",
+    "xau": "node src/xau_bot.js",
+    "dj30": "node src/bot.js",
     "dashboard": "node src/dashboard.js",
     "backtest": "node src/backtest.js"
   },

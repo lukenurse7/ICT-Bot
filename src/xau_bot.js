@@ -4,15 +4,15 @@ require('dotenv').config();
 const chalk = require('chalk');
 const { fetchAll } = require('./data_xau');
 const { runAnalysis } = require('./ict_xau');
-const { sessionStatus, getAsiaSessionBounds } = require('./sessions');
+const { sessionStatus, getAsiaSessionBounds, isWeekday } = require('./sessions');
 const {
   printHeader, printStatusBar, printKeyLevels, printSweep,
   printMSS, printFVG, printConfluence, printSignal, printWaiting
 } = require('./format_xau');
 
-const SCAN_INTERVAL_KZ   = 60;
-const SCAN_INTERVAL_IDLE = 300;
-const SIGNAL_COOLDOWN    = 600;
+// XAUUSD scans always during market hours — no kill zone restriction
+const SCAN_INTERVAL   = 60;   // every 60s regardless of session
+const SIGNAL_COOLDOWN = 600;  // 10 min cooldown between same-direction signals
 
 let lastSignalTime = 0;
 let lastSignalDir  = null;
@@ -22,8 +22,15 @@ async function scan() {
   try {
     printHeader();
 
+    if (!isWeekday()) {
+      console.log(chalk.gray('  Market closed (weekend) — resuming Monday.\n'));
+      scheduleCountdown(SCAN_INTERVAL * 5);
+      return;
+    }
+
     const session = sessionStatus();
-    const scanInterval = session.active ? SCAN_INTERVAL_KZ : SCAN_INTERVAL_IDLE;
+    // Pass session but don't gate on it — XAUUSD trades anytime
+    const alwaysActive = { ...session, active: true };
 
     console.log(chalk.gray('  Fetching live XAUUSD data from TwelveData...'));
     const data = await fetchAll();
@@ -31,7 +38,7 @@ async function scan() {
     const asiaRange = getAsiaSessionBounds(data.h1);
 
     console.log(chalk.gray('  Running ICT analysis...\n'));
-    const result = runAnalysis(data, asiaRange, session);
+    const result = runAnalysis(data, asiaRange, alwaysActive);
 
     printStatusBar(result.quote, session, result.htf);
     printKeyLevels(result.lvls);
@@ -61,7 +68,7 @@ async function scan() {
       printWaiting(result.waitReason, result);
     }
 
-    scheduleCountdown(scanInterval);
+    scheduleCountdown(SCAN_INTERVAL);
 
   } catch (err) {
     printHeader();
@@ -79,10 +86,14 @@ function scheduleCountdown(seconds) {
       clearInterval(timer);
       scan();
     } else {
-      process.stdout.write(chalk.gray(`\r  Next scan in ${countdown}s...   `));
+      process.stdout.write(chalk.gray(`\r  [XAU] Next scan in ${countdown}s...   `));
     }
   }, 1000);
 }
 
-console.log(chalk.yellow('\n  ◆ XAUUSD ICT Signal Bot starting — live data\n'));
-scan();
+module.exports = { scan };
+
+if (require.main === module) {
+  console.log(chalk.yellow('\n  ◆ XAUUSD ICT Signal Bot — scanning 24/5\n'));
+  scan();
+}
