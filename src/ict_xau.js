@@ -549,7 +549,11 @@ function runAnalysis(data, asiaRange, sessionStatus) {
   const dir = sweepResult.mostRecent?.dir;
   const minScore = parseInt(process.env.MIN_CONFLUENCE || '60');
 
-  if (dir && mss.confirmed && confluence.score >= minScore) {
+  // Only fire when price has actually pulled back INTO the FVG (or no FVG — use OB)
+  // Prevents entering at a price that doesn't exist yet
+  const fvgReady = !fvg || fvg.inFVG;
+
+  if (dir && mss.confirmed && confluence.score >= minScore && fvgReady) {
     const entryPrice = fvg?.optimalEntry || ob?.eq || quote.price;
     const levels = calcLevels(dir, entryPrice, sweepResult.mostRecent, lvls, fvg, m5);
 
@@ -594,7 +598,9 @@ function runAnalysis(data, asiaRange, sessionStatus) {
       : !mss.confirmed
       ? `Sweep found on ${sweepResult.mostRecent.levelName} — waiting for MSS`
       : !fvg
-      ? 'MSS confirmed — waiting for FVG entry zone'
+      ? 'MSS confirmed — waiting for FVG to form'
+      : !fvg.inFVG
+      ? `FVG at ${fvg.entryZone} — waiting for price to pull back INTO the zone`
       : null
   };
 }
