@@ -1,381 +1,548 @@
 'use strict';
 
 require('dotenv').config();
-const express = require('express');
-const http = require('http');
+const express   = require('express');
+const http      = require('http');
 const WebSocket = require('ws');
-const cron = require('node-cron');
-const { fetchAllData } = require('./data');
-const { runICTAnalysis } = require('./ict');
-const { isKillZone, killZoneStatus } = require('./killzone');
+const { fetchAll: xauFetch }          = require('./data_xau');
+const { runAnalysis }                 = require('./ict_xau');
+const { sessionStatus, getAsiaSessionBounds, isWeekday } = require('./sessions');
+const { fetchAllData: dj30Fetch }     = require('./data');
+const { runICTAnalysis }              = require('./ict');
+const { isKillZone, killZoneStatus }  = require('./killzone');
 
-const app = express();
+const app    = express();
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
-const PORT = process.env.PORT || 3000;
+const wss    = new WebSocket.Server({ server });
+const PORT   = process.env.PORT || 3000;
 
-let latestData = null;
-let signalHistory = [];
+let latestXAU  = null;
+let latestDJ30 = null;
+let signalHistory = [];   // last 20 signals across both instruments
 
 function broadcast(data) {
   const msg = JSON.stringify(data);
-  wss.clients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN) client.send(msg);
-  });
+  wss.clients.forEach(c => { if (c.readyState === WebSocket.OPEN) c.send(msg); });
 }
 
+// ─── XAUUSD scan ─────────────────────────────────────────────────────────────
+async function scanXAU() {
+  if (!isWeekday()) return;
+  const session     = sessionStatus();
+  const alwaysActive = { ...session, active: true };
+  const data        = await xauFetch();
+  const asia        = getAsiaSessionBounds(data.h1);
+  const result      = runAnalysis(data, asia, alwaysActive);
+
+  latestXAU = {
+    price:      result.quote.price,
+    changePct:  result.quote.changePct,
+    high:       result.quote.high,
+    low:        result.quote.low,
+    bias:       result.htf.bias,
+    daily:      result.htf.daily,
+    h4:         result.htf.h4,
+    session:    session.label,
+    sweep:      result.sweepResult.mostRecent,
+    mss:        result.mss,
+    fvg:        result.fvg,
+    confluence: result.confluence,
+    waitReason: result.waitReason,
+    lvls:       result.lvls,
+    signal:     result.signal,
+    timestamp:  new Date().toISOString()
+  };
+
+  if (result.signal) {
+    const sig = { ...result.signal, instrument: 'XAUUSD', id: `XAU_${Date.now()}` };
+    signalHistory.unshift(sig);
+    if (signalHistory.length > 20) signalHistory.pop();
+    broadcast({ type: 'signal', signal: sig });
+  }
+
+  return latestXAU;
+}
+
+// ─── DJ30 scan ───────────────────────────────────────────────────────────────
+async function scanDJ30() {
+  const kz = killZoneStatus();
+  const { candles15m, candles5m, quote } = await dj30Fetch();
+  const analysis = runICTAnalysis(candles15m, candles5m);
+
+  latestDJ30 = {
+    price:     quote.price,
+    changePct: quote.changePct,
+    bias:      analysis.bias,
+    kzActive:  isKillZone(),
+    kzStatus:  kz.message,
+    mss:       analysis.mss,
+    liquidity: analysis.liquidity,
+    signals:   isKillZone() ? analysis.signals : [],
+    timestamp: new Date().toISOString()
+  };
+
+  if (isKillZone() && analysis.signals.length > 0) {
+    for (const s of analysis.signals) {
+      const sig = { ...s, instrument: 'DJ30', id: `DJ30_${Date.now()}` };
+      signalHistory.unshift(sig);
+      if (signalHistory.length > 20) signalHistory.pop();
+      broadcast({ type: 'signal', signal: sig });
+    }
+  }
+
+  return latestDJ30;
+}
+
+// ─── Combined scan ────────────────────────────────────────────────────────────
 async function runScan() {
-  try {
-    const { candles15m, candles5m, quote } = await fetchAllData();
-    const analysis = runICTAnalysis(candles15m, candles5m);
-    const kzStatus = killZoneStatus();
+  const results = await Promise.allSettled([scanXAU(), scanDJ30()]);
+  const xauErr  = results[0].status === 'rejected' ? results[0].reason?.message : null;
+  const dj30Err = results[1].status === 'rejected' ? results[1].reason?.message : null;
 
-    const payload = {
-      type: 'update',
-      timestamp: new Date().toISOString(),
-      quote,
-      analysis: {
-        bias: analysis.bias,
-        mss: analysis.mss,
-        orderBlocks: analysis.orderBlocks,
-        fvgs: analysis.fvgs,
-        liquidity: analysis.liquidity
-      },
-      kzStatus,
-      signals: isKillZone() ? analysis.signals : []
-    };
-
-    if (isKillZone() && analysis.signals.length > 0) {
-      for (const sig of analysis.signals) {
-        signalHistory.unshift({ ...sig, id: Date.now() });
-        if (signalHistory.length > 50) signalHistory.pop();
-      }
-    }
-
-    payload.signalHistory = signalHistory.slice(0, 10);
-    latestData = payload;
-    broadcast(payload);
-    return payload;
-  } catch (err) {
-    const errPayload = { type: 'error', message: err.message };
-    broadcast(errPayload);
-    throw err;
-  }
+  broadcast({
+    type:          'update',
+    timestamp:     new Date().toISOString(),
+    xau:           latestXAU,
+    dj30:          latestDJ30,
+    signalHistory: signalHistory.slice(0, 20),
+    errors:        { xau: xauErr, dj30: dj30Err }
+  });
 }
 
-// REST endpoint — initial page load data
-app.get('/api/data', async (req, res) => {
-  try {
-    if (latestData) return res.json(latestData);
-    const data = await runScan();
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+// ─── HTTP / WebSocket ─────────────────────────────────────────────────────────
+app.get('/api/data', (req, res) => {
+  res.json({ xau: latestXAU, dj30: latestDJ30, signalHistory });
 });
 
-// Serve the dashboard HTML
-app.get('/', (req, res) => {
-  res.send(getDashboardHTML());
-});
+app.get('/', (req, res) => res.send(getDashboardHTML()));
 
-// WebSocket connection
-wss.on('connection', (ws) => {
-  if (latestData) ws.send(JSON.stringify(latestData));
-  ws.on('message', async (msg) => {
-    const data = JSON.parse(msg.toString());
-    if (data.type === 'scan') {
-      try {
-        await runScan();
-      } catch (e) {
-        ws.send(JSON.stringify({ type: 'error', message: e.message }));
-      }
-    }
+wss.on('connection', ws => {
+  // Send current state immediately on connect
+  ws.send(JSON.stringify({
+    type: 'update', timestamp: new Date().toISOString(),
+    xau: latestXAU, dj30: latestDJ30, signalHistory
+  }));
+  ws.on('message', async msg => {
+    const d = JSON.parse(msg.toString());
+    if (d.type === 'scan') await runScan().catch(() => {});
   });
 });
 
-// Scheduled scans
-cron.schedule('*/5 * * * *', async () => {
-  if (isKillZone()) await runScan().catch(() => {});
-});
-cron.schedule('*/15 * * * *', async () => {
-  if (!isKillZone()) await runScan().catch(() => {});
-});
+// Scan every 60s
+setInterval(() => runScan().catch(() => {}), 60_000);
 
 server.listen(PORT, async () => {
-  console.log(`\n  DJ30 Signal Bot Dashboard running at http://localhost:${PORT}\n`);
+  console.log(`\n  ◆ ICT Dashboard → http://localhost:${PORT}\n`);
   await runScan().catch(e => console.error('Initial scan error:', e.message));
 });
 
-// ─── Dashboard HTML ─────────────────────────────────────────────────────────
+module.exports = { server };
+
+// ─── Dashboard HTML ───────────────────────────────────────────────────────────
 function getDashboardHTML() {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DJ30 Signal Bot</title>
+<title>ICT Signal Bot</title>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --bg: #0d0d0d; --bg2: #141414; --bg3: #1a1a1a; --border: rgba(255,255,255,0.08);
-    --text: #f0f0f0; --text2: #888; --text3: #555;
-    --green: #4ade80; --red: #f87171; --amber: #fbbf24; --blue: #60a5fa; --purple: #a78bfa;
-  }
-  body { background: var(--bg); color: var(--text); font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
-  .header { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; border-bottom: 1px solid var(--border); }
-  .header-title { font-size: 14px; font-weight: 600; letter-spacing: 0.05em; color: var(--text); }
-  .header-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
-  .kz-badge { display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border); color: var(--text2); }
-  .kz-badge.active { border-color: var(--green); color: var(--green); }
-  .kz-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); }
-  .kz-dot.active { background: var(--green); animation: pulse 2s infinite; }
-  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
-  .scan-btn { background: transparent; border: 1px solid var(--border); color: var(--text2); padding: 6px 14px; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 11px; letter-spacing: 0.04em; transition: all 0.15s; }
-  .scan-btn:hover { border-color: var(--text2); color: var(--text); }
-  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); border-bottom: 1px solid var(--border); }
-  .metric { background: var(--bg); padding: 16px 20px; }
-  .metric-label { font-size: 10px; color: var(--text3); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; }
-  .metric-value { font-size: 22px; font-weight: 600; }
-  .metric-sub { font-size: 11px; color: var(--text3); margin-top: 3px; }
-  .green { color: var(--green); } .red { color: var(--red); } .amber { color: var(--amber); } .blue { color: var(--blue); }
-  .body { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); min-height: 300px; }
-  .panel { background: var(--bg2); padding: 16px 20px; }
-  .panel-title { font-size: 10px; color: var(--text3); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 14px; }
-  .row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); }
-  .row:last-child { border-bottom: none; }
-  .row-label { color: var(--text2); }
-  .row-value { color: var(--text); font-weight: 500; }
-  .tag { display: inline-block; font-size: 9px; letter-spacing: 0.05em; padding: 2px 6px; border-radius: 3px; margin: 1px; border: 1px solid; }
-  .tag-ob { color: var(--blue); border-color: rgba(96,165,250,0.3); background: rgba(96,165,250,0.08); }
-  .tag-fvg { color: var(--amber); border-color: rgba(251,191,36,0.3); background: rgba(251,191,36,0.08); }
-  .tag-mss { color: var(--green); border-color: rgba(74,222,128,0.3); background: rgba(74,222,128,0.08); }
-  .tag-liq { color: var(--purple); border-color: rgba(167,139,250,0.3); background: rgba(167,139,250,0.08); }
-  .tag-kz { color: var(--text2); border-color: var(--border); background: transparent; }
-  .signals-section { background: var(--bg3); border-top: 1px solid var(--border); padding: 16px 20px; }
-  .sig-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-  .sig-title { font-size: 10px; color: var(--text3); letter-spacing: 0.06em; text-transform: uppercase; }
-  .signal-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; margin-bottom: 8px; }
-  .signal-card.long { border-left: 2px solid var(--green); }
-  .signal-card.short { border-left: 2px solid var(--red); }
-  .sig-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-  .sig-dir { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; }
-  .sig-time { font-size: 10px; color: var(--text3); }
-  .levels { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 10px 0; }
-  .level { background: var(--bg3); border-radius: 4px; padding: 6px 10px; }
-  .level-lbl { font-size: 9px; color: var(--text3); letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 3px; }
-  .level-val { font-size: 13px; font-weight: 600; }
-  .conf-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
-  .conf-bar-wrap { flex: 1; height: 3px; background: var(--bg3); border-radius: 2px; overflow: hidden; }
-  .conf-bar { height: 100%; border-radius: 2px; background: var(--green); transition: width 0.5s; }
-  .conf-pct { font-size: 11px; color: var(--text2); min-width: 32px; text-align: right; }
-  .empty { text-align: center; padding: 40px; color: var(--text3); }
-  .log { background: var(--bg); border-top: 1px solid var(--border); padding: 10px 20px; font-size: 10px; color: var(--text3); max-height: 60px; overflow-y: auto; line-height: 2; }
-  .error-banner { background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.3); color: var(--red); padding: 10px 16px; font-size: 11px; margin: 8px 20px; border-radius: 4px; display: none; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0a;--bg2:#111;--bg3:#161616;--bg4:#1c1c1c;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);
+  --text:#f0f0f0;--text2:#999;--text3:#555;
+  --green:#4ade80;--red:#f87171;--amber:#fbbf24;--blue:#60a5fa;--purple:#a78bfa;
+}
+body{background:var(--bg);color:var(--text);font-family:'SF Mono','Fira Code',monospace;font-size:13px;min-height:100vh}
+/* Header */
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10;background:var(--bg)}
+.hdr-title{font-size:13px;font-weight:700;letter-spacing:.06em}
+.hdr-sub{font-size:10px;color:var(--text3);margin-top:2px}
+.hdr-right{display:flex;gap:8px;align-items:center}
+.pill{display:flex;align-items:center;gap:5px;font-size:10px;padding:4px 10px;border-radius:20px;border:1px solid var(--border);color:var(--text2);cursor:pointer;background:transparent;font-family:inherit;letter-spacing:.03em;transition:all .15s}
+.pill:hover{border-color:var(--text2);color:var(--text)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--text3)}
+.dot.live{background:var(--green);animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+/* Alert banner */
+#alert-bar{display:none;position:fixed;top:0;left:0;right:0;z-index:100;padding:14px 24px;font-size:13px;font-weight:600;letter-spacing:.04em;cursor:pointer;animation:slideDown .3s ease}
+@keyframes slideDown{from{transform:translateY(-100%)}to{transform:translateY(0)}}
+#alert-bar.buy{background:rgba(74,222,128,.95);color:#000}
+#alert-bar.sell{background:rgba(248,113,113,.95);color:#000}
+/* Instruments row */
+.inst-row{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border-bottom:1px solid var(--border)}
+.inst{background:var(--bg2);padding:16px 24px}
+.inst-name{font-size:10px;color:var(--text3);letter-spacing:.07em;text-transform:uppercase;margin-bottom:8px}
+.inst-price{font-size:26px;font-weight:700;letter-spacing:-.01em}
+.inst-meta{display:flex;gap:16px;margin-top:6px;font-size:11px;color:var(--text2)}
+.badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600;letter-spacing:.04em;border:1px solid}
+.badge-bull{color:var(--green);border-color:rgba(74,222,128,.35);background:rgba(74,222,128,.08)}
+.badge-bear{color:var(--red);border-color:rgba(248,113,113,.35);background:rgba(248,113,113,.08)}
+.badge-range{color:var(--amber);border-color:rgba(251,191,36,.35);background:rgba(251,191,36,.08)}
+.badge-kz{color:var(--green);border-color:rgba(74,222,128,.35);background:rgba(74,222,128,.08)}
+.badge-off{color:var(--text3);border-color:var(--border);background:transparent}
+/* Steps */
+.steps{padding:14px 24px;border-bottom:1px solid var(--border);background:var(--bg2)}
+.steps-title{font-size:10px;color:var(--text3);letter-spacing:.07em;text-transform:uppercase;margin-bottom:10px}
+.step-row{display:flex;align-items:center;gap:10px;padding:5px 0}
+.step-icon{width:18px;text-align:center;font-size:12px}
+.step-label{color:var(--text2);width:90px;flex-shrink:0}
+.step-value{color:var(--text);flex:1}
+.step-row.done .step-label{color:var(--green)}
+.step-row.waiting .step-label{color:var(--text3)}
+/* Confluence bar */
+.conf-wrap{padding:14px 24px;border-bottom:1px solid var(--border)}
+.conf-top{display:flex;justify-content:space-between;margin-bottom:8px;font-size:11px}
+.conf-track{height:6px;background:var(--bg4);border-radius:3px;overflow:hidden}
+.conf-fill{height:100%;border-radius:3px;transition:width .6s ease,background .6s}
+/* Signal cards */
+.sigs-section{padding:16px 24px}
+.sigs-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.sigs-title{font-size:10px;color:var(--text3);letter-spacing:.07em;text-transform:uppercase}
+.sig-card{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:14px 16px;margin-bottom:8px;position:relative;overflow:hidden}
+.sig-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px}
+.sig-card.buy::before{background:var(--green)}
+.sig-card.sell::before{background:var(--red)}
+.sig-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.sig-dir{font-size:14px;font-weight:700;letter-spacing:.04em}
+.sig-meta{font-size:10px;color:var(--text3)}
+.levels-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:10px}
+.lvl{background:var(--bg4);border-radius:4px;padding:8px 10px}
+.lvl-lbl{font-size:9px;color:var(--text3);letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px}
+.lvl-val{font-size:12px;font-weight:600}
+.sig-footer{display:flex;align-items:center;gap:10px}
+.sig-bar-wrap{flex:1;height:3px;background:var(--bg4);border-radius:2px;overflow:hidden}
+.sig-bar{height:100%;border-radius:2px;transition:width .5s}
+.sig-score{font-size:10px;color:var(--text2);min-width:36px;text-align:right}
+.sig-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
+.tag{font-size:9px;padding:2px 6px;border-radius:3px;border:1px solid var(--border);color:var(--text3)}
+.empty{text-align:center;padding:32px;color:var(--text3);font-size:12px}
+/* Footer */
+.footer{padding:8px 24px;border-top:1px solid var(--border);font-size:10px;color:var(--text3);display:flex;justify-content:space-between}
 </style>
 </head>
 <body>
 
-<div class="header">
+<div id="alert-bar" onclick="dismissAlert()">
+  <span id="alert-text"></span>
+  <span style="float:right;font-size:10px;opacity:.7">click to dismiss</span>
+</div>
+
+<div class="hdr">
   <div>
-    <div class="header-title">DJ30 ICT SIGNAL BOT</div>
-    <div class="header-sub">NY Kill Zone · 14:00–16:00 GMT · Real-time via TwelveData</div>
+    <div class="hdr-title">◆ ICT SIGNAL BOT</div>
+    <div class="hdr-sub">XAUUSD (24/5) · DJ30 (14:00–16:00 GMT) · Auto-updates every 60s</div>
   </div>
-  <div style="display:flex; gap:10px; align-items:center;">
-    <div class="kz-badge" id="kz-badge">
-      <div class="kz-dot" id="kz-dot"></div>
-      <span id="kz-text">Checking...</span>
+  <div class="hdr-right">
+    <div class="pill" id="live-pill"><div class="dot" id="live-dot"></div><span id="live-text">Connecting...</span></div>
+    <button class="pill" onclick="enableNotifications()">🔔 Notifications</button>
+    <button class="pill" onclick="requestScan()">↻ Scan now</button>
+  </div>
+</div>
+
+<!-- Instrument prices -->
+<div class="inst-row">
+  <div class="inst">
+    <div class="inst-name">XAUUSD · Gold</div>
+    <div style="display:flex;align-items:baseline;gap:10px">
+      <div class="inst-price" id="xau-price">—</div>
+      <span id="xau-chg" style="font-size:13px">—</span>
     </div>
-    <button class="scan-btn" onclick="requestScan()">↻ Scan now</button>
+    <div class="inst-meta">
+      <span id="xau-hl">—</span>
+      <span id="xau-session">—</span>
+      <span id="xau-bias-badge"></span>
+    </div>
+  </div>
+  <div class="inst">
+    <div class="inst-name">DJ30 · US30</div>
+    <div style="display:flex;align-items:baseline;gap:10px">
+      <div class="inst-price" id="dj-price">—</div>
+      <span id="dj-chg" style="font-size:13px">—</span>
+    </div>
+    <div class="inst-meta">
+      <span id="dj-kz">—</span>
+      <span id="dj-bias-badge"></span>
+    </div>
   </div>
 </div>
 
-<div id="error-banner" class="error-banner"></div>
-
-<div class="grid4">
-  <div class="metric"><div class="metric-label">DJ30</div><div class="metric-value" id="m-price">—</div><div class="metric-sub" id="m-change">—</div></div>
-  <div class="metric"><div class="metric-label">HTF Bias</div><div class="metric-value" id="m-bias">—</div><div class="metric-sub" id="m-bias-sub">4H structure</div></div>
-  <div class="metric"><div class="metric-label">Signals today</div><div class="metric-value" id="m-sigs">0</div><div class="metric-sub">session</div></div>
-  <div class="metric"><div class="metric-label">Last scan</div><div class="metric-value" style="font-size:14px;" id="m-scan">—</div><div class="metric-sub" id="m-next">—</div></div>
-</div>
-
-<div class="body">
-  <div class="panel">
-    <div class="panel-title">Market Structure</div>
-    <div class="row"><span class="row-label">MSS type</span><span class="row-value" id="p-mss">—</span></div>
-    <div class="row"><span class="row-label">MSS level</span><span class="row-value" id="p-mss-lvl">—</span></div>
-    <div class="row"><span class="row-label">Bull OB</span><span class="row-value" id="p-ob-bull">—</span></div>
-    <div class="row"><span class="row-label">Bear OB</span><span class="row-value" id="p-ob-bear">—</span></div>
-    <div class="row"><span class="row-label">BSL (above)</span><span class="row-value amber" id="p-bsl">—</span></div>
-    <div class="row"><span class="row-label">SSL (below)</span><span class="row-value amber" id="p-ssl">—</span></div>
+<!-- XAUUSD setup steps -->
+<div class="steps">
+  <div class="steps-title">XAUUSD Setup Progress</div>
+  <div class="step-row" id="step1">
+    <div class="step-icon">1</div>
+    <div class="step-label">Sweep</div>
+    <div class="step-value" id="step1-val">Waiting...</div>
   </div>
-  <div class="panel">
-    <div class="panel-title">Confluences (5m)</div>
-    <div class="row"><span class="row-label">Bullish FVG</span><span class="row-value" id="p-fvg-bull">—</span></div>
-    <div class="row"><span class="row-label">Bearish FVG</span><span class="row-value" id="p-fvg-bear">—</span></div>
-    <div class="row"><span class="row-label">Active FVGs</span><span class="row-value blue" id="p-fvg-count">—</span></div>
-    <div class="row"><span class="row-label">Bull OB (5m)</span><span class="row-value" id="p-ob5-bull">—</span></div>
-    <div class="row"><span class="row-label">Bear OB (5m)</span><span class="row-value" id="p-ob5-bear">—</span></div>
-    <div class="row"><span class="row-label">EQ Bull OB</span><span class="row-value" id="p-eq">—</span></div>
+  <div class="step-row" id="step2">
+    <div class="step-icon">2</div>
+    <div class="step-label">MSS / BOS</div>
+    <div class="step-value" id="step2-val">—</div>
+  </div>
+  <div class="step-row" id="step3">
+    <div class="step-icon">3</div>
+    <div class="step-label">FVG Entry</div>
+    <div class="step-value" id="step3-val">—</div>
   </div>
 </div>
 
-<div class="signals-section">
-  <div class="sig-header">
-    <span class="sig-title">Signals</span>
-    <span style="font-size:10px; color:var(--text3);" id="sig-note">Kill Zone only</span>
+<!-- Confluence -->
+<div class="conf-wrap">
+  <div class="conf-top">
+    <span style="color:var(--text2)">XAUUSD Confluence</span>
+    <span id="conf-label" style="color:var(--text2)">—</span>
   </div>
-  <div id="signals-container">
-    <div class="empty">Waiting for scan data...</div>
+  <div class="conf-track">
+    <div class="conf-fill" id="conf-fill" style="width:0%;background:var(--text3)"></div>
   </div>
 </div>
 
-<div class="log" id="log">Connecting to data feed...</div>
+<!-- Signals -->
+<div class="sigs-section">
+  <div class="sigs-hdr">
+    <span class="sigs-title">Signals</span>
+    <span id="sigs-count" style="font-size:10px;color:var(--text3)">0 today</span>
+  </div>
+  <div id="sigs-container"><div class="empty">Connecting to bot...</div></div>
+</div>
+
+<div class="footer">
+  <span id="footer-time">—</span>
+  <span id="footer-status">—</span>
+</div>
 
 <script>
-const fmt = p => p ? Math.round(p).toLocaleString('en-GB') : '—';
-const fmtTime = iso => { const d = new Date(iso); return d.toTimeString().slice(0,8) + ' GMT'; };
+// ─── Audio alert (Web Audio API) ─────────────────────────────────────────────
+function playAlert(type) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const freqs = type === 'buy' ? [440, 550, 660] : [660, 550, 440];
+    freqs.forEach((f, i) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type      = 'sine';
+      osc.frequency.value = f;
+      gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.12);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.25);
+      osc.start(ctx.currentTime + i * 0.12);
+      osc.stop(ctx.currentTime + i * 0.12 + 0.3);
+    });
+  } catch(e) {}
+}
 
-let ws;
-let sigCount = 0;
+// ─── Browser push notifications ──────────────────────────────────────────────
+let notifEnabled = false;
+function enableNotifications() {
+  if (!('Notification' in window)) { alert('Browser notifications not supported'); return; }
+  Notification.requestPermission().then(p => {
+    notifEnabled = p === 'granted';
+    document.querySelector('[onclick="enableNotifications()"]').textContent =
+      notifEnabled ? '🔔 On' : '🔔 Denied';
+  });
+}
+
+function sendNotification(sig) {
+  const isLong  = sig.direction === 'BUY' || sig.direction === 'long';
+  const arrow   = isLong ? '▲' : '▼';
+  const instr   = sig.instrument || sig.symbol || 'XAUUSD';
+  const entry   = sig.entry || sig.entry;
+  const title   = arrow + ' ' + (isLong ? 'BUY' : 'SELL') + ' ' + instr;
+  const body    = 'Entry: ' + (entry?.toFixed?.(2) || entry) +
+                  '  SL: '  + (sig.sl?.toFixed?.(2) || sig.sl) +
+                  '  TP1: ' + (sig.tp1?.toFixed?.(2) || sig.tp1) +
+                  '  Score: ' + (sig.confluence || sig.confluence) + '%';
+
+  playAlert(isLong ? 'buy' : 'sell');
+
+  // Alert bar
+  const bar  = document.getElementById('alert-bar');
+  const text = document.getElementById('alert-text');
+  bar.className = isLong ? 'buy' : 'sell';
+  text.textContent = title + '  |  ' + body;
+  bar.style.display = 'block';
+  setTimeout(dismissAlert, 15000);
+
+  // Push notification
+  if (notifEnabled) {
+    new Notification(title, { body, icon: '', tag: 'ict-signal' });
+  }
+}
+
+function dismissAlert() {
+  document.getElementById('alert-bar').style.display = 'none';
+}
+
+// ─── WebSocket ────────────────────────────────────────────────────────────────
+let ws, reconnectTimer;
+const seenSignals = new Set();
 
 function connect() {
   ws = new WebSocket('ws://' + location.host);
-  ws.onopen = () => addLog('Connected to signal bot');
-  ws.onclose = () => { addLog('Connection lost — reconnecting...'); setTimeout(connect, 3000); };
-  ws.onerror = () => addLog('WebSocket error');
+  ws.onopen = () => {
+    document.getElementById('live-dot').className  = 'dot live';
+    document.getElementById('live-text').textContent = 'Live';
+    setStatus('Connected');
+  };
+  ws.onclose = () => {
+    document.getElementById('live-dot').className  = 'dot';
+    document.getElementById('live-text').textContent = 'Reconnecting...';
+    clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(connect, 4000);
+  };
   ws.onmessage = e => {
-    const data = JSON.parse(e.data);
-    if (data.type === 'error') {
-      showError(data.message);
-      return;
+    const d = JSON.parse(e.data);
+    if (d.type === 'update') render(d);
+    if (d.type === 'signal') {
+      if (!seenSignals.has(d.signal.id)) {
+        seenSignals.add(d.signal.id);
+        sendNotification(d.signal);
+      }
     }
-    if (data.type === 'update') render(data);
   };
 }
 
 function requestScan() {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: 'scan' }));
-    addLog('Manual scan triggered...');
-  }
+  if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'scan' }));
 }
 
-function addLog(msg) {
-  const log = document.getElementById('log');
-  const t = new Date().toTimeString().slice(0,8);
-  log.textContent = '[' + t + '] ' + msg;
+function setStatus(msg) {
+  document.getElementById('footer-status').textContent = msg;
 }
 
-function showError(msg) {
-  const b = document.getElementById('error-banner');
-  b.style.display = 'block';
-  b.textContent = '✗ ' + msg;
+// ─── Render ───────────────────────────────────────────────────────────────────
+function fmtP(n, dec=2) { return n != null ? parseFloat(n).toFixed(dec) : '—'; }
+function fmtT(iso) { if (!iso) return ''; const d = new Date(iso); return d.toUTCString().slice(17,22) + ' UTC'; }
+
+function biasBadge(b) {
+  if (!b) return '';
+  const cls = b.includes('bull') ? 'badge-bull' : b.includes('bear') ? 'badge-bear' : 'badge-range';
+  return '<span class="badge '+cls+'">'+b.toUpperCase().replace(/_/g,' ')+'</span>';
 }
 
-function render(data) {
-  document.getElementById('error-banner').style.display = 'none';
+function render(d) {
+  document.getElementById('footer-time').textContent = 'Last update: ' + fmtT(d.timestamp);
 
-  // KZ status
-  const kzActive = data.kzStatus.active;
-  const badge = document.getElementById('kz-badge');
-  const dot = document.getElementById('kz-dot');
-  badge.className = 'kz-badge' + (kzActive ? ' active' : '');
-  dot.className = 'kz-dot' + (kzActive ? ' active' : '');
-  document.getElementById('kz-text').textContent = data.kzStatus.message;
+  // ── XAUUSD ───────────────────────────────────────────────────────────────────
+  const x = d.xau;
+  if (x) {
+    document.getElementById('xau-price').textContent = '$' + fmtP(x.price);
+    const xChg = document.getElementById('xau-chg');
+    xChg.textContent = (x.changePct >= 0 ? '+' : '') + fmtP(x.changePct) + '%';
+    xChg.style.color = x.changePct >= 0 ? 'var(--green)' : 'var(--red)';
+    document.getElementById('xau-hl').textContent = 'H:'+fmtP(x.lvls?.pdh)+' L:'+fmtP(x.lvls?.pdl);
+    document.getElementById('xau-session').textContent = x.session || '';
+    document.getElementById('xau-bias-badge').innerHTML = biasBadge(x.bias);
 
-  // Quote
-  const q = data.quote;
-  document.getElementById('m-price').textContent = fmt(q.price);
-  const chgEl = document.getElementById('m-change');
-  chgEl.textContent = (q.changePct > 0 ? '+' : '') + q.changePct.toFixed(2) + '%';
-  chgEl.className = 'metric-sub ' + (q.changePct >= 0 ? 'green' : 'red');
+    // Steps
+    const hasSweep = !!x.sweep;
+    const hasMSS   = x.mss?.confirmed;
+    const hasFVG   = !!x.fvg;
+    const inFVG    = x.fvg?.inFVG;
 
-  // Bias
-  const bias = data.analysis.bias;
-  const biasEl = document.getElementById('m-bias');
-  biasEl.textContent = bias.toUpperCase();
-  biasEl.className = 'metric-value ' + (bias === 'bullish' ? 'green' : bias === 'bearish' ? 'red' : 'amber');
-
-  // Scan time
-  document.getElementById('m-scan').textContent = fmtTime(data.timestamp).slice(0,5);
-  document.getElementById('m-next').textContent = 'auto-refresh 5m';
-
-  // Structure panel
-  const mss = data.analysis.mss;
-  document.getElementById('p-mss').textContent = mss ? mss.type.replace('_', ' ') : 'none';
-  document.getElementById('p-mss').className = 'row-value ' + (mss ? (mss.type.includes('bull') ? 'green' : 'red') : '');
-  document.getElementById('p-mss-lvl').textContent = mss ? fmt(mss.level) : '—';
-
-  const obs = data.analysis.orderBlocks;
-  document.getElementById('p-ob-bull').textContent = obs.bullish ? fmt(obs.bullish.low) + '–' + fmt(obs.bullish.high) : 'none';
-  document.getElementById('p-ob-bear').textContent = obs.bearish ? fmt(obs.bearish.low) + '–' + fmt(obs.bearish.high) : 'none';
-  document.getElementById('p-ob5-bull').textContent = obs.bullish ? fmt(obs.bullish.eq) + ' EQ' : 'none';
-  document.getElementById('p-ob5-bear').textContent = obs.bearish ? fmt(obs.bearish.eq) + ' EQ' : 'none';
-  document.getElementById('p-eq').textContent = obs.bullish ? fmt(obs.bullish.eq) : '—';
-
-  const liq = data.analysis.liquidity;
-  document.getElementById('p-bsl').textContent = liq.nearestBSL ? fmt(liq.nearestBSL) : '—';
-  document.getElementById('p-ssl').textContent = liq.nearestSSL ? fmt(liq.nearestSSL) : '—';
-
-  const fvgs = data.analysis.fvgs;
-  document.getElementById('p-fvg-bull').textContent = fvgs.bullish ? fmt(fvgs.bullish.bottom) + '–' + fmt(fvgs.bullish.top) : 'none';
-  document.getElementById('p-fvg-bear').textContent = fvgs.bearish ? fmt(fvgs.bearish.bottom) + '–' + fmt(fvgs.bearish.top) : 'none';
-  document.getElementById('p-fvg-count').textContent = fvgs.all ? fvgs.all.length + ' active' : '0';
-
-  // Signals
-  const sigs = data.signals || [];
-  const history = data.signalHistory || [];
-  const allSigs = [...sigs, ...history.filter(s => !sigs.find(x => x.timestamp === s.timestamp))];
-
-  sigCount = history.length;
-  document.getElementById('m-sigs').textContent = sigCount;
-
-  const container = document.getElementById('signals-container');
-  if (allSigs.length === 0) {
-    container.innerHTML = '<div class="empty">' + (kzActive ? 'No high-confluence setup detected yet' : 'Signals only generated during Kill Zone (14:00–16:00 GMT)') + '</div>';
-  } else {
-    container.innerHTML = '';
-    for (const sig of allSigs.slice(0, 5)) {
-      const isLong = sig.direction === 'long';
-      const tagHtml = sig.tags.map(t => {
-        const cls = t.includes('OB') ? 'tag-ob' : t.includes('FVG') ? 'tag-fvg' : t.includes('MSS') || t.includes('BOS') ? 'tag-mss' : t.includes('LIQ') ? 'tag-liq' : 'tag-kz';
-        return '<span class="tag ' + cls + '">' + t + '</span>';
-      }).join('');
-
-      const card = document.createElement('div');
-      card.className = 'signal-card ' + sig.direction;
-      card.innerHTML =
-        '<div class="sig-top">' +
-          '<div style="display:flex;align-items:center;gap:10px;">' +
-            '<span class="sig-dir ' + (isLong ? 'green' : 'red') + '">' + (isLong ? '▲ LONG' : '▼ SHORT') + ' — DJ30</span>' +
-            '<span>' + tagHtml + '</span>' +
-          '</div>' +
-          '<span class="sig-time">' + (sig.timestamp ? fmtTime(sig.timestamp) : '') + '</span>' +
-        '</div>' +
-        '<div class="levels">' +
-          '<div class="level"><div class="level-lbl">Entry</div><div class="level-val">' + fmt(sig.entry) + '</div></div>' +
-          '<div class="level"><div class="level-lbl">Stop loss</div><div class="level-val red">' + fmt(sig.sl) + '</div></div>' +
-          '<div class="level"><div class="level-lbl">TP1</div><div class="level-val green">' + fmt(sig.tp1) + '</div></div>' +
-          '<div class="level"><div class="level-lbl">TP2</div><div class="level-val green">' + fmt(sig.tp2) + '</div></div>' +
-        '</div>' +
-        '<div class="conf-row">' +
-          '<span style="font-size:10px;color:var(--text3);">Confluence</span>' +
-          '<div class="conf-bar-wrap"><div class="conf-bar" style="width:' + sig.confluence + '%;"></div></div>' +
-          '<span class="conf-pct">' + sig.confluence + '%</span>' +
-          '<span style="font-size:10px;color:var(--text3);">R:R 1:' + sig.rr + '</span>' +
-        '</div>';
-      container.appendChild(card);
+    function setStep(id, valId, done, text) {
+      document.getElementById(id).className    = 'step-row ' + (done ? 'done' : 'waiting');
+      document.getElementById(id).querySelector('.step-icon').textContent = done ? '✅' : '⏳';
+      document.getElementById(valId).textContent = text;
     }
+
+    setStep('step1','step1-val', hasSweep,
+      hasSweep ? (x.sweep.dir==='bull'?'↓ SSL':'↑ BSL') + ' sweep on ' + x.sweep.levelName + ' (' + x.sweep.barsAgo + ' bars ago)' : 'Waiting for liquidity sweep');
+    setStep('step2','step2-val', hasMSS,
+      hasMSS ? x.mss.type + ' — ' + x.mss.description : (hasSweep ? 'Sweep detected — waiting for 5m BOS/MSS' : '—'));
+    setStep('step3','step3-val', hasFVG && inFVG,
+      hasFVG ? (inFVG ? '✓ Price inside FVG ' + x.fvg.entryZone : 'FVG ' + x.fvg.entryZone + ' — waiting for pullback') : (hasMSS ? 'MSS confirmed — waiting for FVG' : '—'));
+
+    // Confluence
+    const score = x.confluence?.score || 0;
+    const grade = x.confluence?.grade || '—';
+    const fill  = document.getElementById('conf-fill');
+    fill.style.width      = score + '%';
+    fill.style.background = score >= 80 ? 'var(--green)' : score >= 60 ? 'var(--amber)' : 'var(--red)';
+    document.getElementById('conf-label').textContent = 'Grade ' + grade + '  ' + score + '/100';
+    setStatus(x.waitReason || (x.signal ? 'Signal active' : 'Monitoring'));
   }
 
-  addLog('Data updated · bias: ' + data.analysis.bias + ' · signals: ' + sigs.length);
+  // ── DJ30 ─────────────────────────────────────────────────────────────────────
+  const dj = d.dj30;
+  if (dj) {
+    document.getElementById('dj-price').textContent = parseFloat(dj.price).toLocaleString('en-GB',{minimumFractionDigits:2});
+    const djChg = document.getElementById('dj-chg');
+    djChg.textContent = (dj.changePct >= 0 ? '+' : '') + fmtP(dj.changePct) + '%';
+    djChg.style.color = dj.changePct >= 0 ? 'var(--green)' : 'var(--red)';
+    const kzEl = document.getElementById('dj-kz');
+    kzEl.textContent = dj.kzStatus;
+    kzEl.style.color = dj.kzActive ? 'var(--green)' : 'var(--text3)';
+    document.getElementById('dj-bias-badge').innerHTML = biasBadge(dj.bias);
+  }
+
+  // ── Signal cards ─────────────────────────────────────────────────────────────
+  const allSigs = d.signalHistory || [];
+  document.getElementById('sigs-count').textContent = allSigs.length + ' signal' + (allSigs.length !== 1 ? 's' : '');
+  const container = document.getElementById('sigs-container');
+
+  if (allSigs.length === 0) {
+    // Show current wait status if no signals
+    const waitMsg = d.xau?.waitReason || 'Monitoring — no signal yet';
+    container.innerHTML = '<div class="empty">' + waitMsg + '</div>';
+    return;
+  }
+
+  container.innerHTML = '';
+  for (const sig of allSigs.slice(0, 10)) {
+    const isLong  = sig.direction === 'BUY' || sig.direction === 'long';
+    const instr   = sig.instrument || sig.symbol || 'XAUUSD';
+    const dir     = isLong ? 'BUY' : 'SELL';
+    const score   = sig.confluence || 0;
+    const barClr  = score >= 80 ? 'var(--green)' : score >= 60 ? 'var(--amber)' : 'var(--red)';
+    const entry   = sig.entry;
+    const sl      = sig.sl;
+    const tp1     = sig.tp1;
+    const tp2     = sig.tp2;
+    const tp3     = sig.tp3;
+    const rr      = sig.rr1 || sig.rr || '—';
+
+    const card = document.createElement('div');
+    card.className = 'sig-card ' + (isLong ? 'buy' : 'sell');
+    card.innerHTML =
+      '<div class="sig-top">' +
+        '<div>' +
+          '<span class="sig-dir" style="color:' + (isLong?'var(--green)':'var(--red)') + '">' +
+            (isLong?'▲ BUY':'▼ SELL') + ' — ' + instr +
+          '</span>' +
+          '&nbsp;&nbsp;<span class="badge ' + (isLong?'badge-bull':'badge-bear') + '">Grade ' + (sig.grade||'—') + '</span>' +
+        '</div>' +
+        '<span class="sig-meta">' + (fmtT(sig.timestamp)||'') + '</span>' +
+      '</div>' +
+      '<div class="levels-grid">' +
+        '<div class="lvl"><div class="lvl-lbl">Entry</div><div class="lvl-val">' + fmtP(entry) + '</div></div>' +
+        '<div class="lvl"><div class="lvl-lbl">Stop Loss</div><div class="lvl-val" style="color:var(--red)">' + fmtP(sl) + '</div></div>' +
+        '<div class="lvl"><div class="lvl-lbl">TP1 (1:1.5R)</div><div class="lvl-val" style="color:var(--green)">' + fmtP(tp1) + '</div></div>' +
+        '<div class="lvl"><div class="lvl-lbl">TP2</div><div class="lvl-val" style="color:var(--green)">' + fmtP(tp2) + '</div></div>' +
+        '<div class="lvl"><div class="lvl-lbl">TP3</div><div class="lvl-val" style="color:var(--green)">' + fmtP(tp3) + '</div></div>' +
+      '</div>' +
+      '<div class="sig-footer">' +
+        '<span style="font-size:10px;color:var(--text3)">Confluence</span>' +
+        '<div class="sig-bar-wrap"><div class="sig-bar" style="width:'+score+'%;background:'+barClr+'"></div></div>' +
+        '<span class="sig-score">'+score+'%</span>' +
+        '<span style="font-size:10px;color:var(--text3)">R:R 1:'+rr+'</span>' +
+      '</div>';
+    container.appendChild(card);
+  }
 }
+
+// Auto-request browser notification permission prompt note
+document.addEventListener('DOMContentLoaded', () => {
+  if (Notification.permission === 'granted') {
+    notifEnabled = true;
+    document.querySelector('[onclick="enableNotifications()"]').textContent = '🔔 On';
+  }
+});
 
 connect();
 </script>
 </body>
 </html>`;
 }
-
-module.exports = { app, server };
