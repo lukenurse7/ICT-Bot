@@ -415,11 +415,11 @@ function calcLevels(dir, entry, sweep, levels, fvg, candles5m) {
 
   let tp2, tp3;
   if (isLong) {
-    tp2 = levels.pdh  || entry + risk * 3;
-    tp3 = levels.pwh  || entry + risk * 5;
+    tp2 = (levels.pdh && levels.pdh > entry) ? levels.pdh : entry + risk * 3;
+    tp3 = (levels.pwh && levels.pwh > entry) ? levels.pwh : entry + risk * 5;
   } else {
-    tp2 = levels.pdl  || entry - risk * 3;
-    tp3 = levels.pwl  || entry - risk * 5;
+    tp2 = (levels.pdl && levels.pdl < entry) ? levels.pdl : entry - risk * 3;
+    tp3 = (levels.pwl && levels.pwl < entry) ? levels.pwl : entry - risk * 5;
   }
 
   const rr1 = (Math.abs(tp1 - entry) / risk).toFixed(1);
