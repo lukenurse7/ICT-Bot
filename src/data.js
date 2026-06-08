@@ -6,8 +6,8 @@ require('dotenv').config();
 const API_KEY = process.env.TWELVEDATA_API_KEY;
 const BASE_URL = 'https://api.twelvedata.com';
 
-// DJ30 symbol on TwelveData
-const SYMBOL = 'DJI';
+// DIA = Dow Jones ETF (free tier proxy for DJ30 on TwelveData)
+const SYMBOL = 'DIA';
 
 async function fetchCandles(interval, outputSize = 100) {
   if (!API_KEY || API_KEY === 'your_api_key_here') {
