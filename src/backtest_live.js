@@ -1,7 +1,7 @@
 'use strict';
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  XAUUSD ICT LIVE BACKTEST — Last Week (real TwelveData candles)
+//  XAUUSD ICT LIVE BACKTEST — Last 2 Weeks (real TwelveData candles)
 //  Fetches actual OHLCV data, rolls the ICT engine bar-by-bar,
 //  records every signal that would have fired, simulates outcomes,
 //  and prints a full report.
@@ -24,23 +24,26 @@ const SYMBOL = 'XAU/USD';
 
 // ─── Date helpers ────────────────────────────────────────────────────────────
 
-function lastWeekRange() {
-  // Today is Sunday 8 Jun 2026 — last week Mon 2 Jun → Fri 6 Jun
+function lastTwoWeeksRange() {
+  // Returns Mon 2 weeks ago → Fri of most recent completed week
   const now = new Date();
   const day = now.getUTCDay(); // 0=Sun
-  const daysToLastMon = day === 0 ? 6 : day + 6;
-  const lastMon = new Date(now);
-  lastMon.setUTCDate(now.getUTCDate() - daysToLastMon);
-  lastMon.setUTCHours(0, 0, 0, 0);
-
-  const lastFri = new Date(lastMon);
-  lastFri.setUTCDate(lastMon.getUTCDate() + 4);
+  // End = last Friday
+  const daysToLastFri = day === 0 ? 1 : (day >= 6 ? day - 5 : day + 2);
+  const lastFri = new Date(now);
+  lastFri.setUTCDate(now.getUTCDate() - daysToLastFri);
   lastFri.setUTCHours(23, 59, 59, 0);
+  // Start = Mon 2 weeks before last Friday (14 days back from lastFri's Monday)
+  const lastMon = new Date(lastFri);
+  lastMon.setUTCDate(lastFri.getUTCDate() - 4); // same week Mon
+  const twoWeekMon = new Date(lastMon);
+  twoWeekMon.setUTCDate(lastMon.getUTCDate() - 7); // one week earlier
+  twoWeekMon.setUTCHours(0, 0, 0, 0);
 
   return {
-    start: lastMon,
+    start: twoWeekMon,
     end:   lastFri,
-    label: `${fmt(lastMon)} → ${fmt(lastFri)}`
+    label: `${fmt(twoWeekMon)} → ${fmt(lastFri)}`
   };
 }
 
@@ -63,35 +66,63 @@ function cacheKey(interval, outputsize) {
   return path.join(CACHE_DIR, `xau_${interval}_${outputsize}_${today}.json`);
 }
 
+// Find the best cached file for an interval (largest outputsize available today)
+function findBestCache(interval) {
+  const today = new Date().toISOString().slice(0, 10);
+  const files = fs.readdirSync(CACHE_DIR).filter(f => f.startsWith(`xau_${interval}_`) && f.endsWith(`_${today}.json`));
+  if (!files.length) return null;
+  // Pick the one with the largest outputsize
+  files.sort((a, b) => {
+    const sizeA = parseInt(a.split('_')[2]) || 0;
+    const sizeB = parseInt(b.split('_')[2]) || 0;
+    return sizeB - sizeA;
+  });
+  return path.join(CACHE_DIR, files[0]);
+}
+
 async function fetchHistorical(interval, outputsize) {
   const file = cacheKey(interval, outputsize);
   if (fs.existsSync(file)) {
     process.stdout.write(chalk.gray(` (cached)\n`));
     return JSON.parse(fs.readFileSync(file, 'utf8'));
   }
-  const r = await axios.get(`${BASE}/time_series`, {
-    params: {
-      symbol: SYMBOL,
-      interval,
-      outputsize,
-      apikey: KEY,
-      format: 'JSON',
-      timezone: 'UTC'
-    },
-    timeout: 15000
-  });
-  if (r.data.status === 'error') throw new Error(`TwelveData: ${r.data.message}`);
-  if (!r.data.values?.length) throw new Error('No data returned');
-  const candles = r.data.values.reverse().map(c => ({
-    time:   c.datetime,
-    open:   parseFloat(c.open),
-    high:   parseFloat(c.high),
-    low:    parseFloat(c.low),
-    close:  parseFloat(c.close),
-    volume: parseFloat(c.volume || 0)
-  }));
-  fs.writeFileSync(file, JSON.stringify(candles));
-  return candles;
+  // Use any cached file for this interval today if API credits exhausted
+  const bestCache = findBestCache(interval);
+  if (bestCache) {
+    process.stdout.write(chalk.yellow(` (using best available cache: ${path.basename(bestCache)})\n`));
+    return JSON.parse(fs.readFileSync(bestCache, 'utf8'));
+  }
+  // Retry up to 4 times with exponential backoff for rate limits
+  let lastErr;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (attempt > 0) {
+      const delay = [30000, 60000, 90000][attempt - 1] || 90000;
+      process.stdout.write(chalk.yellow(` (rate limited, retrying in ${delay/1000}s...)\n`));
+      await new Promise(r => setTimeout(r, delay));
+    }
+    try {
+      const r = await axios.get(`${BASE}/time_series`, {
+        params: { symbol: SYMBOL, interval, outputsize, apikey: KEY, format: 'JSON', timezone: 'UTC' },
+        timeout: 20000
+      });
+      if (r.data.status === 'error') throw new Error(`TwelveData: ${r.data.message}`);
+      if (!r.data.values?.length) throw new Error('No data returned');
+      const candles = r.data.values.reverse().map(c => ({
+        time:   c.datetime,
+        open:   parseFloat(c.open),
+        high:   parseFloat(c.high),
+        low:    parseFloat(c.low),
+        close:  parseFloat(c.close),
+        volume: parseFloat(c.volume || 0)
+      }));
+      fs.writeFileSync(file, JSON.stringify(candles));
+      return candles;
+    } catch (e) {
+      if (e.response?.status === 429 || e.message.includes('429')) { lastErr = e; continue; }
+      throw e;
+    }
+  }
+  throw lastErr || new Error('Max retries exceeded');
 }
 
 // Filter candles to a date range (inclusive)
@@ -170,42 +201,57 @@ function simulateOutcome(dir, entry, sl, tp1, tp2, futureCandles) {
 
 async function run() {
   console.clear();
-  console.log('\n' + chalk.bold.yellow('  ◆ XAUUSD ICT — LAST WEEK BACKTEST'));
+  console.log('\n' + chalk.bold.yellow('  ◆ XAUUSD ICT — LAST 2 WEEKS BACKTEST'));
   console.log(chalk.gray('  Fetching real historical data from TwelveData...\n'));
 
-  const range = lastWeekRange();
+  const range = lastTwoWeeksRange();
   console.log(chalk.gray(`  Period: ${range.label}\n`));
 
-  // Fetch enough history so HTF (daily/4H) has context before the week starts
-  // 5m: 5 days × 24h × 12 bars = 1440 bars for the week + 500 warmup = 1940 → use 2000
-  // 15m: ~700 bars
-  // 1H:  ~200 bars
-  // 4H:  ~80 bars
-  // Daily: 30 bars
+  // Fetch enough history so HTF (daily/4H) has context before 2-week period starts
+  // 5m: 10 days × 24h × 12 bars = 2880 bars + 500 warmup → use 3500
+  // 15m: ~1000 bars
+  // 1H:  ~300 bars
+  // 4H:  ~120 bars
+  // Daily: 40 bars
   const wait = ms => new Promise(r => setTimeout(r, ms));
 
-  console.log(chalk.gray('  Fetching 5m candles (2000 bars)...'));
-  const all5m   = await fetchHistorical('5min',  2000); await wait(20000);
-  console.log(chalk.gray('  Fetching 15m candles (700 bars)...'));
-  const all15m  = await fetchHistorical('15min', 700);  await wait(20000);
-  console.log(chalk.gray('  Fetching 1H candles (200 bars)...'));
-  const allH1   = await fetchHistorical('1h',    200);  await wait(20000);
-  console.log(chalk.gray('  Fetching 4H candles (80 bars)...'));
-  const allH4   = await fetchHistorical('4h',    80);   await wait(20000);
-  console.log(chalk.gray('  Fetching Daily candles (30 bars)...'));
-  const allDaily = await fetchHistorical('1day', 30);
-  console.log(chalk.green('  ✓ Data loaded\n'));
+  async function tryFetch(label, interval, size) {
+    process.stdout.write(chalk.gray(`  Fetching ${label}...`));
+    try {
+      const d = await fetchHistorical(interval, size);
+      if (!d.length) throw new Error('empty');
+      return d;
+    } catch (e) {
+      process.stdout.write(chalk.yellow(` (skipped: ${e.message.slice(0,60)})\n`));
+      return null;
+    }
+  }
+
+  const all5m    = await tryFetch('5m candles (3500)', '5min', 3500);
+  if (!all5m) { console.log(chalk.red('  Fatal: 5m data unavailable.')); return; }
+  await wait(25000);
+  const all15m   = await tryFetch('15m candles (1000)', '15min', 1000) || rollup(all5m, 3);
+  await wait(5000);
+  const allH1    = await tryFetch('1H candles (300)', '1h', 300)        || rollup(all5m, 12);
+  await wait(5000);
+  const allH4Raw = await tryFetch('4H candles (120)', '4h', 120);
+  await wait(5000);
+  const allH4    = allH4Raw || rollup(allH1, 4);
+  const allDailyRaw = await tryFetch('Daily candles (40)', '1day', 40);
+  const allDaily = allDailyRaw || rollup(allH1, 24);
+  console.log(chalk.green('  ✓ Data assembled\n'));
 
   // Candles inside last week only (for iteration)
+  const MIN_SCORE = 70;
   const week5m = inRange(all5m, range.start, range.end);
+  console.log(chalk.gray(`  Period: ${range.label}  (2 weeks)  Min score: ${MIN_SCORE}%`));
   console.log(chalk.gray(`  5m candles in range: ${week5m.length}`));
   if (week5m.length === 0) {
-    console.log(chalk.red('  No 5m candles found for last week — market may have been closed or dates off.'));
+    console.log(chalk.red('  No 5m candles found for last 2 weeks — market may have been closed or dates off.'));
     return;
   }
 
-  const signals = [];
-  const MIN_SCORE = 70;      // raised: only Grade B+ setups
+  const signals = [];      // raised: only Grade B+ setups
   const COOLDOWN_BARS = 36;  // 3-hour cooldown (36 × 5m) — one trade per session window
   let lastSignalBar = -999;
 
@@ -298,7 +344,7 @@ async function run() {
   // ─── Print report ───────────────────────────────────────────────────────────
 
   console.log('\n' + '═'.repeat(72));
-  console.log(chalk.bold.yellow('  SIGNAL REPORT — XAUUSD — LAST WEEK'));
+  console.log(chalk.bold.yellow('  SIGNAL REPORT — XAUUSD — LAST 2 WEEKS'));
   console.log(chalk.gray(`  ${range.label}  |  Min confluence: ${MIN_SCORE}%`));
   console.log('═'.repeat(72));
 
@@ -367,7 +413,7 @@ async function run() {
   });
 
   console.log('\n\n' + '═'.repeat(72));
-  console.log(chalk.bold.yellow('  WEEKLY SUMMARY'));
+  console.log(chalk.bold.yellow('  2-WEEK SUMMARY'));
   console.log('═'.repeat(72));
   console.log(chalk.gray('  Total signals:    ') + chalk.white(signals.length));
   console.log(chalk.gray('  Closed trades:    ') + chalk.white(closed.length));
@@ -408,14 +454,14 @@ async function run() {
 
   // ─── Save JSON report ────────────────────────────────────────────────────────
 
-  const reportPath = path.join(__dirname, '..', 'backtest_report_lastweek.json');
+  const reportPath = path.join(__dirname, '..', 'backtest_report_2weeks.json');
   fs.writeFileSync(reportPath, JSON.stringify({
     period: range.label,
     generatedAt: new Date().toISOString(),
     signals: signals.map(s => ({ ...s, reasons: undefined })),
     stats: { total: signals.length, wins: wins.length, losses: losses.length, winRate: wr+'%', netR: totalR.toFixed(2), profitFactor: pf }
   }, null, 2));
-  console.log(chalk.gray(`\n  JSON report saved → backtest_report_lastweek.json`));
+  console.log(chalk.gray(`\n  JSON report saved → backtest_report_2weeks.json`));
   console.log('\n' + '═'.repeat(72) + '\n');
 }
 
