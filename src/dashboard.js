@@ -380,7 +380,8 @@ let ws, reconnectTimer;
 const seenSignals = new Set();
 
 function connect() {
-  ws = new WebSocket('ws://' + location.host);
+  const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+  ws = new WebSocket(proto + location.host);
   ws.onopen = () => {
     document.getElementById('live-dot').className  = 'dot live';
     document.getElementById('live-text').textContent = 'Live';
