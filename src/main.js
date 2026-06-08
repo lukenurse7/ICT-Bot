@@ -10,6 +10,7 @@ require('dotenv').config();
 const chalk = require('chalk');
 const cron  = require('node-cron');
 const { publishSignal, updateStatus, startServer } = require('./signal_server');
+const tg = require('./telegram');
 
 // ─── XAUUSD engine ──────────────────────────────────────────────────────
 const { fetchAll: xauFetch }            = require('./data_xau');
@@ -82,7 +83,8 @@ async function scanXAU() {
 
       if (!dup) {
         printXauSignal(result.signal);
-        publishSignal(result.signal);   // → signal server → MT5 bridge
+        publishSignal(result.signal);
+        tg.send(tg.signalMessage(result.signal));  // → Telegram
         s.lastTime = now;
         s.lastDir  = result.signal.direction;
       } else {
@@ -147,6 +149,7 @@ async function scanDJ30() {
       console.log(chalk.gray(`  TP2    `) + chalk.green(fmtP(sig.tp2)));
       console.log(chalk.bold.white('═'.repeat(62)) + '\n');
 
+      tg.send(tg.signalMessage({ ...sig, instrument: 'DJ30' }));  // → Telegram
       s.lastTime = now;
       s.lastDir  = sig.direction;
     }
