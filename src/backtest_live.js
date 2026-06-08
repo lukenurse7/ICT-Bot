@@ -53,9 +53,22 @@ function fmtDT(iso) {
   return `${fmt(d)} ${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')} UTC`;
 }
 
-// ─── Data fetch ──────────────────────────────────────────────────────────────
+// ─── Data fetch with disk cache ──────────────────────────────────────────────
+
+const CACHE_DIR = path.join(__dirname, '..', '.cache');
+if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR);
+
+function cacheKey(interval, outputsize) {
+  const today = new Date().toISOString().slice(0, 10);
+  return path.join(CACHE_DIR, `xau_${interval}_${outputsize}_${today}.json`);
+}
 
 async function fetchHistorical(interval, outputsize) {
+  const file = cacheKey(interval, outputsize);
+  if (fs.existsSync(file)) {
+    process.stdout.write(chalk.gray(` (cached)\n`));
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
+  }
   const r = await axios.get(`${BASE}/time_series`, {
     params: {
       symbol: SYMBOL,
@@ -69,7 +82,7 @@ async function fetchHistorical(interval, outputsize) {
   });
   if (r.data.status === 'error') throw new Error(`TwelveData: ${r.data.message}`);
   if (!r.data.values?.length) throw new Error('No data returned');
-  return r.data.values.reverse().map(c => ({
+  const candles = r.data.values.reverse().map(c => ({
     time:   c.datetime,
     open:   parseFloat(c.open),
     high:   parseFloat(c.high),
@@ -77,6 +90,8 @@ async function fetchHistorical(interval, outputsize) {
     close:  parseFloat(c.close),
     volume: parseFloat(c.volume || 0)
   }));
+  fs.writeFileSync(file, JSON.stringify(candles));
+  return candles;
 }
 
 // Filter candles to a date range (inclusive)
@@ -170,13 +185,13 @@ async function run() {
   const wait = ms => new Promise(r => setTimeout(r, ms));
 
   console.log(chalk.gray('  Fetching 5m candles (2000 bars)...'));
-  const all5m   = await fetchHistorical('5min',  2000); await wait(15000);
+  const all5m   = await fetchHistorical('5min',  2000); await wait(20000);
   console.log(chalk.gray('  Fetching 15m candles (700 bars)...'));
-  const all15m  = await fetchHistorical('15min', 700);  await wait(15000);
+  const all15m  = await fetchHistorical('15min', 700);  await wait(20000);
   console.log(chalk.gray('  Fetching 1H candles (200 bars)...'));
-  const allH1   = await fetchHistorical('1h',    200);  await wait(15000);
+  const allH1   = await fetchHistorical('1h',    200);  await wait(20000);
   console.log(chalk.gray('  Fetching 4H candles (80 bars)...'));
-  const allH4   = await fetchHistorical('4h',    80);   await wait(15000);
+  const allH4   = await fetchHistorical('4h',    80);   await wait(20000);
   console.log(chalk.gray('  Fetching Daily candles (30 bars)...'));
   const allDaily = await fetchHistorical('1day', 30);
   console.log(chalk.green('  ✓ Data loaded\n'));

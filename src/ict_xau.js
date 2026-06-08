@@ -163,19 +163,19 @@ function detectLiquiditySweep(candles5m, levels, htfBiasResult) {
   // Also detect equal highs/lows on recent 5m swings as liquidity pools
   const m5Swings = findSwings(candles5m.slice(-60), 2);
 
-  // Equal lows (SSL) — two swing lows within 0.3% of each other
+  // Equal lows (SSL) — two swing lows within 0.15% of each other (tightened from 0.3%)
   const eqLows = [];
   for (let i = 0; i < m5Swings.lows.length - 1; i++) {
     const l1 = m5Swings.lows[i], l2 = m5Swings.lows[i + 1];
     const diff = Math.abs(l1.price - l2.price) / l1.price;
-    if (diff < 0.003) eqLows.push({ price: (l1.price + l2.price) / 2, time: l2.time, label: 'Equal Lows (SSL)' });
+    if (diff < 0.0015) eqLows.push({ price: (l1.price + l2.price) / 2, time: l2.time, label: 'Equal Lows (SSL)' });
   }
-  // Equal highs (BSL)
+  // Equal highs (BSL) — tightened to 0.15%
   const eqHighs = [];
   for (let i = 0; i < m5Swings.highs.length - 1; i++) {
     const h1 = m5Swings.highs[i], h2 = m5Swings.highs[i + 1];
     const diff = Math.abs(h1.price - h2.price) / h1.price;
-    if (diff < 0.003) eqHighs.push({ price: (h1.price + h2.price) / 2, time: h2.time, label: 'Equal Highs (BSL)' });
+    if (diff < 0.0015) eqHighs.push({ price: (h1.price + h2.price) / 2, time: h2.time, label: 'Equal Highs (BSL)' });
   }
 
   if (bullAllowed) {
@@ -390,20 +390,25 @@ function findOrderBlock(candles5m, sweepResult) {
 
 // ─── 7. TP / SL CALCULATION ──────────────────────────────────────────────────
 
-function calcLevels(dir, entry, sweep, levels, fvg, candles5m) {
-  const isLong = dir === 'bull';
+// Max risk in points — signals with wider stops are skipped
+const MAX_RISK_PTS = 15;
 
-  // SL: below sweep low (long) or above sweep high (short), +buffer
-  const buf = entry * 0.0008; // 0.08% buffer (approx $2.50 on $3100 gold)
+function calcLevels(dir, entry, sweep, levels, fvg, ob) {
+  const isLong = dir === 'bull';
+  const buf = entry * 0.0008; // ~$3.50 buffer on $4300 gold
+
   let sl;
   if (isLong) {
-    sl = sweep.sweepLow !== undefined
-      ? sweep.sweepLow - buf
-      : entry - (entry * 0.004);
+    // SL below sweep low; also ensure it's below entry
+    const rawSL = sweep.sweepLow !== undefined ? sweep.sweepLow - buf : entry - entry * 0.004;
+    sl = Math.min(rawSL, entry - buf * 2);
   } else {
-    sl = sweep.sweepHigh !== undefined
-      ? sweep.sweepHigh + buf
-      : entry + (entry * 0.004);
+    // SL above sweep high; also ensure it's above entry and above OB/FVG top
+    const sweepSL  = sweep.sweepHigh !== undefined ? sweep.sweepHigh + buf : entry + entry * 0.004;
+    const obSL     = ob?.high ? ob.high + buf : 0;
+    const fvgSL    = fvg?.top ? fvg.top + buf : 0;
+    const rawSL    = Math.max(sweepSL, obSL, fvgSL);
+    sl = Math.max(rawSL, entry + buf * 2); // guarantee SL > entry
   }
 
   const risk = Math.abs(entry - sl);
@@ -549,13 +554,25 @@ function runAnalysis(data, asiaRange, sessionStatus) {
   const dir = sweepResult.mostRecent?.dir;
   const minScore = parseInt(process.env.MIN_CONFLUENCE || '60');
 
-  // Only fire when price has actually pulled back INTO the FVG (or no FVG — use OB)
-  // Prevents entering at a price that doesn't exist yet
-  const fvgReady = !fvg || fvg.inFVG;
+  // Require FVG for entry (33% win rate without vs 63% with)
+  // AND price must be inside the FVG zone (no premature entries)
+  const fvgReady = fvg && fvg.inFVG;
 
   if (dir && mss.confirmed && confluence.score >= minScore && fvgReady) {
-    const entryPrice = fvg?.optimalEntry || ob?.eq || quote.price;
-    const levels = calcLevels(dir, entryPrice, sweepResult.mostRecent, lvls, fvg, m5);
+    const entryPrice = fvg.optimalEntry;
+    const levels = calcLevels(dir, entryPrice, sweepResult.mostRecent, lvls, fvg, ob);
+
+    // Skip if SL is still wrong side or risk is too wide
+    const slValid = dir === 'bull' ? levels.sl < levels.entry : levels.sl > levels.entry;
+    if (!slValid || levels.riskPoints > MAX_RISK_PTS) {
+      return {
+        htf, lvls, sweepResult, mss, fvg, ob, confluence,
+        signal: null, quote,
+        waitReason: !slValid
+          ? 'Setup invalid — SL calculation error, skipping'
+          : `Risk too wide (${levels.riskPoints.toFixed(1)}pts > ${MAX_RISK_PTS}pts max) — waiting for tighter setup`
+      };
+    }
 
     signal = {
       direction:   dir === 'bull' ? 'BUY' : 'SELL',
@@ -594,13 +611,13 @@ function runAnalysis(data, asiaRange, sessionStatus) {
     signal, quote,
     canUpdate: !!sweepResult.mostRecent,
     waitReason: !sweepResult.mostRecent
-      ? 'Waiting for liquidity sweep'
+      ? 'Waiting for liquidity sweep on key levels'
       : !mss.confirmed
-      ? `Sweep found on ${sweepResult.mostRecent.levelName} — waiting for MSS`
+      ? `Sweep on ${sweepResult.mostRecent.levelName} — waiting for 5m MSS/BOS`
       : !fvg
-      ? 'MSS confirmed — waiting for FVG to form'
+      ? 'MSS confirmed — waiting for FVG to form from displacement'
       : !fvg.inFVG
-      ? `FVG at ${fvg.entryZone} — waiting for price to pull back INTO the zone`
+      ? `FVG at ${fvg.entryZone} — waiting for pullback INTO the zone`
       : null
   };
 }
