@@ -5,7 +5,8 @@
   "main": "src/bot.js",
   "scripts": {
     "start": "node src/bot.js",
-    "dashboard": "node src/dashboard.js"
+    "dashboard": "node src/dashboard.js",
+    "backtest": "node src/backtest.js"
   },
   "dependencies": {
     "axios": "^1.6.0",
