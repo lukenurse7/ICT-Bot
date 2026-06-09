@@ -10,6 +10,7 @@ const { sessionStatus, getAsiaSessionBounds, isWeekday } = require('./sessions')
 const { fetchAllData: dj30Fetch }     = require('./data');
 const { runICTAnalysis }              = require('./ict');
 const { isKillZone, killZoneStatus }  = require('./killzone');
+const { send: tgSend, signalMessage }   = require('./telegram');
 
 const app    = express();
 const server = http.createServer(app);
@@ -28,11 +29,10 @@ function broadcast(data) {
 // ─── XAUUSD scan ─────────────────────────────────────────────────────────────
 async function scanXAU() {
   if (!isWeekday()) return;
-  const session     = sessionStatus();
-  const alwaysActive = { ...session, active: true };
-  const data        = await xauFetch();
-  const asia        = getAsiaSessionBounds(data.h1);
-  const result      = runAnalysis(data, asia, alwaysActive);
+  const session = sessionStatus();
+  const data    = await xauFetch();
+  const asia    = getAsiaSessionBounds(data.h1);
+  const result  = runAnalysis(data, asia, session);
 
   latestXAU = {
     price:      result.quote.price,
@@ -58,6 +58,7 @@ async function scanXAU() {
     signalHistory.unshift(sig);
     if (signalHistory.length > 20) signalHistory.pop();
     broadcast({ type: 'signal', signal: sig });
+    tgSend(signalMessage(sig)).catch(() => {});
   }
 
   return latestXAU;
@@ -65,9 +66,10 @@ async function scanXAU() {
 
 // ─── DJ30 scan ───────────────────────────────────────────────────────────────
 async function scanDJ30() {
-  const kz = killZoneStatus();
-  const { candles15m, candles5m, quote } = await dj30Fetch();
-  const analysis = runICTAnalysis(candles15m, candles5m);
+  const kz   = killZoneStatus();
+  const data = await dj30Fetch();
+  const { quote } = data;
+  const analysis = runICTAnalysis(data);
 
   latestDJ30 = {
     price:     quote.price,
@@ -75,19 +77,22 @@ async function scanDJ30() {
     bias:      analysis.bias,
     kzActive:  isKillZone(),
     kzStatus:  kz.message,
+    sweep:     analysis.sweep,
     mss:       analysis.mss,
-    liquidity: analysis.liquidity,
+    fvg:       analysis.fvg,
+    confluence: analysis.confluence,
+    htfAligned: analysis.htfAligned,
+    signal:    analysis.signal,
     signals:   isKillZone() ? analysis.signals : [],
     timestamp: new Date().toISOString()
   };
 
-  if (isKillZone() && analysis.signals.length > 0) {
-    for (const s of analysis.signals) {
-      const sig = { ...s, instrument: 'DJ30', id: `DJ30_${Date.now()}` };
-      signalHistory.unshift(sig);
-      if (signalHistory.length > 20) signalHistory.pop();
-      broadcast({ type: 'signal', signal: sig });
-    }
+  if (isKillZone() && analysis.signal) {
+    const sig = { ...analysis.signal, instrument: 'DJ30', id: `DJ30_${Date.now()}` };
+    signalHistory.unshift(sig);
+    if (signalHistory.length > 20) signalHistory.pop();
+    broadcast({ type: 'signal', signal: sig });
+    tgSend(signalMessage(sig)).catch(() => {});
   }
 
   return latestDJ30;

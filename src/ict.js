@@ -1,354 +1,347 @@
 'use strict';
 
-// ─── ICT Analysis Engine ───────────────────────────────────────────────────
-// Implements: MSS/BOS/CHoCH, Order Blocks, FVG, Liquidity Pools, EQ levels
+// ─── DJ30 ICT Analysis Engine ─────────────────────────────────────────────────
+// Same methodology as ict_xau.js: HTF Bias → Sweep → MSS → FVG entry
+// Kill zone (London 07-09 UTC / NY 12-15 UTC) is enforced by the caller
 
-function detectMarketStructure(candles) {
-  // candles: array of { time, open, high, low, close }
-  // Returns swing highs/lows and structure direction
-  const swingHighs = [];
-  const swingLows = [];
-
-  for (let i = 2; i < candles.length - 2; i++) {
-    const c = candles[i];
-    // Swing high: higher than 2 candles on each side
-    if (
-      c.high > candles[i - 1].high &&
-      c.high > candles[i - 2].high &&
-      c.high > candles[i + 1].high &&
-      c.high > candles[i + 2].high
-    ) {
-      swingHighs.push({ index: i, price: c.high, time: c.time });
+// ─── HTF Bias ─────────────────────────────────────────────────────────────────
+function htfBias(dailyCandles, h4Candles) {
+  function swings(arr) {
+    const highs = [], lows = [];
+    for (let i = 2; i < arr.length - 2; i++) {
+      const c = arr[i];
+      if (c.high > arr[i-1].high && c.high > arr[i-2].high && c.high > arr[i+1].high && c.high > arr[i+2].high)
+        highs.push(c.high);
+      if (c.low  < arr[i-1].low  && c.low  < arr[i-2].low  && c.low  < arr[i+1].low  && c.low  < arr[i+2].low)
+        lows.push(c.low);
     }
-    // Swing low: lower than 2 candles on each side
-    if (
-      c.low < candles[i - 1].low &&
-      c.low < candles[i - 2].low &&
-      c.low < candles[i + 1].low &&
-      c.low < candles[i + 2].low
-    ) {
-      swingLows.push({ index: i, price: c.low, time: c.time });
-    }
+    return { highs, lows };
   }
 
-  // Determine HTF bias from last 3 swing highs/lows
-  const lastHighs = swingHighs.slice(-3);
-  const lastLows = swingLows.slice(-3);
-  let bias = 'ranging';
-
-  if (lastHighs.length >= 2 && lastLows.length >= 2) {
-    const hhPattern = lastHighs[lastHighs.length - 1].price > lastHighs[lastHighs.length - 2].price;
-    const hlPattern = lastLows[lastLows.length - 1].price > lastLows[lastLows.length - 2].price;
-    const lhPattern = lastHighs[lastHighs.length - 1].price < lastHighs[lastHighs.length - 2].price;
-    const llPattern = lastLows[lastLows.length - 1].price < lastLows[lastLows.length - 2].price;
-
-    if (hhPattern && hlPattern) bias = 'bullish';
-    else if (lhPattern && llPattern) bias = 'bearish';
+  function bias(swg) {
+    const { highs, lows } = swg;
+    if (highs.length < 2 || lows.length < 2) return 'ranging';
+    const hh = highs[highs.length-1] > highs[highs.length-2];
+    const hl = lows[lows.length-1]   > lows[lows.length-2];
+    const lh = highs[highs.length-1] < highs[highs.length-2];
+    const ll = lows[lows.length-1]   < lows[lows.length-2];
+    if (hh && hl) return 'bullish';
+    if (lh && ll) return 'bearish';
+    return 'ranging';
   }
 
-  // Detect MSS — price breaking a previous swing high/low
-  const lastCandle = candles[candles.length - 1];
-  let mss = null;
+  const daily = bias(swings(dailyCandles));
+  const h4    = bias(swings(h4Candles));
 
-  if (lastHighs.length >= 2) {
-    const prevSwingHigh = lastHighs[lastHighs.length - 2];
-    if (lastCandle.close > prevSwingHigh.price) {
-      mss = { type: 'bullish_bos', level: prevSwingHigh.price, time: lastCandle.time };
-    }
-  }
-  if (lastLows.length >= 2) {
-    const prevSwingLow = lastLows[lastLows.length - 2];
-    if (lastCandle.close < prevSwingLow.price) {
-      mss = { type: 'bearish_bos', level: prevSwingLow.price, time: lastCandle.time };
-    }
-  }
-
-  return { bias, swingHighs, swingLows, mss };
+  if (daily === 'bullish' && h4 === 'bullish') return 'bullish';
+  if (daily === 'bearish' && h4 === 'bearish') return 'bearish';
+  if (daily === 'bullish' && h4 === 'bearish') return 'pullback_in_bull';
+  if (daily === 'bearish' && h4 === 'bullish') return 'pullback_in_bear';
+  return 'ranging';
 }
 
-function findOrderBlocks(candles, bias) {
-  // OB = last down candle before a bullish move up (bullish OB)
-  //      last up candle before a bearish move down (bearish OB)
-  const obs = [];
+// ─── Liquidity Sweep Detection ────────────────────────────────────────────────
+function detectSweep(candles15m, candles5m) {
+  const LOOKBACK = 50;
+  const recent15 = candles15m.slice(-LOOKBACK);
+  const last5    = candles5m[candles5m.length - 1];
 
-  for (let i = 1; i < candles.length - 3; i++) {
-    const c = candles[i];
-    const next1 = candles[i + 1];
-    const next2 = candles[i + 2];
-    const next3 = candles[i + 3];
+  // Collect significant swing levels from 15m
+  const levels = [];
 
-    // Bullish OB: bearish candle followed by 3 bullish closes above it
-    if (
-      c.close < c.open &&
-      next1.close > c.high &&
-      next2.close > c.high &&
-      next3.close > c.high
-    ) {
-      obs.push({
-        type: 'bullish',
-        high: c.high,
-        low: c.low,
-        eq: (c.high + c.low) / 2,
-        time: c.time,
-        index: i,
-        mitigated: false
-      });
-    }
-
-    // Bearish OB: bullish candle followed by 3 bearish closes below it
-    if (
-      c.close > c.open &&
-      next1.close < c.low &&
-      next2.close < c.low &&
-      next3.close < c.low
-    ) {
-      obs.push({
-        type: 'bearish',
-        high: c.high,
-        low: c.low,
-        eq: (c.high + c.low) / 2,
-        time: c.time,
-        index: i,
-        mitigated: false
-      });
-    }
+  // Equal highs (BSL)
+  for (let i = 2; i < recent15.length - 1; i++) {
+    const c = recent15[i];
+    const prev = recent15.slice(Math.max(0, i-10), i);
+    const eqHigh = prev.find(p => Math.abs(p.high - c.high) / c.high < 0.0005);
+    if (eqHigh) levels.push({ price: Math.max(c.high, eqHigh.high), type: 'BSL', name: 'Equal Highs (BSL)' });
   }
 
-  // Mark mitigated OBs (price has traded back through them)
-  const lastClose = candles[candles.length - 1].close;
-  for (const ob of obs) {
-    if (ob.type === 'bullish' && lastClose < ob.low) ob.mitigated = true;
-    if (ob.type === 'bearish' && lastClose > ob.high) ob.mitigated = true;
+  // Equal lows (SSL)
+  for (let i = 2; i < recent15.length - 1; i++) {
+    const c = recent15[i];
+    const prev = recent15.slice(Math.max(0, i-10), i);
+    const eqLow = prev.find(p => Math.abs(p.low - c.low) / c.low < 0.0005);
+    if (eqLow) levels.push({ price: Math.min(c.low, eqLow.low), type: 'SSL', name: 'Equal Lows (SSL)' });
   }
 
-  // Return most recent unmitigated OBs
-  const active = obs.filter(o => !o.mitigated);
-  const nearest = {
-    bullish: active.filter(o => o.type === 'bullish').slice(-1)[0] || null,
-    bearish: active.filter(o => o.type === 'bearish').slice(-1)[0] || null
-  };
+  // Prev day high/low
+  const yesterday = candles15m.slice(-100).filter(c => {
+    const d = new Date(c.time); return d.getUTCHours() >= 21 || d.getUTCHours() < 2;
+  });
+  if (yesterday.length) {
+    const pdh = Math.max(...yesterday.map(c => c.high));
+    const pdl = Math.min(...yesterday.map(c => c.low));
+    levels.push({ price: pdh, type: 'BSL', name: 'Prev Day High' });
+    levels.push({ price: pdl, type: 'SSL', name: 'Prev Day Low' });
+  }
 
-  return nearest;
-}
-
-function findFairValueGaps(candles) {
-  // FVG = 3-candle pattern where candle[i+2].low > candle[i].high (bullish)
-  //       or candle[i+2].high < candle[i].low (bearish)
-  const fvgs = [];
-
-  for (let i = 0; i < candles.length - 2; i++) {
-    const c0 = candles[i];
-    const c2 = candles[i + 2];
-
-    // Bullish FVG
-    if (c2.low > c0.high) {
-      fvgs.push({
-        type: 'bullish',
-        top: c2.low,
-        bottom: c0.high,
-        mid: (c2.low + c0.high) / 2,
-        time: candles[i + 1].time,
-        filled: false
-      });
+  // Check for sweep: last 5m candle wicked above BSL or below SSL then closed back
+  const results = [];
+  for (const lvl of levels) {
+    if (lvl.type === 'BSL' && last5.high > lvl.price && last5.close < lvl.price) {
+      results.push({ dir: 'bear', level: lvl.price, levelName: lvl.name, barsAgo: 0 });
     }
-
-    // Bearish FVG
-    if (c2.high < c0.low) {
-      fvgs.push({
-        type: 'bearish',
-        top: c0.low,
-        bottom: c2.high,
-        mid: (c0.low + c2.high) / 2,
-        time: candles[i + 1].time,
-        filled: false
-      });
+    if (lvl.type === 'SSL' && last5.low < lvl.price && last5.close > lvl.price) {
+      results.push({ dir: 'bull', level: lvl.price, levelName: lvl.name, barsAgo: 0 });
     }
   }
 
-  // Mark filled FVGs
-  const lastCandle = candles[candles.length - 1];
-  for (const fvg of fvgs) {
-    if (fvg.type === 'bullish' && lastCandle.low <= fvg.bottom) fvg.filled = true;
-    if (fvg.type === 'bearish' && lastCandle.high >= fvg.top) fvg.filled = true;
-  }
-
-  const active = fvgs.filter(f => !f.filled);
-  return {
-    bullish: active.filter(f => f.type === 'bullish').slice(-1)[0] || null,
-    bearish: active.filter(f => f.type === 'bearish').slice(-1)[0] || null,
-    all: active.slice(-5)
-  };
-}
-
-function findLiquidityPools(candles) {
-  // SSL: equal lows / recent swing lows (resting sell-side liquidity)
-  // BSL: equal highs / recent swing highs (resting buy-side liquidity)
-  const recent = candles.slice(-50);
-  const highs = recent.map(c => c.high).sort((a, b) => b - a);
-  const lows = recent.map(c => c.low).sort((a, b) => a - b);
-
-  // Cluster nearby highs/lows (within 20 pts) as equal levels
-  function cluster(arr, threshold = 20) {
-    const pools = [];
-    let i = 0;
-    while (i < arr.length) {
-      let group = [arr[i]];
-      let j = i + 1;
-      while (j < arr.length && Math.abs(arr[j] - arr[i]) < threshold) {
-        group.push(arr[j]);
-        j++;
+  // Also check recent 5m history for sweeps in last 12 bars
+  for (let back = 1; back <= 12; back++) {
+    const idx = candles5m.length - 1 - back;
+    if (idx < 0) break;
+    const c = candles5m[idx];
+    for (const lvl of levels) {
+      if (lvl.type === 'BSL' && c.high > lvl.price && c.close < lvl.price) {
+        results.push({ dir: 'bear', level: lvl.price, levelName: lvl.name, barsAgo: back });
       }
-      if (group.length >= 2) {
-        pools.push(group.reduce((a, b) => a + b, 0) / group.length);
+      if (lvl.type === 'SSL' && c.low < lvl.price && c.close > lvl.price) {
+        results.push({ dir: 'bull', level: lvl.price, levelName: lvl.name, barsAgo: back });
       }
-      i = j;
     }
-    return pools;
   }
 
-  const bsl = cluster(highs).slice(0, 3); // buy-side liquidity above
-  const ssl = cluster(lows).slice(0, 3);  // sell-side liquidity below
+  // Most recent sweep
+  if (!results.length) return { detected: false };
+  results.sort((a, b) => a.barsAgo - b.barsAgo);
+  return { detected: true, ...results[0] };
+}
 
-  const currentPrice = candles[candles.length - 1].close;
+// ─── Market Structure Shift ───────────────────────────────────────────────────
+function detectMSS(candles5m, sweepDir) {
+  const window = candles5m.slice(-20);
+  if (window.length < 5) return { confirmed: false };
+
+  if (sweepDir === 'bear') {
+    // After BSL sweep, look for BOS down (close below recent swing low) or CHoCH
+    let swingLow = Infinity;
+    for (let i = 0; i < window.length - 3; i++) {
+      const c = window[i];
+      if (c.low < window[Math.max(0,i-1)]?.low && c.low < window[i+1]?.low) {
+        swingLow = Math.min(swingLow, c.low);
+      }
+    }
+    const last = window[window.length - 1];
+    if (swingLow < Infinity && last.close < swingLow) {
+      return { confirmed: true, type: 'BOS_DOWN', level: swingLow, description: 'Broke below swing low' };
+    }
+    // CHoCH: last candle closes below prev candle low after sweep
+    const prev = window[window.length - 2];
+    if (last.close < prev.low) {
+      return { confirmed: true, type: 'CHoCH', level: prev.low, description: 'Change of character down' };
+    }
+  }
+
+  if (sweepDir === 'bull') {
+    let swingHigh = -Infinity;
+    for (let i = 0; i < window.length - 3; i++) {
+      const c = window[i];
+      if (c.high > window[Math.max(0,i-1)]?.high && c.high > window[i+1]?.high) {
+        swingHigh = Math.max(swingHigh, c.high);
+      }
+    }
+    const last = window[window.length - 1];
+    if (swingHigh > -Infinity && last.close > swingHigh) {
+      return { confirmed: true, type: 'BOS_UP', level: swingHigh, description: 'Broke above swing high' };
+    }
+    const prev = window[window.length - 2];
+    if (last.close > prev.high) {
+      return { confirmed: true, type: 'CHoCH', level: prev.high, description: 'Change of character up' };
+    }
+  }
+
+  return { confirmed: false };
+}
+
+// ─── FVG with Confirmation Candle ─────────────────────────────────────────────
+function detectFVG(candles5m, sweepDir) {
+  const window = candles5m.slice(-30);
+
+  const candidates = [];
+  for (let i = 0; i < window.length - 2; i++) {
+    const c0 = window[i], c2 = window[i + 2];
+    if (sweepDir === 'bear' && c2.high < c0.low) {
+      const size = c0.low - c2.high;
+      if (size > 0) candidates.push({ top: c0.low, bottom: c2.high, size, idx: i + 1 });
+    }
+    if (sweepDir === 'bull' && c2.low > c0.high) {
+      const size = c2.low - c0.high;
+      if (size > 0) candidates.push({ top: c2.low, bottom: c0.high, size, idx: i + 1 });
+    }
+  }
+
+  if (!candidates.length) return { found: false };
+
+  // Best = largest unfilled FVG
+  const best = candidates.slice(-3).sort((a, b) => b.size - a.size)[0];
+
+  // Confirmation candle: prev candle wicked into FVG and closed back out
+  const prevCandle = window[window.length - 2];
+  let confirmedEntry = false;
+
+  if (sweepDir === 'bear') {
+    const wickedIn  = prevCandle.high >= best.bottom;
+    const closedBack = prevCandle.close <= best.top;
+    const wickDepth = prevCandle.high - best.bottom;
+    confirmedEntry = wickedIn && closedBack && wickDepth >= best.size * 0.5;
+  } else {
+    const wickedIn  = prevCandle.low <= best.top;
+    const closedBack = prevCandle.close >= best.bottom;
+    const wickDepth = best.top - prevCandle.low;
+    confirmedEntry = wickedIn && closedBack && wickDepth >= best.size * 0.5;
+  }
 
   return {
-    bsl: bsl.filter(p => p > currentPrice),
-    ssl: ssl.filter(p => p < currentPrice),
-    nearestBSL: bsl.find(p => p > currentPrice) || null,
-    nearestSSL: ssl.find(p => p < currentPrice) || null
+    found: true,
+    top: best.top,
+    bottom: best.bottom,
+    size: best.size,
+    entryZone: `${best.bottom.toFixed(2)}–${best.top.toFixed(2)}`,
+    inFVG: confirmedEntry
   };
 }
 
-function scoreConfluence(analysis, currentPrice, direction) {
+// ─── Liquidity-based TPs ──────────────────────────────────────────────────────
+function liquidityTPs(dir, entry, risk, candles5m, h1Candles) {
+  const isLong = dir === 'bull';
+  const minTP = isLong ? entry + risk * 1.5 : entry - risk * 1.5;
+  const maxR  = 4.0;
+
+  const candidates = [];
+
+  // 5m equal lows/highs
+  const c5 = candles5m.slice(-60);
+  for (let i = 2; i < c5.length - 1; i++) {
+    const c = c5[i];
+    const prev = c5.slice(Math.max(0, i-8), i);
+    if (isLong) {
+      const eq = prev.find(p => Math.abs(p.high - c.high) / c.high < 0.001);
+      if (eq) candidates.push({ price: Math.max(c.high, eq.high), desc: '5m equal highs' });
+    } else {
+      const eq = prev.find(p => Math.abs(p.low - c.low) / c.low < 0.001);
+      if (eq) candidates.push({ price: Math.min(c.low, eq.low), desc: '5m equal lows' });
+    }
+  }
+
+  // 1H swing highs/lows
+  const c1h = h1Candles.slice(-24);
+  for (let i = 2; i < c1h.length - 2; i++) {
+    const c = c1h[i];
+    if (isLong) {
+      if (c.high > c1h[i-1].high && c.high > c1h[i-2].high && c.high > c1h[i+1].high)
+        candidates.push({ price: c.high, desc: '1H swing high' });
+    } else {
+      if (c.low < c1h[i-1].low && c.low < c1h[i-2].low && c.low < c1h[i+1].low)
+        candidates.push({ price: c.low, desc: '1H swing low' });
+    }
+  }
+
+  // Filter: must be in trade direction and within max R
+  const valid = candidates
+    .filter(t => isLong ? t.price > minTP && t.price < entry + risk * maxR
+                        : t.price < minTP && t.price > entry - risk * maxR)
+    .sort((a, b) => isLong ? a.price - b.price : b.price - a.price);
+
+  const tp2obj = valid[0] || { price: isLong ? entry + risk*2.5 : entry - risk*2.5, desc: 'Fixed 2.5R (no liquidity)' };
+  const tp3obj = valid[1] || { price: isLong ? entry + risk*3.5 : entry - risk*3.5, desc: 'Fixed 3.5R (no liquidity)' };
+
+  return { tp2: tp2obj.price, tp2Desc: tp2obj.desc, tp3: tp3obj.price, tp3Desc: tp3obj.desc };
+}
+
+// ─── Confluence Score ─────────────────────────────────────────────────────────
+function scoreConfluence(sweep, mss, fvg, htfBiasValue, dir) {
   let score = 0;
   const tags = [];
 
-  const { structure, orderBlocks, fvgs, liquidity } = analysis;
+  const htfAligned = (dir === 'bull' && (htfBiasValue === 'bullish' || htfBiasValue === 'pullback_in_bear'))
+                  || (dir === 'bear' && (htfBiasValue === 'bearish' || htfBiasValue === 'pullback_in_bull'));
 
-  // 1. HTF bias alignment
-  if (direction === 'long' && structure.bias === 'bullish') { score += 25; tags.push('HTF_BULL'); }
-  if (direction === 'short' && structure.bias === 'bearish') { score += 25; tags.push('HTF_BEAR'); }
+  if (htfAligned)        { score += 25; tags.push('HTF_ALIGNED'); }
+  if (sweep.detected)    { score += 25; tags.push('SWEEP'); }
+  if (mss.confirmed)     { score += 25; tags.push('MSS'); }
+  if (fvg.found)         { score += 15; tags.push('FVG'); }
+  if (fvg.inFVG)         { score += 10; tags.push('CONF_CANDLE'); }
 
-  // 2. Order Block
-  if (direction === 'long' && orderBlocks.bullish) {
-    const ob = orderBlocks.bullish;
-    if (currentPrice >= ob.low && currentPrice <= ob.high) {
-      score += 20; tags.push('OB');
-    } else if (currentPrice > ob.low && currentPrice < ob.high * 1.002) {
-      score += 10; tags.push('OB_NEAR');
-    }
-  }
-  if (direction === 'short' && orderBlocks.bearish) {
-    const ob = orderBlocks.bearish;
-    if (currentPrice >= ob.low && currentPrice <= ob.high) {
-      score += 20; tags.push('OB');
-    }
-  }
-
-  // 3. FVG
-  if (direction === 'long' && fvgs.bullish) {
-    const fvg = fvgs.bullish;
-    if (currentPrice >= fvg.bottom && currentPrice <= fvg.top) {
-      score += 15; tags.push('FVG');
-    }
-  }
-  if (direction === 'short' && fvgs.bearish) {
-    const fvg = fvgs.bearish;
-    if (currentPrice >= fvg.bottom && currentPrice <= fvg.top) {
-      score += 15; tags.push('FVG');
-    }
-  }
-
-  // 4. MSS
-  if (structure.mss) {
-    if (direction === 'long' && structure.mss.type === 'bullish_bos') { score += 20; tags.push('MSS'); }
-    if (direction === 'short' && structure.mss.type === 'bearish_bos') { score += 20; tags.push('MSS'); }
-  }
-
-  // 5. Liquidity target in direction
-  if (direction === 'long' && liquidity.nearestBSL) { score += 10; tags.push('LIQ_TARGET'); }
-  if (direction === 'short' && liquidity.nearestSSL) { score += 10; tags.push('LIQ_TARGET'); }
-
-  // 6. KZ tag (always present — this engine only fires in kill zone)
-  score += 10; tags.push('KZ');
-
-  return { score: Math.min(score, 100), tags };
+  const grade = score >= 90 ? 'A+' : score >= 80 ? 'A' : score >= 70 ? 'B' : score >= 60 ? 'C' : 'D';
+  return { score: Math.min(score, 100), grade, tags };
 }
 
-function generateSignal(analysis, candles, direction) {
-  const currentPrice = candles[candles.length - 1].close;
-  const { score, tags } = scoreConfluence(analysis, currentPrice, direction);
+// ─── Main Analysis ────────────────────────────────────────────────────────────
+function runICTAnalysis(data) {
+  const { daily, h4, h1, candles15m, candles5m } = data;
 
-  if (score < 45) return null; // minimum confluence threshold
+  const bias    = htfBias(daily, h4);
+  const sweep   = detectSweep(candles15m, candles5m);
+  const mss     = sweep.detected ? detectMSS(candles5m, sweep.dir) : { confirmed: false };
+  const fvg     = (sweep.detected && mss.confirmed) ? detectFVG(candles5m, sweep.dir) : { found: false };
+  const dir     = sweep.dir || null;
+  const conf    = dir ? scoreConfluence(sweep, mss, fvg, bias, dir) : { score: 0, grade: 'D', tags: [] };
 
-  const { orderBlocks, fvgs, structure } = analysis;
-  const isLong = direction === 'long';
+  const htfAligned = dir && (
+    (dir === 'bull' && (bias === 'bullish' || bias === 'pullback_in_bear')) ||
+    (dir === 'bear' && (bias === 'bearish' || bias === 'pullback_in_bull'))
+  );
 
-  // Entry: current price or OB entry
-  let entry = currentPrice;
-  const ob = isLong ? orderBlocks.bullish : orderBlocks.bearish;
-  if (ob) {
-    entry = isLong ? ob.eq : ob.eq; // target EQ of OB
+  let signal = null;
+
+  if (dir && mss.confirmed && fvg.inFVG && htfAligned && conf.score >= 80) {
+    const lastCandle = candles5m[candles5m.length - 1];
+    const isLong = dir === 'bull';
+    const entry  = isLong ? fvg.bottom + fvg.size * 0.5 : fvg.top - fvg.size * 0.5;
+
+    // SL: just beyond the sweep level
+    const sl = isLong
+      ? sweep.level - (sweep.level * 0.001)
+      : sweep.level + (sweep.level * 0.001);
+
+    const risk = Math.abs(entry - sl);
+    const tp1  = isLong ? entry + risk * 1.5 : entry - risk * 1.5;
+
+    const { tp2, tp2Desc, tp3, tp3Desc } = liquidityTPs(dir, entry, risk, candles5m, h1);
+
+    signal = {
+      direction: isLong ? 'BUY' : 'SELL',
+      entry:    parseFloat(entry.toFixed(2)),
+      sl:       parseFloat(sl.toFixed(2)),
+      tp1:      parseFloat(tp1.toFixed(2)),
+      tp2:      parseFloat(tp2.toFixed(2)),
+      tp3:      parseFloat(tp3.toFixed(2)),
+      tp2Desc, tp3Desc,
+      rr:       '1.5',
+      rr1:      '1.5',
+      stopPoints: Math.round(Math.abs(entry - sl)),
+      confluence: conf.score,
+      grade:    conf.grade,
+      tags:     conf.tags,
+      sweep:    sweep.levelName,
+      mssType:  mss.type,
+      htfBias:  bias,
+      hasFVG:   true,
+      timestamp: new Date().toISOString(),
+      price:    lastCandle.close
+    };
   }
 
-  // SL: below OB low (long) or above OB high (short)
-  let slBuffer = currentPrice * 0.0015; // 0.15% default
-  let sl = isLong
-    ? (ob ? ob.low - slBuffer : currentPrice - slBuffer * 3)
-    : (ob ? ob.high + slBuffer : currentPrice + slBuffer * 3);
-
-  const risk = Math.abs(entry - sl);
-  const tp1 = isLong ? entry + risk * 1.5 : entry - risk * 1.5;
-  const tp2 = isLong ? entry + risk * 2.5 : entry - risk * 2.5;
-  const rr1 = (Math.abs(tp1 - entry) / risk).toFixed(1);
-
-  // Estimate stop size in points
-  const stopPoints = Math.round(Math.abs(entry - sl));
-
   return {
-    direction,
-    entry: Math.round(entry),
-    sl: Math.round(sl),
-    tp1: Math.round(tp1),
-    tp2: Math.round(tp2),
-    rr: rr1,
-    stopPoints,
-    confluence: score,
-    tags,
-    timestamp: new Date().toISOString(),
-    price: Math.round(currentPrice)
+    bias,
+    sweep,
+    mss,
+    fvg,
+    confluence: conf,
+    htfAligned: !!htfAligned,
+    signal,
+    // legacy compat
+    signals: signal ? [signal] : [],
+    liquidity: { nearestBSL: null, nearestSSL: null },
+    structure: { bias, mss: mss.confirmed ? mss : null }
   };
 }
 
-function runICTAnalysis(candles15m, candles5m) {
-  // Run on 15m for HTF context, 5m for entry precision
-  const structure = detectMarketStructure(candles15m);
-  const orderBlocks = findOrderBlocks(candles15m, structure.bias);
-  const fvgs = findFairValueGaps(candles15m);
-  const fvgs5m = findFairValueGaps(candles5m);
-  const liquidity = findLiquidityPools(candles15m);
-  const ob5m = findOrderBlocks(candles5m, structure.bias);
-
-  const analysis = { structure, orderBlocks: ob5m, fvgs: fvgs5m, liquidity };
-
-  const signals = [];
-  const longSig = generateSignal(analysis, candles5m, 'long');
-  const shortSig = generateSignal(analysis, candles5m, 'short');
-
-  if (longSig && longSig.confluence >= 50) signals.push(longSig);
-  if (shortSig && shortSig.confluence >= 50) signals.push(shortSig);
-
-  // Only return top signal if both fire (avoid conflicting)
-  const topSignals = signals.sort((a, b) => b.confluence - a.confluence).slice(0, 1);
-
-  return {
-    bias: structure.bias,
-    mss: structure.mss,
-    orderBlocks: ob5m,
-    fvgs: fvgs5m,
-    liquidity,
-    signals: topSignals
-  };
-}
-
-module.exports = { runICTAnalysis, detectMarketStructure, findOrderBlocks, findFairValueGaps, findLiquidityPools };
+module.exports = {
+  runICTAnalysis,
+  detectMarketStructure: (c) => { const s = { highs: [], lows: [] }; return s; },
+  findOrderBlocks: () => ({ bullish: null, bearish: null }),
+  findFairValueGaps: () => ({ bullish: null, bearish: null, all: [] }),
+  findLiquidityPools: () => ({ bsl: [], ssl: [], nearestBSL: null, nearestSSL: null })
+};
