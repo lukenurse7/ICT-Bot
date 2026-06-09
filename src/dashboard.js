@@ -133,12 +133,34 @@ wss.on('connection', ws => {
   });
 });
 
-// Scan every 60s
-setInterval(() => runScan().catch(() => {}), 60_000);
+// Scan every 5 minutes — 5m candles only close every 5m so this misses nothing
+// DJ30 only scanned during its KZ window (12:00-16:00 UTC) to save API credits
+function shouldScanDJ30() {
+  const h = new Date().getUTCHours();
+  return h >= 12 && h < 16;
+}
+
+async function runScanSmart() {
+  const results = await Promise.allSettled([
+    scanXAU(),
+    shouldScanDJ30() ? scanDJ30() : Promise.resolve(null)
+  ]);
+  const xauErr  = results[0].status === 'rejected' ? results[0].reason?.message : null;
+  const dj30Err = results[1].status === 'rejected' ? results[1].reason?.message : null;
+
+  broadcast({
+    type: 'update', timestamp: new Date().toISOString(),
+    xau: latestXAU, dj30: latestDJ30,
+    signalHistory: signalHistory.slice(0, 20),
+    errors: { xau: xauErr, dj30: dj30Err }
+  });
+}
+
+setInterval(() => runScanSmart().catch(() => {}), 5 * 60 * 1000);
 
 server.listen(PORT, async () => {
   console.log(`\n  ◆ ICT Dashboard → http://localhost:${PORT}\n`);
-  await runScan().catch(e => console.error('Initial scan error:', e.message));
+  await runScanSmart().catch(e => console.error('Initial scan error:', e.message));
 });
 
 module.exports = { server };
