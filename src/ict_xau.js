@@ -357,11 +357,11 @@ function entryFVG(candles5m, mssResult, sweepResult) {
   //   prev candle wicked DOWN into FVG (prev.low <= fvg.top)
   //   prev candle closed INSIDE or ABOVE fvg (prev.close >= fvg.bottom)
 
-  const dir = sweep.dir;
+  const fvgDir = sweep.dir;
   let confirmedEntry = false;
   let wickValid      = false;
 
-  if (dir === 'bear') {
+  if (fvgDir === 'bear') {
     // Wick up into FVG zone
     const wickedIn = prevCandle.high >= best.bottom;
     // Closed back inside or below (rejection confirmed)
@@ -371,6 +371,7 @@ function entryFVG(candles5m, mssResult, sweepResult) {
     wickValid = wickDepth >= best.size * 0.5;
     confirmedEntry = wickedIn && closedBack && wickValid;
   } else {
+    // Bull FVG
     const wickedIn   = prevCandle.low <= best.top;
     const closedBack = prevCandle.close >= best.bottom;
     const wickDepth  = best.top - prevCandle.low;
