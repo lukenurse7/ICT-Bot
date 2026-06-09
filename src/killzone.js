@@ -1,6 +1,6 @@
 'use strict';
 
-// Kill Zone: NY 14:00–16:00 GMT (your trading window)
+// Kill Zone: NY  14:00–16:00 GMT (DJ30 window)
 // Markets closed Saturday/Sunday
 
 function getGMTTime() {
@@ -26,7 +26,7 @@ function isKillZone() {
   const { hours, minutes } = getGMTTime();
   const totalMins = hours * 60 + minutes;
   const kzStart = 14 * 60; // 14:00
-  const kzEnd = 16 * 60;   // 16:00
+  const kzEnd   = 16 * 60; // 16:00
   return totalMins >= kzStart && totalMins < kzEnd;
 }
 
@@ -53,13 +53,13 @@ function killZoneStatus() {
 
   const totalMins = hours * 60 + minutes;
   const kzStart = 14 * 60;
-  const kzEnd = 16 * 60;
+  const kzEnd   = 4 * 60;
 
   if (totalMins >= kzStart && totalMins < kzEnd) {
     const remaining = kzEnd - totalMins;
     return {
       active: true,
-      message: `KILL ZONE ACTIVE — ${remaining}m remaining`,
+      message: `DJ30 KILL ZONE ACTIVE — ${remaining}m remaining`,
       minutesRemaining: remaining
     };
   }
@@ -70,11 +70,11 @@ function killZoneStatus() {
     const m = wait % 60;
     return {
       active: false,
-      message: `Kill Zone opens in ${h > 0 ? h + 'h ' : ''}${m}m (14:00 GMT)`
+      message: `DJ30 Kill Zone opens in ${h > 0 ? h + 'h ' : ''}${m}m (14:00 GMT)`
     };
   }
 
-  return { active: false, message: 'Kill Zone ended — next session tomorrow 14:00 GMT' };
+  return { active: false, message: 'DJ30 Kill Zone ended — next session tomorrow 14:00 GMT' };
 }
 
 module.exports = { isKillZone, isMarketOpen, minutesUntilKillZone, killZoneStatus, getGMTTime };
