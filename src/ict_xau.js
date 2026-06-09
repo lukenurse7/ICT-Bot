@@ -558,7 +558,13 @@ function runAnalysis(data, asiaRange, sessionStatus) {
   // AND price must be inside the FVG zone (no premature entries)
   const fvgReady = fvg && fvg.inFVG;
 
-  if (dir && mss.confirmed && confluence.score >= minScore && fvgReady) {
+  // HTF bias hard gate for XAUUSD — Asia session is low liquidity so we only
+  // trade in the direction the daily + 4H structure is pointing.
+  // Ranging or counter-trend signals are skipped entirely.
+  const htfAligned = (dir === 'bull' && (htf.bias === 'bullish' || htf.bias === 'pullback_in_bear'))
+                  || (dir === 'bear' && (htf.bias === 'bearish' || htf.bias === 'pullback_in_bull'));
+
+  if (dir && mss.confirmed && confluence.score >= minScore && fvgReady && htfAligned) {
     const entryPrice = fvg.optimalEntry;
     const levels = calcLevels(dir, entryPrice, sweepResult.mostRecent, lvls, fvg, ob);
 
@@ -606,19 +612,24 @@ function runAnalysis(data, asiaRange, sessionStatus) {
     };
   }
 
+  const htfBlockReason = (dir && mss.confirmed && fvgReady && !htfAligned)
+    ? `HTF bias is ${htf.bias.toUpperCase().replace(/_/g,' ')} — ${dir === 'bull' ? 'BUY' : 'SELL'} blocked until Daily+4H align`
+    : null;
+
   return {
     htf, lvls, sweepResult, mss, fvg, ob, confluence,
     signal, quote,
     canUpdate: !!sweepResult.mostRecent,
-    waitReason: !sweepResult.mostRecent
-      ? 'Waiting for liquidity sweep on key levels'
-      : !mss.confirmed
-      ? `Sweep on ${sweepResult.mostRecent.levelName} — waiting for 5m MSS/BOS`
-      : !fvg
-      ? 'MSS confirmed — waiting for FVG to form from displacement'
-      : !fvg.inFVG
-      ? `FVG at ${fvg.entryZone} — waiting for pullback INTO the zone`
-      : null
+    waitReason: htfBlockReason
+      || (!sweepResult.mostRecent
+        ? 'Waiting for liquidity sweep on key levels'
+        : !mss.confirmed
+        ? `Sweep on ${sweepResult.mostRecent.levelName} — waiting for 5m MSS/BOS`
+        : !fvg
+        ? 'MSS confirmed — waiting for FVG to form from displacement'
+        : !fvg.inFVG
+        ? `FVG at ${fvg.entryZone} — waiting for pullback INTO the zone`
+        : null)
   };
 }
 
