@@ -23,10 +23,11 @@ const SYMBOL = 'XAU/USD';
 // ─── Account simulation settings ────────────────────────────────────────────
 const ACCOUNT_START  = 1000;   // £1,000 starting balance
 const RISK_PCT       = 0.01;   // 1% risk per trade
-const PARTIAL_CLOSE  = 0.5;    // close 50% at TP1 (1.5R)
-const TP1_R          = 1.5;
-const TP2_R          = 3.0;
+const TP1_R          = 1.5;    // 50% closed here, SL moves to breakeven
+const TP2_R          = 3.0;    // 25% closed here
+const TP3_R          = 5.0;    // final 25% closed here
 const DAILY_LOSS_CAP = 0.03;   // stop trading if down 3% in a day
+const SIM_BARS       = 288;    // 24 hours of 5m bars
 
 // ─── Date helpers ────────────────────────────────────────────────────────────
 
@@ -155,19 +156,50 @@ function asiaRange(h1Candles, date) {
   return { high: Math.max(...asia.map(c => c.high)), low: Math.min(...asia.map(c => c.low)) };
 }
 
-function simulateOutcome(dir, entry, sl, tp1, tp2, futureCandles) {
+function simulateOutcome(dir, entry, sl, tp1, tp2, tp3, futureCandles) {
+  // Partial close simulation:
+  // TP1 hit → close 50% at 1.5R, move SL to breakeven
+  // TP2 hit → close 25% at 3R
+  // TP3 hit → close final 25% at 5R
+  // SL hit before TP1 → full loss (-1R)
+  // SL hit after TP1 (at BE) → locked in +0.75R from TP1 portion
+  let tp1Hit = false;
+  let currentSL = sl;
+
   for (const c of futureCandles) {
-    if (dir === 'bull') {
-      if (c.low  <= sl)  return { result: 'LOSS',    pnlR: -1,       exitPrice: sl,  exitTime: c.time };
-      if (c.high >= tp2) return { result: 'WIN_TP2', pnlR: PARTIAL_CLOSE * TP1_R + PARTIAL_CLOSE * TP2_R, exitPrice: tp2, exitTime: c.time };
-      if (c.high >= tp1) return { result: 'WIN_TP1', pnlR: PARTIAL_CLOSE * TP1_R, exitPrice: tp1, exitTime: c.time };
+    const slHit  = dir === 'bull' ? c.low  <= currentSL : c.high >= currentSL;
+    const tp1Hit_ = dir === 'bull' ? c.high >= tp1 : c.low  <= tp1;
+    const tp2Hit  = dir === 'bull' ? c.high >= tp2 : c.low  <= tp2;
+    const tp3Hit  = dir === 'bull' ? c.high >= tp3 : c.low  <= tp3;
+
+    if (!tp1Hit) {
+      if (slHit)  return { result: 'LOSS',    pnlR: -1,     exitPrice: sl,  exitTime: c.time, exits: ['Full loss at SL'] };
+      if (tp3Hit) { // fast move through all targets
+        return { result: 'WIN_TP3', pnlR: 0.5*TP1_R + 0.25*TP2_R + 0.25*TP3_R, exitPrice: tp3, exitTime: c.time,
+          exits: ['50% @ TP1 (1.5R)', '25% @ TP2 (3R)', '25% @ TP3 (5R)'] };
+      }
+      if (tp2Hit) {
+        return { result: 'WIN_TP2', pnlR: 0.5*TP1_R + 0.25*TP2_R + 0.25*TP2_R, exitPrice: tp2, exitTime: c.time,
+          exits: ['50% @ TP1 (1.5R)', '50% @ TP2 (3R)'] };
+      }
+      if (tp1Hit_) {
+        tp1Hit = true;
+        currentSL = entry; // move SL to breakeven
+      }
     } else {
-      if (c.high >= sl)  return { result: 'LOSS',    pnlR: -1,       exitPrice: sl,  exitTime: c.time };
-      if (c.low  <= tp2) return { result: 'WIN_TP2', pnlR: PARTIAL_CLOSE * TP1_R + PARTIAL_CLOSE * TP2_R, exitPrice: tp2, exitTime: c.time };
-      if (c.low  <= tp1) return { result: 'WIN_TP1', pnlR: PARTIAL_CLOSE * TP1_R, exitPrice: tp1, exitTime: c.time };
+      // TP1 already hit — SL at breakeven
+      if (slHit)  return { result: 'WIN_TP1_BE', pnlR: 0.5*TP1_R, exitPrice: entry, exitTime: c.time,
+        exits: ['50% @ TP1 (1.5R)', '50% stopped at breakeven'] };
+      if (tp3Hit) return { result: 'WIN_TP3', pnlR: 0.5*TP1_R + 0.25*TP2_R + 0.25*TP3_R, exitPrice: tp3, exitTime: c.time,
+        exits: ['50% @ TP1 (1.5R)', '25% @ TP2 (3R)', '25% @ TP3 (5R)'] };
+      if (tp2Hit) return { result: 'WIN_TP2', pnlR: 0.5*TP1_R + 0.25*TP2_R + 0.25*TP2_R, exitPrice: tp2, exitTime: c.time,
+        exits: ['50% @ TP1 (1.5R)', '50% @ TP2 (3R)'] };
     }
   }
-  return { result: 'OPEN', pnlR: null, exitPrice: null, exitTime: null };
+
+  if (tp1Hit) return { result: 'WIN_TP1_OPEN', pnlR: 0.5*TP1_R, exitPrice: null, exitTime: null,
+    exits: ['50% @ TP1 (1.5R)', '50% still open beyond 24h window'] };
+  return { result: 'OPEN', pnlR: null, exitPrice: null, exitTime: null, exits: [] };
 }
 
 // ─── HTF bias hard gate (mirrors ict_xau.js) ────────────────────────────────
@@ -277,9 +309,12 @@ async function run() {
     const tp2 = dir === 'bull'
       ? (lvls.pdh && lvls.pdh > entryPrice + risk * 2 ? lvls.pdh : entryPrice + risk * TP2_R)
       : (lvls.pdl && lvls.pdl < entryPrice - risk * 2 ? lvls.pdl : entryPrice - risk * TP2_R);
+    const tp3 = dir === 'bull'
+      ? (lvls.pwh && lvls.pwh > entryPrice + risk * 3 ? lvls.pwh : entryPrice + risk * TP3_R)
+      : (lvls.pwl && lvls.pwl < entryPrice - risk * 3 ? lvls.pwl : entryPrice - risk * TP3_R);
 
-    const future  = month5m.slice(i + 1, i + 61);
-    const outcome = simulateOutcome(dir, entryPrice, sl, tp1, tp2, future);
+    const future  = month5m.slice(i + 1, i + SIM_BARS);
+    const outcome = simulateOutcome(dir, entryPrice, sl, tp1, tp2, tp3, future);
 
     // ── Account simulation ──────────────────────────────────────────────────
     const riskGBP  = balance * RISK_PCT;           // £ risked this trade
@@ -306,6 +341,7 @@ async function run() {
       sl:       parseFloat(sl.toFixed(2)),
       tp1:      parseFloat(tp1.toFixed(2)),
       tp2:      parseFloat(tp2.toFixed(2)),
+      tp3:      parseFloat(tp3.toFixed(2)),
       risk:     parseFloat(risk.toFixed(2)),
       score:    conf.score,
       grade:    conf.grade,
@@ -339,7 +375,9 @@ async function run() {
   signals.forEach((s, idx) => {
     const isLong = s.dir === 'BUY';
     const color  = isLong ? chalk.green : chalk.red;
-    const outcomeColor = s.result?.startsWith('WIN') ? chalk.green : s.result === 'LOSS' ? chalk.red : chalk.yellow;
+    const outcomeColor = s.result === 'WIN_TP3' ? chalk.bold.green
+      : s.result?.startsWith('WIN') ? chalk.green
+      : s.result === 'LOSS' ? chalk.red : chalk.yellow;
 
     console.log('\n' + chalk.bold(`  Signal #${idx + 1}`) + chalk.gray(` — ${fmtDT(s.time)}  ${s.session}`));
     console.log('  ' + '─'.repeat(68));
@@ -352,13 +390,15 @@ async function run() {
     console.log(chalk.gray('  ┌─ LEVELS ──────────────────────────────────────────────┐'));
     console.log(chalk.gray('  │  Entry    ') + chalk.bold.white(`$${s.entry}`));
     console.log(chalk.gray('  │  SL       ') + chalk.red(`$${s.sl}`) + chalk.gray(`  (${s.risk}pts  risk: £${s.riskGBP})`));
-    console.log(chalk.gray('  │  TP1      ') + chalk.green(`$${s.tp1}`) + chalk.gray(`  (1:${TP1_R}R)`));
-    console.log(chalk.gray('  │  TP2      ') + chalk.green(`$${s.tp2}`) + chalk.gray(`  (1:${TP2_R}R)`));
+    console.log(chalk.gray('  │  TP1      ') + chalk.green(`$${s.tp1}`) + chalk.gray(`  (1:${TP1_R}R — 50% close, BE stop)`));
+    console.log(chalk.gray('  │  TP2      ') + chalk.green(`$${s.tp2}`) + chalk.gray(`  (1:${TP2_R}R — 25% close)`));
+    console.log(chalk.gray('  │  TP3      ') + chalk.green(`$${s.tp3}`) + chalk.gray(`  (1:${TP3_R}R — final 25%)`));
     if (s.result) {
       const pnlStr = s.pnlR != null
-        ? (s.pnlR > 0 ? chalk.green(`+${s.pnlR}R  +£${s.pnlGBP}`) : chalk.red(`${s.pnlR}R  -£${Math.abs(s.pnlGBP)}`))
+        ? (s.pnlR > 0 ? chalk.green(`+${s.pnlR.toFixed(2)}R  +£${s.pnlGBP}`) : chalk.red(`${s.pnlR.toFixed(2)}R  -£${Math.abs(s.pnlGBP)}`))
         : chalk.yellow('(open)');
       console.log(chalk.gray('  │  Outcome  ') + outcomeColor(s.result) + '  ' + pnlStr);
+      if (s.exits?.length) s.exits.forEach(e => console.log(chalk.gray(`  │    → ${e}`)));
       if (s.exitTime) console.log(chalk.gray(`  │  Exit     ${fmtDT(s.exitTime)}  @ $${s.exitPrice?.toFixed(2)}`));
       if (s.balanceAfter) console.log(chalk.gray('  │  Balance  ') + chalk.bold.white(fmtGBP(s.balanceAfter)));
     }
