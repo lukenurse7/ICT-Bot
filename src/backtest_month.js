@@ -181,7 +181,7 @@ function htfAligned(htf, dir) {
 async function run() {
   console.clear();
   console.log('\n' + chalk.bold.yellow('  ◆ XAUUSD ICT — LAST MONTH BACKTEST'));
-  console.log(chalk.gray('  HTF Bias filter ON  |  1% risk per trade  |  £1,000 start\n'));
+  console.log(chalk.gray('  HTF Bias filter ON  |  Kill Zone only  |  80% min score  |  1% risk  |  £1,000 start\n'));
 
   const range = lastMonthRange();
 
@@ -213,7 +213,7 @@ async function run() {
   if (month5m.length === 0) { console.log(chalk.red('  No 5m data found for period.')); return; }
 
   const signals      = [];
-  const MIN_SCORE    = 70;
+  const MIN_SCORE    = 80;
   const COOLDOWN     = 36; // 3h
   let lastSignalBar  = -999;
 
@@ -261,6 +261,9 @@ async function run() {
 
     // HTF bias hard gate
     if (!htfAligned(htf, dir)) continue;
+
+    // Kill zone hard gate — London 07:00-09:00 or NY 12:00-15:00 UTC only
+    if (!session.active) continue;
 
     const entryPrice = fvg.optimalEntry;
     const buf        = entryPrice * 0.0008;

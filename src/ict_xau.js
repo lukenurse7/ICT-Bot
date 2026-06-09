@@ -558,13 +558,14 @@ function runAnalysis(data, asiaRange, sessionStatus) {
   // AND price must be inside the FVG zone (no premature entries)
   const fvgReady = fvg && fvg.inFVG;
 
-  // HTF bias hard gate for XAUUSD — Asia session is low liquidity so we only
-  // trade in the direction the daily + 4H structure is pointing.
-  // Ranging or counter-trend signals are skipped entirely.
+  // HTF bias hard gate for XAUUSD — only trade in direction Daily+4H structure points
   const htfAligned = (dir === 'bull' && (htf.bias === 'bullish' || htf.bias === 'pullback_in_bear'))
                   || (dir === 'bear' && (htf.bias === 'bearish' || htf.bias === 'pullback_in_bull'));
 
-  if (dir && mss.confirmed && confluence.score >= minScore && fvgReady && htfAligned) {
+  // Kill zone hard gate — only fire during London (07:00-09:00) or NY (12:00-15:00) UTC
+  const inKillZone = sessionStatus?.active === true;
+
+  if (dir && mss.confirmed && confluence.score >= minScore && fvgReady && htfAligned && inKillZone) {
     const entryPrice = fvg.optimalEntry;
     const levels = calcLevels(dir, entryPrice, sweepResult.mostRecent, lvls, fvg, ob);
 
@@ -615,12 +616,15 @@ function runAnalysis(data, asiaRange, sessionStatus) {
   const htfBlockReason = (dir && mss.confirmed && fvgReady && !htfAligned)
     ? `HTF bias is ${htf.bias.toUpperCase().replace(/_/g,' ')} — ${dir === 'bull' ? 'BUY' : 'SELL'} blocked until Daily+4H align`
     : null;
+  const kzBlockReason = (dir && mss.confirmed && fvgReady && htfAligned && !inKillZone)
+    ? `Setup ready but outside kill zone (${sessionStatus?.label || 'off-hours'}) — waiting for London/NY window`
+    : null;
 
   return {
     htf, lvls, sweepResult, mss, fvg, ob, confluence,
     signal, quote,
     canUpdate: !!sweepResult.mostRecent,
-    waitReason: htfBlockReason
+    waitReason: htfBlockReason || kzBlockReason
       || (!sweepResult.mostRecent
         ? 'Waiting for liquidity sweep on key levels'
         : !mss.confirmed
