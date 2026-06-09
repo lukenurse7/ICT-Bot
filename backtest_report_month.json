@@ -1,6 +1,6 @@
 {
   "period": "2026-05-11 → 2026-06-05",
-  "generatedAt": "2026-06-09T09:09:14.203Z",
+  "generatedAt": "2026-06-09T09:18:25.860Z",
   "settings": {
     "startBalance": 1000,
     "riskPct": 1,
@@ -9,18 +9,18 @@
   },
   "account": {
     "start": 1000,
-    "end": 946.1,
-    "netGBP": -53.9,
-    "returnPct": -5.4,
-    "maxDrawdown": 5.4
+    "end": 943.66,
+    "netGBP": -56.34,
+    "returnPct": -5.6,
+    "maxDrawdown": 5.6
   },
   "stats": {
     "total": 11,
-    "wins": 2,
-    "losses": 7,
-    "winRate": "22%",
-    "netR": "-5.50",
-    "profitFactor": "0.21"
+    "wins": 3,
+    "losses": 8,
+    "winRate": "27%",
+    "netR": "-5.75",
+    "profitFactor": "0.28"
   },
   "signals": [
     {
@@ -31,6 +31,7 @@
       "sl": 4568.58,
       "tp1": 4546.71,
       "tp2": 4268.19,
+      "tp3": 4268.19,
       "risk": 8.75,
       "score": 95,
       "grade": "A",
@@ -46,7 +47,10 @@
       "result": "LOSS",
       "pnlR": -1,
       "exitPrice": 4568.576364672,
-      "exitTime": "2026-05-25 09:55:00"
+      "exitTime": "2026-05-25 09:55:00",
+      "exits": [
+        "Full loss at SL"
+      ]
     },
     {
       "i": 726,
@@ -56,6 +60,7 @@
       "sl": 4577.91,
       "tp1": 4552.39,
       "tp2": 4268.19,
+      "tp3": 4268.19,
       "risk": 10.21,
       "score": 100,
       "grade": "A",
@@ -66,12 +71,15 @@
       "hasFVG": true,
       "hasOB": true,
       "riskGBP": 9.9,
-      "pnlGBP": null,
-      "balanceAfter": null,
-      "result": "OPEN",
-      "pnlR": null,
-      "exitPrice": null,
-      "exitTime": null
+      "pnlGBP": -9.9,
+      "balanceAfter": 980.1,
+      "result": "LOSS",
+      "pnlR": -1,
+      "exitPrice": 4577.908420656,
+      "exitTime": "2026-05-25 23:10:00",
+      "exits": [
+        "Full loss at SL"
+      ]
     },
     {
       "i": 952,
@@ -81,6 +89,7 @@
       "sl": 4536.71,
       "tp1": 4511.25,
       "tp2": 4268.19,
+      "tp3": 4268.19,
       "risk": 10.18,
       "score": 100,
       "grade": "A",
@@ -90,13 +99,16 @@
       "mssType": "BOS_DOWN",
       "hasFVG": true,
       "hasOB": true,
-      "riskGBP": 9.9,
-      "pnlGBP": -9.9,
-      "balanceAfter": 980.1,
+      "riskGBP": 9.8,
+      "pnlGBP": -9.8,
+      "balanceAfter": 970.3,
       "result": "LOSS",
       "pnlR": -1,
       "exitPrice": 4536.7127935,
-      "exitTime": "2026-05-26 07:55:00"
+      "exitTime": "2026-05-26 07:55:00",
+      "exits": [
+        "Full loss at SL"
+      ]
     },
     {
       "i": 1034,
@@ -106,6 +118,7 @@
       "sl": 4531.3,
       "tp1": 4507.88,
       "tp2": 4268.19,
+      "tp3": 4268.19,
       "risk": 9.37,
       "score": 100,
       "grade": "A",
@@ -115,13 +128,17 @@
       "mssType": "BOS_DOWN",
       "hasFVG": true,
       "hasOB": true,
-      "riskGBP": 9.8,
-      "pnlGBP": 7.35,
-      "balanceAfter": 987.45,
-      "result": "WIN_TP1",
+      "riskGBP": 9.7,
+      "pnlGBP": 7.28,
+      "balanceAfter": 977.58,
+      "result": "WIN_TP1_BE",
       "pnlR": 0.75,
-      "exitPrice": 4507.875190628001,
-      "exitTime": "2026-05-26 15:15:00"
+      "exitPrice": 4521.93281,
+      "exitTime": "2026-05-26 22:00:00",
+      "exits": [
+        "50% @ TP1 (1.5R)",
+        "50% stopped at breakeven"
+      ]
     },
     {
       "i": 1533,
@@ -131,35 +148,11 @@
       "sl": 4399.82,
       "tp1": 4380.45,
       "tp2": 4268.19,
+      "tp3": 4268.19,
       "risk": 7.75,
       "score": 100,
       "grade": "A",
       "session": "🟡 London KZ",
-      "htfBias": "bearish",
-      "sweep": "Equal Highs (BSL)",
-      "mssType": "BOS_DOWN",
-      "hasFVG": true,
-      "hasOB": true,
-      "riskGBP": 9.87,
-      "pnlGBP": -9.87,
-      "balanceAfter": 977.58,
-      "result": "LOSS",
-      "pnlR": -1,
-      "exitPrice": 4399.816446172,
-      "exitTime": "2026-05-28 10:10:00"
-    },
-    {
-      "i": 1600,
-      "time": "2026-05-28 13:40:00",
-      "dir": "SELL",
-      "entry": 4426.15,
-      "sl": 4440.69,
-      "tp1": 4404.34,
-      "tp2": 4268.19,
-      "risk": 14.54,
-      "score": 100,
-      "grade": "A",
-      "session": "🟢 NY KZ",
       "htfBias": "bearish",
       "sweep": "Equal Highs (BSL)",
       "mssType": "BOS_DOWN",
@@ -170,18 +163,22 @@
       "balanceAfter": 967.8,
       "result": "LOSS",
       "pnlR": -1,
-      "exitPrice": 4440.688720448,
-      "exitTime": "2026-05-28 14:10:00"
+      "exitPrice": 4399.816446172,
+      "exitTime": "2026-05-28 10:10:00",
+      "exits": [
+        "Full loss at SL"
+      ]
     },
     {
-      "i": 1871,
-      "time": "2026-05-29 12:15:00",
+      "i": 1600,
+      "time": "2026-05-28 13:40:00",
       "dir": "SELL",
-      "entry": 4531.69,
-      "sl": 4546.19,
-      "tp1": 4509.94,
+      "entry": 4426.15,
+      "sl": 4440.69,
+      "tp1": 4404.34,
       "tp2": 4268.19,
-      "risk": 14.5,
+      "tp3": 4268.19,
+      "risk": 14.54,
       "score": 100,
       "grade": "A",
       "session": "🟢 NY KZ",
@@ -195,8 +192,40 @@
       "balanceAfter": 958.12,
       "result": "LOSS",
       "pnlR": -1,
+      "exitPrice": 4440.688720448,
+      "exitTime": "2026-05-28 14:10:00",
+      "exits": [
+        "Full loss at SL"
+      ]
+    },
+    {
+      "i": 1871,
+      "time": "2026-05-29 12:15:00",
+      "dir": "SELL",
+      "entry": 4531.69,
+      "sl": 4546.19,
+      "tp1": 4509.94,
+      "tp2": 4268.19,
+      "tp3": 4268.19,
+      "risk": 14.5,
+      "score": 100,
+      "grade": "A",
+      "session": "🟢 NY KZ",
+      "htfBias": "bearish",
+      "sweep": "Equal Highs (BSL)",
+      "mssType": "BOS_DOWN",
+      "hasFVG": true,
+      "hasOB": true,
+      "riskGBP": 9.58,
+      "pnlGBP": -9.58,
+      "balanceAfter": 948.54,
+      "result": "LOSS",
+      "pnlR": -1,
       "exitPrice": 4546.189170848001,
-      "exitTime": "2026-05-29 14:00:00"
+      "exitTime": "2026-05-29 14:00:00",
+      "exits": [
+        "Full loss at SL"
+      ]
     },
     {
       "i": 2672,
@@ -206,6 +235,7 @@
       "sl": 4519.6,
       "tp1": 4491.9,
       "tp2": 4268.19,
+      "tp3": 4268.19,
       "risk": 11.08,
       "score": 100,
       "grade": "A",
@@ -215,13 +245,17 @@
       "mssType": "BOS_DOWN",
       "hasFVG": true,
       "hasOB": true,
-      "riskGBP": 9.58,
-      "pnlGBP": 7.19,
-      "balanceAfter": 965.31,
-      "result": "WIN_TP1",
+      "riskGBP": 9.49,
+      "pnlGBP": 7.11,
+      "balanceAfter": 955.66,
+      "result": "WIN_TP1_BE",
       "pnlR": 0.75,
-      "exitPrice": 4491.904473480001,
-      "exitTime": "2026-06-01 08:40:00"
+      "exitPrice": 4508.5221,
+      "exitTime": "2026-06-01 10:45:00",
+      "exits": [
+        "50% @ TP1 (1.5R)",
+        "50% stopped at breakeven"
+      ]
     },
     {
       "i": 3334,
@@ -231,6 +265,7 @@
       "sl": 4468.85,
       "tp1": 4433.8,
       "tp2": 4268.19,
+      "tp3": 4268.19,
       "risk": 14.02,
       "score": 100,
       "grade": "A",
@@ -240,13 +275,17 @@
       "mssType": "BOS_DOWN",
       "hasFVG": true,
       "hasOB": true,
-      "riskGBP": 9.65,
-      "pnlGBP": null,
-      "balanceAfter": null,
-      "result": "OPEN",
-      "pnlR": null,
-      "exitPrice": null,
-      "exitTime": null
+      "riskGBP": 9.56,
+      "pnlGBP": 7.17,
+      "balanceAfter": 962.82,
+      "result": "WIN_TP1_BE",
+      "pnlR": 0.75,
+      "exitPrice": 4454.82948,
+      "exitTime": "2026-06-03 23:45:00",
+      "exits": [
+        "50% @ TP1 (1.5R)",
+        "50% stopped at breakeven"
+      ]
     },
     {
       "i": 3536,
@@ -256,6 +295,7 @@
       "sl": 4480.45,
       "tp1": 4452.63,
       "tp2": 4268.19,
+      "tp3": 4268.19,
       "risk": 11.13,
       "score": 95,
       "grade": "A",
@@ -265,13 +305,16 @@
       "mssType": "CHoCH",
       "hasFVG": true,
       "hasOB": true,
-      "riskGBP": 9.65,
-      "pnlGBP": -9.65,
-      "balanceAfter": 955.66,
+      "riskGBP": 9.63,
+      "pnlGBP": -9.63,
+      "balanceAfter": 953.19,
       "result": "LOSS",
       "pnlR": -1,
       "exitPrice": 4480.452388176001,
-      "exitTime": "2026-06-04 11:25:00"
+      "exitTime": "2026-06-04 11:25:00",
+      "exits": [
+        "Full loss at SL"
+      ]
     },
     {
       "i": 3599,
@@ -281,6 +324,7 @@
       "sl": 4479.26,
       "tp1": 4472.47,
       "tp2": 4268.19,
+      "tp3": 4268.19,
       "risk": 13.57,
       "score": 100,
       "grade": "A",
@@ -290,13 +334,16 @@
       "mssType": "BOS_DOWN",
       "hasFVG": true,
       "hasOB": true,
-      "riskGBP": 9.56,
-      "pnlGBP": -9.56,
-      "balanceAfter": 946.1,
+      "riskGBP": 9.53,
+      "pnlGBP": -9.53,
+      "balanceAfter": 943.66,
       "result": "LOSS",
       "pnlR": -1,
       "exitPrice": 4479.2604760760005,
-      "exitTime": "2026-06-04 12:20:00"
+      "exitTime": "2026-06-04 12:20:00",
+      "exits": [
+        "Full loss at SL"
+      ]
     }
   ]
 }
