@@ -340,15 +340,52 @@ function entryFVG(candles5m, mssResult, sweepResult) {
 
   // Return the closest FVG to current price
   const current = candles5m[candles5m.length - 1].close;
+  const prevCandle = candles5m[candles5m.length - 2];
   relevant.sort((a, b) => Math.abs(a.mid - current) - Math.abs(b.mid - current));
   const best = relevant[0];
 
-  // Check if price is currently inside the FVG (optimal entry)
-  const inFVG = current >= best.bottom && current <= best.top;
+  // ── Confirmation candle check ─────────────────────────────────────────────
+  // ICT entry rule: price must WICK into/through FVG on previous candle,
+  // then CLOSE back inside it. Entering on first touch = catching falling knife.
+  //
+  // For bearish FVG (SELL setup):
+  //   prev candle wicked UP into FVG (prev.high >= fvg.bottom)
+  //   prev candle closed INSIDE or BELOW fvg (prev.close <= fvg.top)
+  //   current price is at or near FVG (ready to enter on this candle open)
+  //
+  // For bullish FVG (BUY setup):
+  //   prev candle wicked DOWN into FVG (prev.low <= fvg.top)
+  //   prev candle closed INSIDE or ABOVE fvg (prev.close >= fvg.bottom)
+
+  const dir = sweep.dir;
+  let confirmedEntry = false;
+  let wickValid      = false;
+
+  if (dir === 'bear') {
+    // Wick up into FVG zone
+    const wickedIn = prevCandle.high >= best.bottom;
+    // Closed back inside or below (rejection confirmed)
+    const closedBack = prevCandle.close <= best.top;
+    // Minimum wick depth: wick into FVG must be at least 50% of FVG size
+    const wickDepth = prevCandle.high - best.bottom;
+    wickValid = wickDepth >= best.size * 0.5;
+    confirmedEntry = wickedIn && closedBack && wickValid;
+  } else {
+    const wickedIn   = prevCandle.low <= best.top;
+    const closedBack = prevCandle.close >= best.bottom;
+    const wickDepth  = best.top - prevCandle.low;
+    wickValid = wickDepth >= best.size * 0.5;
+    confirmedEntry = wickedIn && closedBack && wickValid;
+  }
+
+  // inFVG is now gated by confirmation candle — not just price touching zone
+  const inFVG = confirmedEntry;
 
   return {
     ...best,
     inFVG,
+    confirmedEntry,
+    wickValid,
     distanceToFVG: inFVG ? 0 : Math.abs(current - best.mid),
     entryZone: `${best.bottom.toFixed(2)} – ${best.top.toFixed(2)}`,
     optimalEntry: best.mid
@@ -567,9 +604,11 @@ function scoreConfluence(htf, sweep, mss, fvg, ob, session) {
     score += 10;
     reasons.push(`✅ FVG identified: ${fvg.entryZone} (${fvg.type})`);
     if (fvg.inFVG) {
-      score += 5; reasons.push('✅ Price currently INSIDE FVG — optimal entry zone');
+      score += 5; reasons.push('✅ Confirmation candle — wick into FVG + close back inside, entry confirmed');
+    } else if (fvg.wickValid === false) {
+      reasons.push(`⏳ FVG touched but wick too shallow — waiting for proper rejection wick`);
     } else {
-      reasons.push(`⏳ Price approaching FVG — wait for entry into ${fvg.entryZone}`);
+      reasons.push(`⏳ FVG at ${fvg.entryZone} — waiting for confirmation candle (wick in + close back)`);
     }
   } else {
     reasons.push('⚠️ No FVG found post-MSS — use OB for entry or wait');
