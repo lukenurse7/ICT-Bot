@@ -340,15 +340,53 @@ function entryFVG(candles5m, mssResult, sweepResult) {
 
   // Return the closest FVG to current price
   const current = candles5m[candles5m.length - 1].close;
+  const prevCandle = candles5m[candles5m.length - 2];
   relevant.sort((a, b) => Math.abs(a.mid - current) - Math.abs(b.mid - current));
   const best = relevant[0];
 
-  // Check if price is currently inside the FVG (optimal entry)
-  const inFVG = current >= best.bottom && current <= best.top;
+  // ── Confirmation candle check ─────────────────────────────────────────────
+  // ICT entry rule: price must WICK into/through FVG on previous candle,
+  // then CLOSE back inside it. Entering on first touch = catching falling knife.
+  //
+  // For bearish FVG (SELL setup):
+  //   prev candle wicked UP into FVG (prev.high >= fvg.bottom)
+  //   prev candle closed INSIDE or BELOW fvg (prev.close <= fvg.top)
+  //   current price is at or near FVG (ready to enter on this candle open)
+  //
+  // For bullish FVG (BUY setup):
+  //   prev candle wicked DOWN into FVG (prev.low <= fvg.top)
+  //   prev candle closed INSIDE or ABOVE fvg (prev.close >= fvg.bottom)
+
+  const fvgDir = sweep.dir;
+  let confirmedEntry = false;
+  let wickValid      = false;
+
+  if (fvgDir === 'bear') {
+    // Wick up into FVG zone
+    const wickedIn = prevCandle.high >= best.bottom;
+    // Closed back inside or below (rejection confirmed)
+    const closedBack = prevCandle.close <= best.top;
+    // Minimum wick depth: wick into FVG must be at least 50% of FVG size
+    const wickDepth = prevCandle.high - best.bottom;
+    wickValid = wickDepth >= best.size * 0.5;
+    confirmedEntry = wickedIn && closedBack && wickValid;
+  } else {
+    // Bull FVG
+    const wickedIn   = prevCandle.low <= best.top;
+    const closedBack = prevCandle.close >= best.bottom;
+    const wickDepth  = best.top - prevCandle.low;
+    wickValid = wickDepth >= best.size * 0.5;
+    confirmedEntry = wickedIn && closedBack && wickValid;
+  }
+
+  // inFVG is now gated by confirmation candle — not just price touching zone
+  const inFVG = confirmedEntry;
 
   return {
     ...best,
     inFVG,
+    confirmedEntry,
+    wickValid,
     distanceToFVG: inFVG ? 0 : Math.abs(current - best.mid),
     entryZone: `${best.bottom.toFixed(2)} – ${best.top.toFixed(2)}`,
     optimalEntry: best.mid
@@ -388,44 +426,125 @@ function findOrderBlock(candles5m, sweepResult) {
   }
 }
 
-// ─── 7. TP / SL CALCULATION ──────────────────────────────────────────────────
+// ─── 7. LIQUIDITY TARGET SCANNER ─────────────────────────────────────────────
+
+// Scan candles for equal highs or equal lows (2+ touches within tolerance)
+function findEqualLevels(candles, dir, lookback = 30, tol = 2.5) {
+  const slice = candles.slice(-lookback);
+  const levels = [];
+  const prices = dir === 'bear'
+    ? slice.map(c => c.low)   // equal lows below = sell-side liquidity (SSL)
+    : slice.map(c => c.high); // equal highs above = buy-side liquidity (BSL)
+
+  for (let i = 0; i < prices.length; i++) {
+    const p = prices[i];
+    const touches = prices.filter(x => Math.abs(x - p) <= tol).length;
+    if (touches >= 2) levels.push({ price: p, touches, source: `5m equal ${dir === 'bear' ? 'lows' : 'highs'}` });
+  }
+  // Deduplicate — group levels within tolerance
+  const deduped = [];
+  for (const l of levels) {
+    if (!deduped.find(d => Math.abs(d.price - l.price) <= tol)) deduped.push(l);
+  }
+  return deduped;
+}
+
+// Scan H1 candles for swing highs/lows from last N candles
+function findH1SwingLevels(h1Candles, dir, lookback = 10) {
+  const slice = h1Candles.slice(-lookback);
+  if (dir === 'bear') {
+    // Swing lows below = sell-side liquidity targets
+    return slice.map(c => ({ price: c.low,  source: '1H swing low' }))
+                .sort((a, b) => b.price - a.price); // highest first (closest to entry for SELL)
+  } else {
+    return slice.map(c => ({ price: c.high, source: '1H swing high' }))
+                .sort((a, b) => a.price - b.price); // lowest first (closest to entry for BUY)
+  }
+}
+
+// Multi-timeframe liquidity target hierarchy
+// Returns { tp2, tp2Desc, tp3, tp3Desc }
+function liquidityTargets(dir, entry, risk, levels, candles5m, h1Candles) {
+  const isLong = dir === 'bull';
+  const minR   = 1.5; // must be beyond TP1
+  const maxR   = 4.0; // cap — don't reach for daily moves on a 5m entry
+
+  function inRange(price) {
+    const r = Math.abs(price - entry) / risk;
+    return r > minR && r <= maxR;
+  }
+
+  // Candidate pool — ordered from closest to furthest
+  const candidates = [];
+
+  // 1. 5m equal lows/highs (intraday liquidity pools, swept fast)
+  const eq5m = findEqualLevels(candles5m, isLong ? 'bull' : 'bear', 40, 2.5);
+  for (const l of eq5m) {
+    if (isLong ? l.price > entry : l.price < entry) candidates.push(l);
+  }
+
+  // 2. 1H swing lows/highs (session-level targets)
+  const h1Swings = findH1SwingLevels(h1Candles, isLong ? 'bull' : 'bear', 12);
+  for (const l of h1Swings) {
+    if (isLong ? l.price > entry : l.price < entry) candidates.push(l);
+  }
+
+  // 3. Asia session high/low
+  if (levels.asiaHigh && isLong && levels.asiaHigh > entry) candidates.push({ price: levels.asiaHigh, source: 'Asia High (BSL)' });
+  if (levels.asiaLow  && !isLong && levels.asiaLow  < entry) candidates.push({ price: levels.asiaLow,  source: 'Asia Low (SSL)' });
+
+  // 4. PDH/PDL — only if within maxR
+  if (isLong && levels.pdh && levels.pdh > entry) candidates.push({ price: levels.pdh, source: 'PDH (BSL)' });
+  if (!isLong && levels.pdl && levels.pdl < entry) candidates.push({ price: levels.pdl, source: 'PDL (SSL)' });
+
+  // Sort by distance from entry (nearest first)
+  candidates.sort((a, b) => Math.abs(a.price - entry) - Math.abs(b.price - entry));
+
+  // Pick TP2 = first candidate within range
+  const tp2Candidate = candidates.find(c => inRange(c.price));
+  const tp2     = tp2Candidate ? tp2Candidate.price : (isLong ? entry + risk * 2.5 : entry - risk * 2.5);
+  const tp2Desc = tp2Candidate ? tp2Candidate.source : 'Fixed 2.5R (no liquidity in range)';
+
+  // Pick TP3 = next candidate beyond TP2
+  const tp3Candidates = candidates.filter(c => {
+    const r = Math.abs(c.price - entry) / risk;
+    return r > Math.abs(tp2 - entry) / risk + 0.5 && r <= 6;
+  });
+  const tp3Candidate = tp3Candidates[0];
+  const tp3     = tp3Candidate ? tp3Candidate.price
+    : (isLong ? (levels.pwh && levels.pwh > tp2 ? levels.pwh : entry + risk * 5)
+              : (levels.pwl && levels.pwl < tp2 ? levels.pwl : entry - risk * 5));
+  const tp3Desc = tp3Candidate ? tp3Candidate.source : (isLong ? 'PWH extension' : 'PWL extension');
+
+  return { tp2: parseFloat(tp2.toFixed(2)), tp2Desc, tp3: parseFloat(tp3.toFixed(2)), tp3Desc };
+}
+
+// ─── 7b. TP / SL CALCULATION ─────────────────────────────────────────────────
 
 // Max risk in points — signals with wider stops are skipped
 const MAX_RISK_PTS = 15;
 
-function calcLevels(dir, entry, sweep, levels, fvg, ob) {
+function calcLevels(dir, entry, sweep, levels, fvg, ob, candles5m, h1Candles) {
   const isLong = dir === 'bull';
-  const buf = entry * 0.0008; // ~$3.50 buffer on $4300 gold
+  const buf = entry * 0.0008;
 
   let sl;
   if (isLong) {
-    // SL below sweep low; also ensure it's below entry
     const rawSL = sweep.sweepLow !== undefined ? sweep.sweepLow - buf : entry - entry * 0.004;
     sl = Math.min(rawSL, entry - buf * 2);
   } else {
-    // SL above sweep high; also ensure it's above entry and above OB/FVG top
-    const sweepSL  = sweep.sweepHigh !== undefined ? sweep.sweepHigh + buf : entry + entry * 0.004;
-    const obSL     = ob?.high ? ob.high + buf : 0;
-    const fvgSL    = fvg?.top ? fvg.top + buf : 0;
-    const rawSL    = Math.max(sweepSL, obSL, fvgSL);
-    sl = Math.max(rawSL, entry + buf * 2); // guarantee SL > entry
+    const sweepSL = sweep.sweepHigh !== undefined ? sweep.sweepHigh + buf : entry + entry * 0.004;
+    const obSL    = ob?.high ? ob.high + buf : 0;
+    const fvgSL   = fvg?.top ? fvg.top + buf : 0;
+    const rawSL   = Math.max(sweepSL, obSL, fvgSL);
+    sl = Math.max(rawSL, entry + buf * 2);
   }
 
   const risk = Math.abs(entry - sl);
+  const tp1  = isLong ? entry + risk * 1.5 : entry - risk * 1.5;
 
-  // TP1: 1.5R — partial profits
-  // TP2: PDH/PDL or next liquidity pool (HTF target)
-  // TP3: previous week H/L (full run target)
-  const tp1 = isLong ? entry + risk * 1.5 : entry - risk * 1.5;
-
-  let tp2, tp3;
-  if (isLong) {
-    tp2 = (levels.pdh && levels.pdh > entry + risk * 2) ? levels.pdh : entry + risk * 3;
-    tp3 = (levels.pwh && levels.pwh > entry + risk * 3) ? levels.pwh : entry + risk * 5;
-  } else {
-    tp2 = (levels.pdl && levels.pdl < entry - risk * 2) ? levels.pdl : entry - risk * 3;
-    tp3 = (levels.pwl && levels.pwl < entry - risk * 3) ? levels.pwl : entry - risk * 5;
-  }
+  // TP2/TP3 from liquidity hierarchy
+  const { tp2, tp2Desc, tp3, tp3Desc } = liquidityTargets(dir, entry, risk, levels, candles5m, h1Candles);
 
   const rr1 = (Math.abs(tp1 - entry) / risk).toFixed(1);
   const rr2 = (Math.abs(tp2 - entry) / risk).toFixed(1);
@@ -434,14 +553,12 @@ function calcLevels(dir, entry, sweep, levels, fvg, ob) {
     entry:      parseFloat(entry.toFixed(2)),
     sl:         parseFloat(sl.toFixed(2)),
     tp1:        parseFloat(tp1.toFixed(2)),
-    tp2:        parseFloat(tp2.toFixed(2)),
-    tp3:        parseFloat(tp3.toFixed(2)),
-    rr1, rr2,
+    tp2, tp3, rr1, rr2,
     riskPoints: parseFloat(risk.toFixed(2)),
     slDesc:     isLong ? 'Below sweep low + buffer' : 'Above sweep high + buffer',
-    tp1Desc:    '1.5R — partial close here',
-    tp2Desc:    isLong ? 'PDH / Buy-side liquidity' : 'PDL / Sell-side liquidity',
-    tp3Desc:    isLong ? 'Previous Week High' : 'Previous Week Low'
+    tp1Desc:    '1.5R — 50% close, SL to breakeven',
+    tp2Desc,
+    tp3Desc
   };
 }
 
@@ -488,9 +605,11 @@ function scoreConfluence(htf, sweep, mss, fvg, ob, session) {
     score += 10;
     reasons.push(`✅ FVG identified: ${fvg.entryZone} (${fvg.type})`);
     if (fvg.inFVG) {
-      score += 5; reasons.push('✅ Price currently INSIDE FVG — optimal entry zone');
+      score += 5; reasons.push('✅ Confirmation candle — wick into FVG + close back inside, entry confirmed');
+    } else if (fvg.wickValid === false) {
+      reasons.push(`⏳ FVG touched but wick too shallow — waiting for proper rejection wick`);
     } else {
-      reasons.push(`⏳ Price approaching FVG — wait for entry into ${fvg.entryZone}`);
+      reasons.push(`⏳ FVG at ${fvg.entryZone} — waiting for confirmation candle (wick in + close back)`);
     }
   } else {
     reasons.push('⚠️ No FVG found post-MSS — use OB for entry or wait');
@@ -520,7 +639,7 @@ function scoreConfluence(htf, sweep, mss, fvg, ob, session) {
 // ─── 9. MASTER ANALYSIS ──────────────────────────────────────────────────────
 
 function runAnalysis(data, asiaRange, sessionStatus) {
-  const { daily, h4, m15, m5, quote } = data;
+  const { daily, h4, h1, m15, m5, quote } = data;
 
   // Step 1: HTF bias
   const htf = htfBias(daily, h4);
@@ -558,9 +677,16 @@ function runAnalysis(data, asiaRange, sessionStatus) {
   // AND price must be inside the FVG zone (no premature entries)
   const fvgReady = fvg && fvg.inFVG;
 
-  if (dir && mss.confirmed && confluence.score >= minScore && fvgReady) {
+  // HTF bias hard gate for XAUUSD — only trade in direction Daily+4H structure points
+  const htfAligned = (dir === 'bull' && (htf.bias === 'bullish' || htf.bias === 'pullback_in_bear'))
+                  || (dir === 'bear' && (htf.bias === 'bearish' || htf.bias === 'pullback_in_bull'));
+
+  // Kill zone hard gate — only fire during London (07:00-09:00) or NY (12:00-15:00) UTC
+  const inKillZone = sessionStatus?.active === true;
+
+  if (dir && mss.confirmed && confluence.score >= minScore && fvgReady && htfAligned && inKillZone) {
     const entryPrice = fvg.optimalEntry;
-    const levels = calcLevels(dir, entryPrice, sweepResult.mostRecent, lvls, fvg, ob);
+    const levels = calcLevels(dir, entryPrice, sweepResult.mostRecent, lvls, fvg, ob, m5, h1);
 
     // Skip if SL is still wrong side or risk is too wide
     const slValid = dir === 'bull' ? levels.sl < levels.entry : levels.sl > levels.entry;
@@ -606,23 +732,32 @@ function runAnalysis(data, asiaRange, sessionStatus) {
     };
   }
 
+  const htfBlockReason = (dir && mss.confirmed && fvgReady && !htfAligned)
+    ? `HTF bias is ${htf.bias.toUpperCase().replace(/_/g,' ')} — ${dir === 'bull' ? 'BUY' : 'SELL'} blocked until Daily+4H align`
+    : null;
+  const kzBlockReason = (dir && mss.confirmed && fvgReady && htfAligned && !inKillZone)
+    ? `Setup ready but outside kill zone (${sessionStatus?.label || 'off-hours'}) — waiting for London/NY window`
+    : null;
+
   return {
     htf, lvls, sweepResult, mss, fvg, ob, confluence,
     signal, quote,
     canUpdate: !!sweepResult.mostRecent,
-    waitReason: !sweepResult.mostRecent
-      ? 'Waiting for liquidity sweep on key levels'
-      : !mss.confirmed
-      ? `Sweep on ${sweepResult.mostRecent.levelName} — waiting for 5m MSS/BOS`
-      : !fvg
-      ? 'MSS confirmed — waiting for FVG to form from displacement'
-      : !fvg.inFVG
-      ? `FVG at ${fvg.entryZone} — waiting for pullback INTO the zone`
-      : null
+    waitReason: htfBlockReason || kzBlockReason
+      || (!sweepResult.mostRecent
+        ? 'Waiting for liquidity sweep on key levels'
+        : !mss.confirmed
+        ? `Sweep on ${sweepResult.mostRecent.levelName} — waiting for 5m MSS/BOS`
+        : !fvg
+        ? 'MSS confirmed — waiting for FVG to form from displacement'
+        : !fvg.inFVG
+        ? `FVG at ${fvg.entryZone} — waiting for pullback INTO the zone`
+        : null)
   };
 }
 
 module.exports = {
   runAnalysis, htfBias, keyLevels, detectLiquiditySweep,
-  detectMSS, findFVGs, entryFVG, findOrderBlock, scoreConfluence
+  detectMSS, findFVGs, entryFVG, findOrderBlock, scoreConfluence,
+  liquidityTargets
 };
