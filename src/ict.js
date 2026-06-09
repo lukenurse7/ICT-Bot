@@ -250,14 +250,10 @@ function liquidityTPs(dir, entry, risk, candles5m, h1Candles) {
 }
 
 // ─── Confluence Score ─────────────────────────────────────────────────────────
-function scoreConfluence(sweep, mss, fvg, htfBiasValue, dir) {
-  let score = 0;
-  const tags = [];
+function scoreConfluence(sweep, mss, fvg) {
+  let score = 25;  // KZ = 25pts — enforced by caller, replaces HTF bias gate
+  const tags = ['KZ'];
 
-  const htfAligned = (dir === 'bull' && (htfBiasValue === 'bullish' || htfBiasValue === 'pullback_in_bear'))
-                  || (dir === 'bear' && (htfBiasValue === 'bearish' || htfBiasValue === 'pullback_in_bull'));
-
-  if (htfAligned)        { score += 25; tags.push('HTF_ALIGNED'); }
   if (sweep.detected)    { score += 25; tags.push('SWEEP'); }
   if (mss.confirmed)     { score += 25; tags.push('MSS'); }
   if (fvg.found)         { score += 15; tags.push('FVG'); }
@@ -276,16 +272,11 @@ function runICTAnalysis(data) {
   const mss     = sweep.detected ? detectMSS(candles5m, sweep.dir) : { confirmed: false };
   const fvg     = (sweep.detected && mss.confirmed) ? detectFVG(candles5m, sweep.dir) : { found: false };
   const dir     = sweep.dir || null;
-  const conf    = dir ? scoreConfluence(sweep, mss, fvg, bias, dir) : { score: 0, grade: 'D', tags: [] };
-
-  const htfAligned = dir && (
-    (dir === 'bull' && (bias === 'bullish' || bias === 'pullback_in_bear')) ||
-    (dir === 'bear' && (bias === 'bearish' || bias === 'pullback_in_bull'))
-  );
+  const conf    = dir ? scoreConfluence(sweep, mss, fvg) : { score: 0, grade: 'D', tags: [] };
 
   let signal = null;
 
-  if (dir && mss.confirmed && fvg.inFVG && htfAligned && conf.score >= 80) {
+  if (dir && mss.confirmed && fvg.inFVG && conf.score >= 80) {
     const lastCandle = candles5m[candles5m.length - 1];
     const isLong = dir === 'bull';
     const entry  = isLong ? fvg.bottom + fvg.size * 0.5 : fvg.top - fvg.size * 0.5;
