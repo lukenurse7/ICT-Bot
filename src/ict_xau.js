@@ -388,44 +388,125 @@ function findOrderBlock(candles5m, sweepResult) {
   }
 }
 
-// ─── 7. TP / SL CALCULATION ──────────────────────────────────────────────────
+// ─── 7. LIQUIDITY TARGET SCANNER ─────────────────────────────────────────────
+
+// Scan candles for equal highs or equal lows (2+ touches within tolerance)
+function findEqualLevels(candles, dir, lookback = 30, tol = 2.5) {
+  const slice = candles.slice(-lookback);
+  const levels = [];
+  const prices = dir === 'bear'
+    ? slice.map(c => c.low)   // equal lows below = sell-side liquidity (SSL)
+    : slice.map(c => c.high); // equal highs above = buy-side liquidity (BSL)
+
+  for (let i = 0; i < prices.length; i++) {
+    const p = prices[i];
+    const touches = prices.filter(x => Math.abs(x - p) <= tol).length;
+    if (touches >= 2) levels.push({ price: p, touches, source: `5m equal ${dir === 'bear' ? 'lows' : 'highs'}` });
+  }
+  // Deduplicate — group levels within tolerance
+  const deduped = [];
+  for (const l of levels) {
+    if (!deduped.find(d => Math.abs(d.price - l.price) <= tol)) deduped.push(l);
+  }
+  return deduped;
+}
+
+// Scan H1 candles for swing highs/lows from last N candles
+function findH1SwingLevels(h1Candles, dir, lookback = 10) {
+  const slice = h1Candles.slice(-lookback);
+  if (dir === 'bear') {
+    // Swing lows below = sell-side liquidity targets
+    return slice.map(c => ({ price: c.low,  source: '1H swing low' }))
+                .sort((a, b) => b.price - a.price); // highest first (closest to entry for SELL)
+  } else {
+    return slice.map(c => ({ price: c.high, source: '1H swing high' }))
+                .sort((a, b) => a.price - b.price); // lowest first (closest to entry for BUY)
+  }
+}
+
+// Multi-timeframe liquidity target hierarchy
+// Returns { tp2, tp2Desc, tp3, tp3Desc }
+function liquidityTargets(dir, entry, risk, levels, candles5m, h1Candles) {
+  const isLong = dir === 'bull';
+  const minR   = 1.5; // must be beyond TP1
+  const maxR   = 4.0; // cap — don't reach for daily moves on a 5m entry
+
+  function inRange(price) {
+    const r = Math.abs(price - entry) / risk;
+    return r > minR && r <= maxR;
+  }
+
+  // Candidate pool — ordered from closest to furthest
+  const candidates = [];
+
+  // 1. 5m equal lows/highs (intraday liquidity pools, swept fast)
+  const eq5m = findEqualLevels(candles5m, isLong ? 'bull' : 'bear', 40, 2.5);
+  for (const l of eq5m) {
+    if (isLong ? l.price > entry : l.price < entry) candidates.push(l);
+  }
+
+  // 2. 1H swing lows/highs (session-level targets)
+  const h1Swings = findH1SwingLevels(h1Candles, isLong ? 'bull' : 'bear', 12);
+  for (const l of h1Swings) {
+    if (isLong ? l.price > entry : l.price < entry) candidates.push(l);
+  }
+
+  // 3. Asia session high/low
+  if (levels.asiaHigh && isLong && levels.asiaHigh > entry) candidates.push({ price: levels.asiaHigh, source: 'Asia High (BSL)' });
+  if (levels.asiaLow  && !isLong && levels.asiaLow  < entry) candidates.push({ price: levels.asiaLow,  source: 'Asia Low (SSL)' });
+
+  // 4. PDH/PDL — only if within maxR
+  if (isLong && levels.pdh && levels.pdh > entry) candidates.push({ price: levels.pdh, source: 'PDH (BSL)' });
+  if (!isLong && levels.pdl && levels.pdl < entry) candidates.push({ price: levels.pdl, source: 'PDL (SSL)' });
+
+  // Sort by distance from entry (nearest first)
+  candidates.sort((a, b) => Math.abs(a.price - entry) - Math.abs(b.price - entry));
+
+  // Pick TP2 = first candidate within range
+  const tp2Candidate = candidates.find(c => inRange(c.price));
+  const tp2     = tp2Candidate ? tp2Candidate.price : (isLong ? entry + risk * 2.5 : entry - risk * 2.5);
+  const tp2Desc = tp2Candidate ? tp2Candidate.source : 'Fixed 2.5R (no liquidity in range)';
+
+  // Pick TP3 = next candidate beyond TP2
+  const tp3Candidates = candidates.filter(c => {
+    const r = Math.abs(c.price - entry) / risk;
+    return r > Math.abs(tp2 - entry) / risk + 0.5 && r <= 6;
+  });
+  const tp3Candidate = tp3Candidates[0];
+  const tp3     = tp3Candidate ? tp3Candidate.price
+    : (isLong ? (levels.pwh && levels.pwh > tp2 ? levels.pwh : entry + risk * 5)
+              : (levels.pwl && levels.pwl < tp2 ? levels.pwl : entry - risk * 5));
+  const tp3Desc = tp3Candidate ? tp3Candidate.source : (isLong ? 'PWH extension' : 'PWL extension');
+
+  return { tp2: parseFloat(tp2.toFixed(2)), tp2Desc, tp3: parseFloat(tp3.toFixed(2)), tp3Desc };
+}
+
+// ─── 7b. TP / SL CALCULATION ─────────────────────────────────────────────────
 
 // Max risk in points — signals with wider stops are skipped
 const MAX_RISK_PTS = 15;
 
-function calcLevels(dir, entry, sweep, levels, fvg, ob) {
+function calcLevels(dir, entry, sweep, levels, fvg, ob, candles5m, h1Candles) {
   const isLong = dir === 'bull';
-  const buf = entry * 0.0008; // ~$3.50 buffer on $4300 gold
+  const buf = entry * 0.0008;
 
   let sl;
   if (isLong) {
-    // SL below sweep low; also ensure it's below entry
     const rawSL = sweep.sweepLow !== undefined ? sweep.sweepLow - buf : entry - entry * 0.004;
     sl = Math.min(rawSL, entry - buf * 2);
   } else {
-    // SL above sweep high; also ensure it's above entry and above OB/FVG top
-    const sweepSL  = sweep.sweepHigh !== undefined ? sweep.sweepHigh + buf : entry + entry * 0.004;
-    const obSL     = ob?.high ? ob.high + buf : 0;
-    const fvgSL    = fvg?.top ? fvg.top + buf : 0;
-    const rawSL    = Math.max(sweepSL, obSL, fvgSL);
-    sl = Math.max(rawSL, entry + buf * 2); // guarantee SL > entry
+    const sweepSL = sweep.sweepHigh !== undefined ? sweep.sweepHigh + buf : entry + entry * 0.004;
+    const obSL    = ob?.high ? ob.high + buf : 0;
+    const fvgSL   = fvg?.top ? fvg.top + buf : 0;
+    const rawSL   = Math.max(sweepSL, obSL, fvgSL);
+    sl = Math.max(rawSL, entry + buf * 2);
   }
 
   const risk = Math.abs(entry - sl);
+  const tp1  = isLong ? entry + risk * 1.5 : entry - risk * 1.5;
 
-  // TP1: 1.5R — partial profits
-  // TP2: PDH/PDL or next liquidity pool (HTF target)
-  // TP3: previous week H/L (full run target)
-  const tp1 = isLong ? entry + risk * 1.5 : entry - risk * 1.5;
-
-  let tp2, tp3;
-  if (isLong) {
-    tp2 = (levels.pdh && levels.pdh > entry + risk * 2) ? levels.pdh : entry + risk * 3;
-    tp3 = (levels.pwh && levels.pwh > entry + risk * 3) ? levels.pwh : entry + risk * 5;
-  } else {
-    tp2 = (levels.pdl && levels.pdl < entry - risk * 2) ? levels.pdl : entry - risk * 3;
-    tp3 = (levels.pwl && levels.pwl < entry - risk * 3) ? levels.pwl : entry - risk * 5;
-  }
+  // TP2/TP3 from liquidity hierarchy
+  const { tp2, tp2Desc, tp3, tp3Desc } = liquidityTargets(dir, entry, risk, levels, candles5m, h1Candles);
 
   const rr1 = (Math.abs(tp1 - entry) / risk).toFixed(1);
   const rr2 = (Math.abs(tp2 - entry) / risk).toFixed(1);
@@ -434,14 +515,12 @@ function calcLevels(dir, entry, sweep, levels, fvg, ob) {
     entry:      parseFloat(entry.toFixed(2)),
     sl:         parseFloat(sl.toFixed(2)),
     tp1:        parseFloat(tp1.toFixed(2)),
-    tp2:        parseFloat(tp2.toFixed(2)),
-    tp3:        parseFloat(tp3.toFixed(2)),
-    rr1, rr2,
+    tp2, tp3, rr1, rr2,
     riskPoints: parseFloat(risk.toFixed(2)),
     slDesc:     isLong ? 'Below sweep low + buffer' : 'Above sweep high + buffer',
-    tp1Desc:    '1.5R — partial close here',
-    tp2Desc:    isLong ? 'PDH / Buy-side liquidity' : 'PDL / Sell-side liquidity',
-    tp3Desc:    isLong ? 'Previous Week High' : 'Previous Week Low'
+    tp1Desc:    '1.5R — 50% close, SL to breakeven',
+    tp2Desc,
+    tp3Desc
   };
 }
 
@@ -520,7 +599,7 @@ function scoreConfluence(htf, sweep, mss, fvg, ob, session) {
 // ─── 9. MASTER ANALYSIS ──────────────────────────────────────────────────────
 
 function runAnalysis(data, asiaRange, sessionStatus) {
-  const { daily, h4, m15, m5, quote } = data;
+  const { daily, h4, h1, m15, m5, quote } = data;
 
   // Step 1: HTF bias
   const htf = htfBias(daily, h4);
@@ -567,7 +646,7 @@ function runAnalysis(data, asiaRange, sessionStatus) {
 
   if (dir && mss.confirmed && confluence.score >= minScore && fvgReady && htfAligned && inKillZone) {
     const entryPrice = fvg.optimalEntry;
-    const levels = calcLevels(dir, entryPrice, sweepResult.mostRecent, lvls, fvg, ob);
+    const levels = calcLevels(dir, entryPrice, sweepResult.mostRecent, lvls, fvg, ob, m5, h1);
 
     // Skip if SL is still wrong side or risk is too wide
     const slValid = dir === 'bull' ? levels.sl < levels.entry : levels.sl > levels.entry;
@@ -639,5 +718,6 @@ function runAnalysis(data, asiaRange, sessionStatus) {
 
 module.exports = {
   runAnalysis, htfBias, keyLevels, detectLiquiditySweep,
-  detectMSS, findFVGs, entryFVG, findOrderBlock, scoreConfluence
+  detectMSS, findFVGs, entryFVG, findOrderBlock, scoreConfluence,
+  liquidityTargets
 };

@@ -13,7 +13,8 @@ const path  = require('path');
 
 const {
   htfBias, keyLevels, detectLiquiditySweep,
-  detectMSS, entryFVG, findOrderBlock, scoreConfluence
+  detectMSS, entryFVG, findOrderBlock, scoreConfluence,
+  liquidityTargets
 } = require('./ict_xau');
 
 const KEY    = process.env.TWELVEDATA_API_KEY;
@@ -264,9 +265,9 @@ async function run() {
     if (i - lastSignalBar < COOLDOWN) continue;
     if (dailyBlocked[dateStr]) continue;
 
-    const slice5m  = all5m.filter(c  => new Date(c.time)  <= currentTime);
-    const slice15m = all15m.filter(c => new Date(c.time)  <= currentTime);
-    const sliceH1  = allH1.filter(c  => new Date(c.time)  <= currentTime);
+    const slice5m  = all5m.filter(c  => new Date(c.time) <= currentTime);
+    const slice15m = all15m.filter(c => new Date(c.time) <= currentTime);
+    const sliceH1  = allH1.filter(c  => new Date(c.time) <= currentTime);
 
     if (slice5m.length < 40 || allH4.length < 6 || allDaily.length < 5) continue;
 
@@ -306,12 +307,13 @@ async function run() {
     if (risk > 15 || risk <= 0) continue;
 
     const tp1 = dir === 'bull' ? entryPrice + risk * TP1_R : entryPrice - risk * TP1_R;
-    const tp2 = dir === 'bull'
-      ? (lvls.pdh && lvls.pdh > entryPrice + risk * 2 ? lvls.pdh : entryPrice + risk * TP2_R)
-      : (lvls.pdl && lvls.pdl < entryPrice - risk * 2 ? lvls.pdl : entryPrice - risk * TP2_R);
-    const tp3 = dir === 'bull'
-      ? (lvls.pwh && lvls.pwh > entryPrice + risk * 3 ? lvls.pwh : entryPrice + risk * TP3_R)
-      : (lvls.pwl && lvls.pwl < entryPrice - risk * 3 ? lvls.pwl : entryPrice - risk * TP3_R);
+
+    // Use multi-timeframe liquidity hierarchy for TP2/TP3
+    const liq = liquidityTargets(dir, entryPrice, risk, lvls, slice5m, sliceH1);
+    const tp2 = liq.tp2;
+    const tp3 = liq.tp3;
+    const tp2Desc = liq.tp2Desc;
+    const tp3Desc = liq.tp3Desc;
 
     const future  = month5m.slice(i + 1, i + SIM_BARS);
     const outcome = simulateOutcome(dir, entryPrice, sl, tp1, tp2, tp3, future);
@@ -342,6 +344,7 @@ async function run() {
       tp1:      parseFloat(tp1.toFixed(2)),
       tp2:      parseFloat(tp2.toFixed(2)),
       tp3:      parseFloat(tp3.toFixed(2)),
+      tp2Desc, tp3Desc,
       risk:     parseFloat(risk.toFixed(2)),
       score:    conf.score,
       grade:    conf.grade,
@@ -391,8 +394,8 @@ async function run() {
     console.log(chalk.gray('  │  Entry    ') + chalk.bold.white(`$${s.entry}`));
     console.log(chalk.gray('  │  SL       ') + chalk.red(`$${s.sl}`) + chalk.gray(`  (${s.risk}pts  risk: £${s.riskGBP})`));
     console.log(chalk.gray('  │  TP1      ') + chalk.green(`$${s.tp1}`) + chalk.gray(`  (1:${TP1_R}R — 50% close, BE stop)`));
-    console.log(chalk.gray('  │  TP2      ') + chalk.green(`$${s.tp2}`) + chalk.gray(`  (1:${TP2_R}R — 25% close)`));
-    console.log(chalk.gray('  │  TP3      ') + chalk.green(`$${s.tp3}`) + chalk.gray(`  (1:${TP3_R}R — final 25%)`));
+    console.log(chalk.gray('  │  TP2      ') + chalk.green(`$${s.tp2}`) + chalk.gray(`  (25% — ${s.tp2Desc})`));
+    console.log(chalk.gray('  │  TP3      ') + chalk.green(`$${s.tp3}`) + chalk.gray(`  (25% — ${s.tp3Desc})`));
     if (s.result) {
       const pnlStr = s.pnlR != null
         ? (s.pnlR > 0 ? chalk.green(`+${s.pnlR.toFixed(2)}R  +£${s.pnlGBP}`) : chalk.red(`${s.pnlR.toFixed(2)}R  -£${Math.abs(s.pnlGBP)}`))
