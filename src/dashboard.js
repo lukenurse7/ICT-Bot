@@ -133,8 +133,9 @@ wss.on('connection', ws => {
   });
 });
 
-// Scan every 5 minutes — 5m candles only close every 5m so this misses nothing
-// DJ30 only scanned during its KZ window (12:00-16:00 UTC) to save API credits
+// Scan every 5 minutes — aligns with 5m candle closes, misses nothing
+// XAU: scans during ALL ICT kill zones (Asia 02-05, London 07-09, Silver Bullet 10-11, NY 12-15)
+// DJ30: scans during NY window only (12-16 UTC)
 function shouldScanDJ30() {
   const h = new Date().getUTCHours();
   return h >= 12 && h < 16;
@@ -259,7 +260,7 @@ body{background:var(--bg);color:var(--text);font-family:'SF Mono','Fira Code',mo
 <div class="hdr">
   <div>
     <div class="hdr-title">◆ ICT SIGNAL BOT</div>
-    <div class="hdr-sub">XAUUSD (24/5) · DJ30 (14:00–16:00 GMT) · Auto-updates every 60s</div>
+    <div class="hdr-sub">XAUUSD · All ICT Sessions · DJ30 NY KZ · Scans every 5m</div>
   </div>
   <div class="hdr-right">
     <div class="pill" id="live-pill"><div class="dot" id="live-dot"></div><span id="live-text">Connecting...</span></div>
