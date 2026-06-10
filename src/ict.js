@@ -274,6 +274,12 @@ function runICTAnalysis(data) {
   const dir     = sweep.dir || null;
   const conf    = dir ? scoreConfluence(sweep, mss, fvg) : { score: 0, grade: 'D', tags: [] };
 
+  // Informational only — NOT a signal gate for DJ30 (KZ is the bias filter)
+  const htfAligned = dir && (
+    (dir === 'bull' && (bias === 'bullish' || bias === 'pullback_in_bear')) ||
+    (dir === 'bear' && (bias === 'bearish' || bias === 'pullback_in_bull'))
+  );
+
   let signal = null;
 
   if (dir && mss.confirmed && fvg.inFVG && conf.score >= 80) {

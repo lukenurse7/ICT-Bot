@@ -1,12 +1,14 @@
 'use strict';
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  DJ30 ICT — 3 MONTH BACKTEST
+//  DJ30 ICT — 3 MONTH BACKTEST  (Market Execution Edition)
 //  DJ30 strategy: Kill Zone IS the bias filter — no HTF bias gate needed
 //  NY Open (12-15 UTC) and London (07-09 UTC) provide the directional event
 //    • Kill zone only (London 07-09, NY 12-15 UTC) — this replaces HTF bias
 //    • 80% min confluence
 //    • Liquidity sweep → MSS/BOS/CHoCH → FVG confirmation candle
+//    • ENTRY: open of the NEXT bar after signal fires (market execution)
+//    • SL: just beyond sweep level (same as live)
 //    • Multi-TF liquidity targets (TP2/TP3)
 //    • 50% close TP1 @ 1.5R, BE stop, 25% TP2, 25% TP3
 //    • 1% risk per trade, £1,000 start
@@ -374,7 +376,7 @@ function sessionLabel(iso) {
 // ─── Main ────────────────────────────────────────────────────────────────────
 async function run() {
   console.clear();
-  console.log('\n' + chalk.bold.cyan('  ◆ DJ30 ICT — 3 MONTH BACKTEST'));
+  console.log('\n' + chalk.bold.cyan('  ◆ DJ30 ICT — 3 MONTH BACKTEST  [MARKET EXECUTION]'));
   console.log(chalk.gray('  HTF Bias filter ON  |  Kill Zone only  |  80% min score  |  1% risk  |  £1,000 start\n'));
 
   const range = threeMonthRange();
@@ -434,7 +436,10 @@ async function run() {
     if (!dir || !mss.confirmed || !fvg.inFVG || conf.score < MIN_SCORE) continue;
 
     const isLong  = dir === 'bull';
-    const entry   = isLong ? fvg.bottom + fvg.size * 0.5 : fvg.top - fvg.size * 0.5;
+    // Market execution: enter at the open of the next bar (not FVG midpoint)
+    const nextBar = period5m[i + 1];
+    if (!nextBar) continue;
+    const entry   = nextBar.open;
     const sl      = isLong
       ? sweep.level - sweep.level * 0.001
       : sweep.level + sweep.level * 0.001;
@@ -444,7 +449,8 @@ async function run() {
     const tp1 = isLong ? entry + risk * TP1_R : entry - risk * TP1_R;
     const { tp2, tp2Desc, tp3, tp3Desc } = liquidityTPs(dir, entry, risk, slice5m, sliceH1);
 
-    const future  = period5m.slice(i + 1, i + SIM_BARS);
+    // Simulate from bar AFTER entry bar (i+1 is entry bar, simulation starts at i+2)
+    const future  = period5m.slice(i + 2, i + SIM_BARS);
     const outcome = simulateOutcome(dir, entry, sl, tp1, tp2, tp3, future);
 
     const riskGBP = balance * RISK_PCT;
@@ -583,7 +589,7 @@ async function run() {
   const reportPath = path.join(__dirname, '..', 'backtest_report_3month_dj30.json');
   fs.writeFileSync(reportPath, JSON.stringify({
     period: range.label, generatedAt: new Date().toISOString(),
-    settings: { symbol: 'DJ30/DIA', startBalance: ACCOUNT_START, riskPct: RISK_PCT*100, minConfluence: MIN_SCORE },
+    settings: { symbol: 'DJ30/DIA', entryMethod: 'market_execution_next_bar_open', startBalance: ACCOUNT_START, riskPct: RISK_PCT*100, minConfluence: MIN_SCORE },
     account: {
       start: ACCOUNT_START, end: parseFloat(balance.toFixed(2)),
       netGBP: parseFloat(totalGBP.toFixed(2)),

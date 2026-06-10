@@ -278,7 +278,10 @@ async function run() {
     if (!dir || !mss.confirmed || conf.score < MIN_SCORE || !fvg?.inFVG) continue;
     if (!htfAligned(htf, dir)) continue;
 
-    const entryPrice = fvg.optimalEntry;
+    // Market execution: enter at the open of the next bar (not FVG optimalEntry)
+    const nextBar5m = period5m[i + 1];
+    if (!nextBar5m) continue;
+    const entryPrice = nextBar5m.open;
     const buf  = entryPrice * 0.0008;
     const sl   = dir === 'bull'
       ? Math.min((sweepResult.mostRecent.sweepLow || entryPrice) - buf, entryPrice - buf * 2)
@@ -291,7 +294,8 @@ async function run() {
     const tp2  = liq.tp2;
     const tp3  = liq.tp3;
 
-    const future  = period5m.slice(i + 1, i + SIM_BARS);
+    // Simulate from bar AFTER entry bar
+    const future  = period5m.slice(i + 2, i + SIM_BARS);
     const outcome = simulateOutcome(dir, entryPrice, sl, tp1, tp2, tp3, future);
 
     const riskGBP = balance * RISK_PCT;
