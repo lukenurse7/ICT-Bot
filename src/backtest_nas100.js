@@ -343,12 +343,23 @@ async function run() {
     const tp = parseFloat(sweep.targetLevel.toFixed(2));
     const risk = Math.abs(entry - sl);
 
-    // Validity checks
-    if (risk < entry * MIN_STOP_PCT)              { stats.riskFail++; continue; }
-    if (risk > entry * 0.04)                      { stats.riskFail++; continue; }
-    if (isLong  && (sl >= entry || tp <= entry))  { stats.riskFail++; continue; }
-    if (!isLong && (sl <= entry || tp >= entry))  { stats.riskFail++; continue; }
-    if (Math.abs(tp - entry) < MIN_TP_DIST)       { stats.riskFail++; continue; }
+    // Validity checks — log reason for debug
+    const tpDist = Math.abs(tp - entry);
+    const failReason =
+      risk < entry * MIN_STOP_PCT              ? `stop_too_small (risk=$${risk.toFixed(3)}, min=$${(entry*MIN_STOP_PCT).toFixed(3)})` :
+      risk > entry * 0.04                      ? `stop_too_large (risk=$${risk.toFixed(3)})` :
+      isLong  && sl >= entry                   ? `bull_sl_above_entry (sl=$${sl} entry=$${entry})` :
+      isLong  && tp <= entry                   ? `bull_tp_below_entry` :
+      !isLong && sl <= entry                   ? `bear_sl_below_entry (sl=$${sl} entry=$${entry})` :
+      !isLong && tp >= entry                   ? `bear_tp_above_entry (tp=$${tp} entry=$${entry})` :
+      tpDist < MIN_TP_DIST                     ? `tp_too_close (dist=$${tpDist.toFixed(3)})` : null;
+    if (failReason) {
+      stats.riskFail++;
+      stats.riskFailLog = stats.riskFailLog || [];
+      stats.riskFailLog.push({ date: dateStr, dir: isLong?'BUY':'SELL', entry, sl, tp, fvgSize: fvg.size, reason: failReason,
+        sweptLevel: sweep.sweptLevel, targetLevel: sweep.targetLevel, slAnchor: result.slAnchor });
+      continue;
+    }
 
     const rrPot = parseFloat((Math.abs(tp - entry) / risk).toFixed(2));
 
@@ -484,6 +495,21 @@ async function run() {
   }, null, 2));
 
   console.log(chalk.gray('\n  Report → backtest_report_nas100.json'));
+
+  if (stats.riskFailLog && stats.riskFailLog.length) {
+    console.log('\n' + sep);
+    console.log(chalk.bold.yellow('  RISK-FAIL DEBUG — days that had FVG but failed validity checks'));
+    console.log(sep);
+    stats.riskFailLog.forEach((r, i) => {
+      const clr = r.dir === 'BUY' ? chalk.green : chalk.red;
+      console.log(`\n  #${i+1} ${chalk.gray(r.date)}  ${clr(r.dir)}  FVG: $${r.fvgSize}`);
+      console.log(`  Entry $${r.entry}  SL $${r.sl}  TP $${r.tp}  slAnchor $${r.slAnchor}`);
+      console.log(`  Swept $${r.sweptLevel}  → Target $${r.targetLevel}`);
+      console.log(chalk.red(`  ✗ ${r.reason}`));
+    });
+    console.log('\n' + sep);
+  }
+
   console.log('\n' + sep + '\n');
 }
 
