@@ -259,6 +259,8 @@ async function run() {
     if (risk < MIN_STOP_PTS || risk > entry * 0.025)       { stats.riskFail++; continue; }
     if (isLong  && (sl >= entry || tp <= entry))            { stats.riskFail++; continue; }
     if (!isLong && (sl <= entry || tp >= entry))            { stats.riskFail++; continue; }
+    // Skip if opposing liquidity TP gives less than 2R — not worth taking
+    if (Math.abs(tp - entry) / risk < 2.0)                 { stats.riskFail++; continue; }
 
     const rrPotential = parseFloat((Math.abs(tp - entry) / risk).toFixed(2));
 
