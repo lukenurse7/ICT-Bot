@@ -10,13 +10,25 @@ const {
   printMSS, printFVG, printConfluence, printSignal, printWaiting
 } = require('./format_xau');
 
-// XAUUSD scans always during market hours — no kill zone restriction
-const SCAN_INTERVAL   = 60;   // every 60s regardless of session
-const SIGNAL_COOLDOWN = 600;  // 10 min cooldown between same-direction signals
+const SCAN_INTERVAL = 60;
 
-let lastSignalTime = 0;
-let lastSignalDir  = null;
-let timer          = null;
+// Kill zone windows: London 07:00-09:00 UTC, NY 12:00-15:00 UTC
+function isKillZone() {
+  const h = new Date().getUTCHours();
+  return (h >= 7 && h < 9) || (h >= 12 && h < 15);
+}
+function currentKZWindow() {
+  const h = new Date().getUTCHours();
+  const d = new Date().toISOString().slice(0, 10);
+  if (h >= 7 && h < 9)  return `${d}_LON`;
+  if (h >= 12 && h < 15) return `${d}_NY`;
+  return null;
+}
+
+let lastSignalTime  = 0;
+let lastSignalDir   = null;
+let lastKZWindow    = null;
+let timer           = null;
 
 async function scan() {
   try {
@@ -29,8 +41,9 @@ async function scan() {
     }
 
     const session = sessionStatus();
-    // Pass session but don't gate on it — XAUUSD trades anytime
-    const alwaysActive = { ...session, active: true };
+    const inKZ    = isKillZone();
+    // Signal gate: only active during London or NY kill zone
+    const kzSession = { ...session, active: inKZ };
 
     console.log(chalk.gray('  Fetching live XAUUSD data from TwelveData...'));
     const data = await fetchAll();
@@ -38,7 +51,7 @@ async function scan() {
     const asiaRange = getAsiaSessionBounds(data.h1);
 
     console.log(chalk.gray('  Running ICT analysis...\n'));
-    const result = runAnalysis(data, asiaRange, alwaysActive);
+    const result = runAnalysis(data, asiaRange, kzSession);
 
     printStatusBar(result.quote, session, result.htf);
     printKeyLevels(result.lvls);
@@ -52,17 +65,21 @@ async function scan() {
     printConfluence(result.confluence);
 
     if (result.signal) {
-      const now = Date.now();
-      const sameDir = result.signal.direction === lastSignalDir;
-      const cooled  = (now - lastSignalTime) > SIGNAL_COOLDOWN * 1000;
+      const now    = Date.now();
+      const kzWin  = currentKZWindow();
+      const sameWindow = kzWin && kzWin === lastKZWindow && result.signal.direction === lastSignalDir;
+      const outsideKZ  = !inKZ;
 
-      if (!sameDir || cooled) {
+      if (outsideKZ) {
+        console.log(chalk.gray('\n  Setup valid but outside KZ — no signal sent'));
+      } else if (sameWindow) {
+        const elapsed = Math.round((now - lastSignalTime) / 60000);
+        console.log(chalk.gray(`\n  Signal already fired this ${kzWin?.split('_')[1]} session (${elapsed}m ago)`));
+      } else {
         printSignal(result.signal);
         lastSignalTime = now;
         lastSignalDir  = result.signal.direction;
-      } else {
-        console.log(chalk.gray('\n  Signal active — cooldown: ') +
-          chalk.yellow(`${Math.round((SIGNAL_COOLDOWN * 1000 - (now - lastSignalTime)) / 60000)}m remaining`));
+        lastKZWindow   = kzWin;
       }
     } else {
       printWaiting(result.waitReason, result);

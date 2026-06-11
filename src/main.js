@@ -31,7 +31,7 @@ const SIGNAL_COOLDOWN = 600 * 1000; // 10 min ms
 
 // Per-instrument state
 const state = {
-  xau:  { lastTime: 0, lastDir: null },
+  xau:  { lastTime: 0, lastDir: null, lastKZWindow: null },
   dj30: { lastTime: 0, lastDir: null }
 };
 
@@ -52,18 +52,39 @@ function banner() {
   console.log(divider());
 }
 
+// ─── XAUUSD kill zone check ───────────────────────────────────────────────
+// Only fire signals during London (07:00-09:00 UTC) or NY (12:00-15:00 UTC)
+function isXauKillZone() {
+  const h = new Date().getUTCHours();
+  return (h >= 7 && h < 9) || (h >= 12 && h < 15);
+}
+
+// Track the last kill zone window a signal fired in — prevents stale re-fires
+// when price revisits the FVG hours later
+function currentKZWindow() {
+  const h = new Date().getUTCHours();
+  const d = new Date().toISOString().slice(0, 10);
+  if (h >= 7 && h < 9)  return `${d}_LON`;
+  if (h >= 12 && h < 15) return `${d}_NY`;
+  return null;
+}
+
 // ─── XAUUSD scan ─────────────────────────────────────────────────────────
 
 async function scanXAU() {
   if (!isWeekday()) return;
 
+  // Only generate signals inside kill zones — outside KZ, just show status
+  const inKZ = isXauKillZone();
+
   try {
     const session = sessionStatus();
-    const alwaysActive = { ...session, active: true };
+    // Signal gate: active only during kill zones
+    const kzSession = { ...session, active: inKZ };
 
     const data     = await xauFetch();
     const asia     = getAsiaSessionBounds(data.h1);
-    const result   = runAnalysis(data, asia, alwaysActive);
+    const result   = runAnalysis(data, asia, kzSession);
 
     // Print compact XAU block
     console.log('\n' + chalk.bold.yellow('  ◆ XAUUSD') + chalk.gray(`  [${ts()}]`));
@@ -77,18 +98,27 @@ async function scanXAU() {
     printConfluence(result.confluence);
 
     if (result.signal) {
-      const now = Date.now();
-      const s   = state.xau;
-      const dup = result.signal.direction === s.lastDir && (now - s.lastTime) < SIGNAL_COOLDOWN;
+      const now  = Date.now();
+      const s    = state.xau;
+      const kzWin = currentKZWindow();
 
-      if (!dup) {
+      // Block if: same direction AND same kill zone window (signal already fired this session)
+      const sameWindow = kzWin && kzWin === s.lastKZWindow && result.signal.direction === s.lastDir;
+      // Also block if: outside kill zone (stale setup being evaluated between sessions)
+      const outsideKZ  = !inKZ;
+
+      if (outsideKZ) {
+        console.log(chalk.gray('  [XAU] Setup valid but outside KZ — no signal sent'));
+      } else if (sameWindow) {
+        const elapsed = Math.round((now - s.lastTime) / 60000);
+        console.log(chalk.gray(`  [XAU] Signal already fired this ${kzWin?.split('_')[1]} session (${elapsed}m ago)`));
+      } else {
         printXauSignal(result.signal);
         publishSignal(result.signal);
-        tg.send(tg.signalMessage(result.signal));  // → Telegram
-        s.lastTime = now;
-        s.lastDir  = result.signal.direction;
-      } else {
-        console.log(chalk.gray('  [XAU] Signal cooldown active'));
+        tg.send(tg.signalMessage(result.signal));
+        s.lastTime     = now;
+        s.lastDir      = result.signal.direction;
+        s.lastKZWindow = kzWin;
       }
     } else {
       printWaiting(result.waitReason, result);

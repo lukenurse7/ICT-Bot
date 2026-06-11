@@ -19,9 +19,6 @@ const {
 
 const ACCOUNT_START = 1500;
 const RISK_PCT      = 0.02;
-const TP1_R         = 1.5;
-const TP2_R         = 2.5;
-const TP3_R         = 5.0;
 const SIM_BARS      = 288;
 const MIN_SCORE     = 80;
 const COOLDOWN      = 36;
@@ -98,25 +95,24 @@ function htfAlignedFn(htf, dir) {
       || (dir === 'bear' && (htf.bias === 'bearish' || htf.bias === 'pullback_in_bull'));
 }
 
-function simulateOutcome(dir, entry, sl, tp1, tp2, tp3, futureCandles) {
+// Simulate trade with structure-based TPs (variable R, not fixed multiples)
+// Management: 50% off at TP1 → SL moves to breakeven → 50% runs to TP2
+function simulateOutcome(dir, entry, sl, tp1, tp2, tp1R, tp2R, futureCandles) {
   let tp1Hit = false, currentSL = sl;
   for (const c of futureCandles) {
     const slHit   = dir === 'bull' ? c.low  <= currentSL : c.high >= currentSL;
     const tp1Hit_ = dir === 'bull' ? c.high >= tp1       : c.low  <= tp1;
     const tp2Hit  = dir === 'bull' ? c.high >= tp2       : c.low  <= tp2;
-    const tp3Hit  = dir === 'bull' ? c.high >= tp3       : c.low  <= tp3;
     if (!tp1Hit) {
       if (slHit)   return { result: 'LOSS',       pnlR: -1 };
-      if (tp3Hit)  return { result: 'WIN_TP3',    pnlR: 0.5*TP1_R + 0.25*TP2_R + 0.25*TP3_R };
-      if (tp2Hit)  return { result: 'WIN_TP2',    pnlR: 0.5*TP1_R + 0.5*TP2_R };
+      if (tp2Hit)  return { result: 'WIN_TP2',    pnlR: +(0.5 * tp1R + 0.5 * tp2R).toFixed(2) };
       if (tp1Hit_) { tp1Hit = true; currentSL = entry; }
     } else {
-      if (slHit)   return { result: 'WIN_TP1_BE', pnlR: 0.5*TP1_R };
-      if (tp3Hit)  return { result: 'WIN_TP3',    pnlR: 0.5*TP1_R + 0.25*TP2_R + 0.25*TP3_R };
-      if (tp2Hit)  return { result: 'WIN_TP2',    pnlR: 0.5*TP1_R + 0.5*TP2_R };
+      if (slHit)   return { result: 'WIN_TP1_BE', pnlR: +(0.5 * tp1R).toFixed(2) };
+      if (tp2Hit)  return { result: 'WIN_TP2',    pnlR: +(0.5 * tp1R + 0.5 * tp2R).toFixed(2) };
     }
   }
-  if (tp1Hit) return { result: 'WIN_TP1_OPEN', pnlR: 0.5*TP1_R };
+  if (tp1Hit) return { result: 'WIN_TP1_OPEN', pnlR: +(0.5 * tp1R).toFixed(2) };
   return { result: 'OPEN', pnlR: null };
 }
 
@@ -184,18 +180,30 @@ function run() {
     if (!htfAlignedFn(htf, dir)) continue;
 
     const isLong     = dir === 'bull';
-    const limitEntry = fvg.optimalEntry;                       // FVG midpoint — your limit price
-    const buf        = limitEntry * 0.0008;
-    const sl         = isLong
-      ? Math.min((sweepResult.mostRecent.sweepLow  || limitEntry) - buf, limitEntry - buf * 2)
-      : Math.max((sweepResult.mostRecent.sweepHigh || limitEntry) + buf, limitEntry + buf * 2);
-    const risk = Math.abs(limitEntry - sl);
+    const limitEntry = fvg.optimalEntry;
+
+    // SL: above the swing high swept (for SELL) / below swing low swept (for BUY) + $3 buffer
+    const SL_BUF = 3;
+    let sl;
+    if (isLong) {
+      const sweepExtreme = sweepResult.mostRecent.sweepLow ?? (limitEntry - SL_BUF * 3);
+      sl = parseFloat((sweepExtreme - SL_BUF).toFixed(2));
+      if (sl >= limitEntry) sl = parseFloat((limitEntry - SL_BUF * 3).toFixed(2));
+    } else {
+      const sweepExtreme = sweepResult.mostRecent.sweepHigh ?? (limitEntry + SL_BUF * 3);
+      sl = parseFloat((sweepExtreme + SL_BUF).toFixed(2));
+      if (sl <= limitEntry) sl = parseFloat((limitEntry + SL_BUF * 3).toFixed(2));
+    }
+
+    const risk = parseFloat(Math.abs(limitEntry - sl).toFixed(2));
     if (risk > 15 || risk <= 0) continue;
 
-    const tp1 = isLong ? limitEntry + risk * TP1_R : limitEntry - risk * TP1_R;
-    const liq = liquidityTargets(dir, limitEntry, risk, lvls, slice5m, sliceH1);
-    const tp2 = liq.tp2;
-    const tp3 = liq.tp3;
+    // TP: nearest real structure levels (Asia opposite, 1H swings, PDH/PDL)
+    const liq  = liquidityTargets(dir, limitEntry, risk, lvls, slice5m, sliceH1);
+    const tp1  = liq.tp1;
+    const tp2  = liq.tp2;
+    const tp1R = liq.tp1R;
+    const tp2R = liq.tp2R;
 
     // ── Check if limit fills within FILL_WINDOW bars ──────────────────────────
     const fillBars = period5m.slice(i + 1, i + 1 + FILL_WINDOW);
@@ -223,7 +231,7 @@ function run() {
 
     // ── Filled — simulate from bar after fill ─────────────────────────────────
     const future  = period5m.slice(i + 1 + fillIdx + 1, i + 1 + fillIdx + 1 + SIM_BARS);
-    const outcome = simulateOutcome(dir, limitEntry, sl, tp1, tp2, tp3, future);
+    const outcome = simulateOutcome(dir, limitEntry, sl, tp1, tp2, tp1R, tp2R, future);
 
     // 2% of CURRENT balance = risk amount — this is the compounding
     const riskGBP = balance * RISK_PCT;
@@ -239,11 +247,9 @@ function run() {
     signals.push({
       time: bar.time, dir: isLong ? 'BUY' : 'SELL',
       limitEntry: parseFloat(limitEntry.toFixed(2)),
-      sl: parseFloat(sl.toFixed(2)),
-      tp1: parseFloat(tp1.toFixed(2)),
-      tp2: parseFloat(tp2.toFixed(2)),
-      tp3: parseFloat(tp3.toFixed(2)),
+      sl, tp1, tp2, tp1R, tp2R,
       risk: parseFloat(risk.toFixed(2)),
+      tp1Desc: liq.tp1Desc, tp2Desc: liq.tp2Desc,
       session: sessionLabel(bar.time),
       htfBias: htf.bias,
       score: conf.score, grade: conf.grade,
@@ -295,9 +301,12 @@ function run() {
     console.log(
       chalk.gray('       Limit ') + chalk.white(`$${s.limitEntry}`) +
       chalk.gray('  SL ') + chalk.red(`$${s.sl}`) +
-      chalk.gray('  TP1 ') + chalk.green(`$${s.tp1}`) +
-      chalk.gray('  TP2 ') + chalk.green(`$${s.tp2}`) +
-      '  ' + oc(s.result) + '  ' + pnlStr +
+      chalk.gray(`  TP1 `) + chalk.green(`$${s.tp1}`) + chalk.gray(` (${s.tp1R}R ${s.tp1Desc})`) +
+      chalk.gray(`  TP2 `) + chalk.green(`$${s.tp2}`) + chalk.gray(` (${s.tp2R}R ${s.tp2Desc})`)
+    );
+    console.log(
+      chalk.gray('              ') +
+      oc(s.result) + '  ' + pnlStr +
       (s.balanceAfter ? chalk.gray('  → ') + chalk.white(fmtGBP(s.balanceAfter)) : '')
     );
   });

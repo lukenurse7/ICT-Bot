@@ -428,144 +428,157 @@ function findOrderBlock(candles5m, sweepResult) {
 
 // ─── 7. LIQUIDITY TARGET SCANNER ─────────────────────────────────────────────
 
-// Scan candles for equal highs or equal lows (2+ touches within tolerance)
-function findEqualLevels(candles, dir, lookback = 30, tol = 2.5) {
+// Find 5m equal lows (SSL pools) or equal highs (BSL pools) within tolerance
+function findEqualLevels(candles, dir, lookback = 40, tol = 3.0) {
   const slice = candles.slice(-lookback);
-  const levels = [];
+  const swings = findSwings(slice, 2);
   const prices = dir === 'bear'
-    ? slice.map(c => c.low)   // equal lows below = sell-side liquidity (SSL)
-    : slice.map(c => c.high); // equal highs above = buy-side liquidity (BSL)
+    ? swings.lows.map(s => s.price)
+    : swings.highs.map(s => s.price);
 
+  const clusters = [];
   for (let i = 0; i < prices.length; i++) {
-    const p = prices[i];
-    const touches = prices.filter(x => Math.abs(x - p) <= tol).length;
-    if (touches >= 2) levels.push({ price: p, touches, source: `5m equal ${dir === 'bear' ? 'lows' : 'highs'}` });
+    const group = prices.filter(x => Math.abs(x - prices[i]) <= tol);
+    if (group.length >= 2) {
+      const avg = group.reduce((s, x) => s + x, 0) / group.length;
+      if (!clusters.find(c => Math.abs(c.price - avg) <= tol))
+        clusters.push({ price: avg, touches: group.length, source: `5m equal ${dir === 'bear' ? 'lows' : 'highs'} (${group.length} touches)` });
+    }
   }
-  // Deduplicate — group levels within tolerance
-  const deduped = [];
-  for (const l of levels) {
-    if (!deduped.find(d => Math.abs(d.price - l.price) <= tol)) deduped.push(l);
-  }
-  return deduped;
+  return clusters;
 }
 
-// Scan H1 candles for swing highs/lows from last N candles
-function findH1SwingLevels(h1Candles, dir, lookback = 10) {
+// Find genuine 1H swing points (not every bar — swing highs/lows only)
+function findH1Swings(h1Candles, dir, lookback = 30) {
   const slice = h1Candles.slice(-lookback);
+  const swings = findSwings(slice, 2);
   if (dir === 'bear') {
-    // Swing lows below = sell-side liquidity targets
-    return slice.map(c => ({ price: c.low,  source: '1H swing low' }))
-                .sort((a, b) => b.price - a.price); // highest first (closest to entry for SELL)
+    return swings.lows
+      .map(s => ({ price: s.price, source: '1H swing low' }))
+      .sort((a, b) => b.price - a.price);
   } else {
-    return slice.map(c => ({ price: c.high, source: '1H swing high' }))
-                .sort((a, b) => a.price - b.price); // lowest first (closest to entry for BUY)
+    return swings.highs
+      .map(s => ({ price: s.price, source: '1H swing high' }))
+      .sort((a, b) => a.price - b.price);
   }
 }
 
-// Multi-timeframe liquidity target hierarchy
-// Returns { tp2, tp2Desc, tp3, tp3Desc }
+// ─── Structure-based TP scanner ───────────────────────────────────────────────
+// TPs are placed at real price levels where liquidity ACTUALLY sits.
+// No arbitrary R-multiple minimums — the market decides the R.
+//
+// Priority order for TP1 (nearest target):
+//   1. Asia session opposite extreme  — primary ICT KZ target
+//   2. 5m equal high/low clusters     — fresh liquidity pools just printed
+//   3. 1H genuine swing high/low      — nearest structure on 1H
+//   4. PDH / PDL                      — institutional daily level
+//
+// TP2 (next target beyond TP1):
+//   Same hierarchy, but must be meaningfully further than TP1
+//
+// Min distance from entry: 0.5R (filters sub-noise targets)
+// Max distance from entry: 15R (filters unreachable levels for a 1-day trade)
+
 function liquidityTargets(dir, entry, risk, levels, candles5m, h1Candles) {
-  const isLong = dir === 'bull';
+  const isLong  = dir === 'bull';
+  const MIN_R   = 1.0;   // ignore levels less than 1R away — too close to be meaningful
+  const MAX_R   = 15.0;
 
-  // TP2: minimum 2.5R — target 1H swing levels and session highs/lows
-  // TP3: minimum 4R   — target PDH/PDL, PWH/PWL, or fixed 5R extension
-  // 5m equal lows/highs deliberately excluded — too close, creates clustered TPs
+  function rOf(p)          { return Math.abs(p - entry) / risk; }
+  function validSide(p)    { return isLong ? p > entry : p < entry; }
+  function inRange(p)      { return rOf(p) >= MIN_R && rOf(p) <= MAX_R; }
 
-  const tp2MinR = 2.5;
-  const tp3MinR = 4.0;
-  const tp2MaxR = 6.0;
-  const tp3MaxR = 10.0;
+  const candidates = [];
 
-  function rOf(price) { return Math.abs(price - entry) / risk; }
-
-  // TP2 candidates — 1H swings and session levels (meaningful structure)
-  const tp2Candidates = [];
-
-  const h1Swings = findH1SwingLevels(h1Candles, isLong ? 'bull' : 'bear', 24);
-  for (const l of h1Swings) {
-    const r = rOf(l.price);
-    if (r >= tp2MinR && r <= tp2MaxR && (isLong ? l.price > entry : l.price < entry))
-      tp2Candidates.push(l);
+  function add(price, source, priority) {
+    if (price && validSide(price) && inRange(price))
+      candidates.push({ price: parseFloat(price.toFixed(2)), source, priority, r: rOf(price) });
   }
 
-  if (levels.asiaHigh && isLong && rOf(levels.asiaHigh) >= tp2MinR && rOf(levels.asiaHigh) <= tp2MaxR)
-    tp2Candidates.push({ price: levels.asiaHigh, source: 'Asia High (BSL)' });
-  if (levels.asiaLow && !isLong && rOf(levels.asiaLow) >= tp2MinR && rOf(levels.asiaLow) <= tp2MaxR)
-    tp2Candidates.push({ price: levels.asiaLow, source: 'Asia Low (SSL)' });
+  // 1. Asia opposite extreme — where price CAME FROM before the session, now the target
+  if (isLong)  add(levels.asiaHigh, 'Asia High (BSL)',     1);
+  if (!isLong) add(levels.asiaLow,  'Asia Low (SSL)',      1);
 
-  tp2Candidates.sort((a, b) => Math.abs(a.price - entry) - Math.abs(b.price - entry));
-  const tp2Obj  = tp2Candidates[0];
-  const tp2     = tp2Obj ? tp2Obj.price : (isLong ? entry + risk * tp2MinR : entry - risk * tp2MinR);
-  const tp2Desc = tp2Obj ? tp2Obj.source : `Fixed ${tp2MinR}R`;
+  // 2. 5m equal high/low clusters — fresh liquidity pools printed this session
+  const eq5m = findEqualLevels(candles5m, isLong ? 'bull' : 'bear', 60, 3.0);
+  for (const l of eq5m) add(l.price, l.source, 2);
 
-  // TP3 candidates — PDH/PDL, PWH/PWL, or further 1H swings beyond TP2
-  const tp3Candidates = [];
-  const tp2R = rOf(tp2);
+  // 3. 1H genuine swing levels — clean structural liquidity
+  const h1sw = findH1Swings(h1Candles, isLong ? 'bull' : 'bear', 30);
+  for (const l of h1sw) add(l.price, l.source, 3);
 
-  if (isLong && levels.pdh && rOf(levels.pdh) > tp2R && rOf(levels.pdh) <= tp3MaxR)
-    tp3Candidates.push({ price: levels.pdh, source: 'Prev Day High' });
-  if (!isLong && levels.pdl && rOf(levels.pdl) > tp2R && rOf(levels.pdl) <= tp3MaxR)
-    tp3Candidates.push({ price: levels.pdl, source: 'Prev Day Low' });
-  if (isLong && levels.pwh && rOf(levels.pwh) > tp2R && rOf(levels.pwh) <= tp3MaxR)
-    tp3Candidates.push({ price: levels.pwh, source: 'Prev Week High' });
-  if (!isLong && levels.pwl && rOf(levels.pwl) > tp2R && rOf(levels.pwl) <= tp3MaxR)
-    tp3Candidates.push({ price: levels.pwl, source: 'Prev Week Low' });
+  // 4. PDH / PDL — daily institutional levels
+  if (isLong)  add(levels.pdh, 'Prev Day High', 4);
+  if (!isLong) add(levels.pdl, 'Prev Day Low',  4);
 
-  // Also consider 1H swings beyond TP2
-  for (const l of h1Swings) {
-    const r = rOf(l.price);
-    if (r > tp2R + 0.5 && r <= tp3MaxR && (isLong ? l.price > tp2 : l.price < tp2))
-      tp3Candidates.push(l);
+  // 5. PWH / PWL — weekly levels (extended targets only)
+  if (isLong)  add(levels.pwh, 'Prev Week High', 5);
+  if (!isLong) add(levels.pwl, 'Prev Week Low',  5);
+
+  // Sort by distance (closest first), then priority
+  candidates.sort((a, b) => a.r !== b.r ? a.r - b.r : a.priority - b.priority);
+
+  // Deduplicate — collapse levels within $5 of each other
+  const deduped = [];
+  for (const c of candidates) {
+    if (!deduped.find(d => Math.abs(d.price - c.price) <= 5)) deduped.push(c);
   }
 
-  tp3Candidates.sort((a, b) => Math.abs(a.price - entry) - Math.abs(b.price - entry));
-  const tp3Obj  = tp3Candidates[0];
-  const tp3     = tp3Obj ? tp3Obj.price : (isLong ? entry + risk * 5 : entry - risk * 5);
-  const tp3Desc = tp3Obj ? tp3Obj.source : 'Fixed 5R extension';
+  // TP1 = closest real level
+  const tp1Obj = deduped[0] || null;
+  const tp1    = tp1Obj ? tp1Obj.price : parseFloat((isLong ? entry + risk * 2 : entry - risk * 2).toFixed(2));
+  const tp1R   = parseFloat(rOf(tp1).toFixed(2));
+  const tp1Desc = tp1Obj ? tp1Obj.source : 'Fixed 2R (no structure found)';
 
-  return { tp2: parseFloat(tp2.toFixed(2)), tp2Desc, tp3: parseFloat(tp3.toFixed(2)), tp3Desc };
+  // TP2 = next level at least 1R further than TP1
+  const tp2Candidates = deduped.filter(c => c.r >= tp1R + 1.0);
+  const tp2Obj  = tp2Candidates[0] || null;
+  const tp2     = tp2Obj ? tp2Obj.price : parseFloat((isLong ? entry + risk * (tp1R + 2) : entry - risk * (tp1R + 2)).toFixed(2));
+  const tp2R    = parseFloat(rOf(tp2).toFixed(2));
+  const tp2Desc = tp2Obj ? tp2Obj.source : 'Fixed extension (no structure beyond TP1)';
+
+  return { tp1, tp1R, tp1Desc, tp2, tp2R, tp2Desc };
 }
 
 // ─── 7b. TP / SL CALCULATION ─────────────────────────────────────────────────
 
-// Max risk in points — signals with wider stops are skipped
+// SL for XAUUSD:
+//   SHORT → above the swing high that was swept (the BSL pool just taken) + $3 buffer
+//   LONG  → below the swing low that was swept (the SSL pool just taken) − $3 buffer
+//
+// $3 buffer is tight enough to keep risk small while staying above the actual wick.
+// We skip setups wider than $15 — if the sweep wick was $15+ above entry, the setup is poor.
+const SL_BUF_PTS  = 3;
 const MAX_RISK_PTS = 15;
 
 function calcLevels(dir, entry, sweep, levels, fvg, ob, candles5m, h1Candles) {
   const isLong = dir === 'bull';
-  const buf = entry * 0.0008;
 
+  // SL = beyond the sweep wick (the liquidity pool that was taken) + $3
   let sl;
   if (isLong) {
-    const rawSL = sweep.sweepLow !== undefined ? sweep.sweepLow - buf : entry - entry * 0.004;
-    sl = Math.min(rawSL, entry - buf * 2);
+    const sweepExtreme = sweep.sweepLow ?? (entry - SL_BUF_PTS * 3);
+    sl = parseFloat((sweepExtreme - SL_BUF_PTS).toFixed(2));
   } else {
-    const sweepSL = sweep.sweepHigh !== undefined ? sweep.sweepHigh + buf : entry + entry * 0.004;
-    const obSL    = ob?.high ? ob.high + buf : 0;
-    const fvgSL   = fvg?.top ? fvg.top + buf : 0;
-    const rawSL   = Math.max(sweepSL, obSL, fvgSL);
-    sl = Math.max(rawSL, entry + buf * 2);
+    const sweepExtreme = sweep.sweepHigh ?? (entry + SL_BUF_PTS * 3);
+    sl = parseFloat((sweepExtreme + SL_BUF_PTS).toFixed(2));
   }
 
-  const risk = Math.abs(entry - sl);
-  const tp1  = isLong ? entry + risk * 1.5 : entry - risk * 1.5;
+  // Sanity check: SL must be on the correct side of entry
+  if (isLong  && sl >= entry) sl = parseFloat((entry - SL_BUF_PTS * 2).toFixed(2));
+  if (!isLong && sl <= entry) sl = parseFloat((entry + SL_BUF_PTS * 2).toFixed(2));
 
-  // TP2/TP3 from liquidity hierarchy
-  const { tp2, tp2Desc, tp3, tp3Desc } = liquidityTargets(dir, entry, risk, levels, candles5m, h1Candles);
+  const risk = parseFloat(Math.abs(entry - sl).toFixed(2));
 
-  const rr1 = (Math.abs(tp1 - entry) / risk).toFixed(1);
-  const rr2 = (Math.abs(tp2 - entry) / risk).toFixed(1);
+  // TP1 and TP2 from real structure
+  const { tp1, tp1R, tp1Desc, tp2, tp2R, tp2Desc } = liquidityTargets(dir, entry, risk, levels, candles5m, h1Candles);
 
   return {
-    entry:      parseFloat(entry.toFixed(2)),
-    sl:         parseFloat(sl.toFixed(2)),
-    tp1:        parseFloat(tp1.toFixed(2)),
-    tp2, tp3, rr1, rr2,
-    riskPoints: parseFloat(risk.toFixed(2)),
-    slDesc:     isLong ? 'Below sweep low + buffer' : 'Above sweep high + buffer',
-    tp1Desc:    '1.5R — 50% close, SL to breakeven',
-    tp2Desc,
-    tp3Desc
+    entry, sl, tp1, tp2,
+    tp1R, tp2R,
+    riskPoints: risk,
+    slDesc:  isLong ? `Below sweep low $${sweep.sweepLow?.toFixed(2)} − $${SL_BUF_PTS}` : `Above sweep high $${sweep.sweepHigh?.toFixed(2)} + $${SL_BUF_PTS}`,
+    tp1Desc, tp2Desc
   };
 }
 
@@ -714,14 +727,12 @@ function runAnalysis(data, asiaRange, sessionStatus) {
       sl:          levels.sl,
       tp1:         levels.tp1,
       tp2:         levels.tp2,
-      tp3:         levels.tp3,
-      rr1:         levels.rr1,
-      rr2:         levels.rr2,
+      tp1R:        levels.tp1R,
+      tp2R:        levels.tp2R,
       riskPoints:  levels.riskPoints,
       slDesc:      levels.slDesc,
       tp1Desc:     levels.tp1Desc,
       tp2Desc:     levels.tp2Desc,
-      tp3Desc:     levels.tp3Desc,
       confluence:  confluence.score,
       grade:       confluence.grade,
       timestamp:   new Date().toISOString(),
