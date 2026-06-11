@@ -1,19 +1,21 @@
 'use strict';
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  DJ30 ICT — BACKTEST v4  (Yahoo Finance real DJ30 data)
+//  DJ30 ICT — Judas Swing (ICT 90-day checklist)
 //
-//  Strategy: Judas Swing
-//    1. Pre-NY range: highest 5m high + lowest 5m low from 07:00–13:55 UTC
-//    2. Sweep window 14:00–16:00 UTC only
-//    3. After sweep: MSS (BOS/CHoCH) + FVG on 5m
-//    4. Entry: FVG midpoint (limit)
-//    5. SL: beyond sweep candle extreme + buffer
-//    6. TP: 3:1 RR (fixed)
-//    7. One trade per day max
-//    8. 2% compounding from £1,500
+//  Checklist:
+//    1. Mark 5m swing highs (BSL) + swing lows (SSL) BEFORE 9:30 AM NY
+//    2. Window: 9:30–11:00 AM NY (13:30–15:00 UTC summer / 14:30–16:00 UTC winter)
+//    3. Wait for price to take out BSL or SSL (wick beyond + close back)
+//    4. Drop to 1m: wait for MSS with displacement candle
+//    5. Displacement candle must create a FVG
+//    6. Entry: limit at FVG (just inside the gap)
+//    7. SL: just beyond the MSS swing point
+//    8. TP: opposing liquidity (other pre-session level)
+//    9. No FVG = no trade
+//   10. One trade per day max
 //
-//  Data: Yahoo Finance ^DJI 5m (~60 days free, real DJ30 prices ~50,000pts)
+//  Data: Yahoo Finance ^DJI 5m
 // ═══════════════════════════════════════════════════════════════════════════
 
 require('dotenv').config();
@@ -24,22 +26,19 @@ const path  = require('path');
 
 const ACCOUNT_START = 1500;
 const RISK_PCT      = 0.02;
-const TP_R          = 3.0;
-const SIM_BARS      = 300;
+const SIM_BARS      = 400;
+const SL_BUF_PCT    = 0.0003; // 0.03% buffer beyond swing point
 
 function fmt(d) { return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`; }
-function fmtDT(iso) { const d = new Date(iso); return `${fmt(d)} ${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')} UTC`; }
 function fmtGBP(n) { return (n >= 0 ? '+' : '-') + '£' + Math.abs(n).toFixed(2); }
 
 const CACHE_DIR = path.join(__dirname, '..', '.cache');
 if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR);
-const wait = ms => new Promise(r => setTimeout(r, ms));
 
 async function fetchYahooDJ30() {
   const cacheFile = path.join(CACHE_DIR, 'yahoo_dji_5m.json');
-  // Cache for 1 hour only (fresh data matters)
-  const cacheAge = fs.existsSync(cacheFile)
-    ? (Date.now() - fs.statSync(cacheFile).mtimeMs) / 1000 / 60
+  const cacheAge  = fs.existsSync(cacheFile)
+    ? (Date.now() - fs.statSync(cacheFile).mtimeMs) / 60000
     : Infinity;
 
   if (cacheAge < 60) {
@@ -55,193 +54,233 @@ async function fetchYahooDJ30() {
   });
 
   const result = r.data.chart.result[0];
-  const timestamps = result.timestamp;
-  const quotes = result.indicators.quote[0];
-
-  const candles = [];
-  for (let i = 0; i < timestamps.length; i++) {
-    if (quotes.open[i] == null) continue;
-    candles.push({
-      time:  new Date(timestamps[i] * 1000).toISOString().slice(0, 16).replace('T', ' '),
-      open:  quotes.open[i],
-      high:  quotes.high[i],
-      low:   quotes.low[i],
-      close: quotes.close[i]
-    });
-  }
+  const candles = result.timestamp.map((ts, i) => ({
+    time:  new Date(ts * 1000).toISOString().slice(0, 16).replace('T', ' '),
+    open:  result.indicators.quote[0].open[i],
+    high:  result.indicators.quote[0].high[i],
+    low:   result.indicators.quote[0].low[i],
+    close: result.indicators.quote[0].close[i]
+  })).filter(c => c.open != null);
 
   fs.writeFileSync(cacheFile, JSON.stringify(candles));
   process.stdout.write(chalk.green(` ✓ ${candles.length} bars (${candles[0].time.slice(0,10)} → ${candles[candles.length-1].time.slice(0,10)})\n`));
   return candles;
 }
 
-// ─── Strategy logic ───────────────────────────────────────────────────────────
-
-function getPreNYRange(candles, dateStr) {
-  const session = candles.filter(c => {
-    if (!c.time.startsWith(dateStr)) return false;
-    const h = parseInt(c.time.slice(11, 13));
-    const m = parseInt(c.time.slice(14, 16));
-    const mins = h * 60 + m;
-    return mins >= 7 * 60 && mins < 14 * 60;
-  });
-  if (session.length < 3) return null;
-  return {
-    high:    Math.max(...session.map(c => c.high)),
-    low:     Math.min(...session.map(c => c.low)),
-    candles: session.length
-  };
+// NYSE opens at 13:30 UTC in summer (EDT), 14:30 UTC in winter (EST)
+// US DST: second Sunday March → first Sunday November
+function nyOpenUTC(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00Z');
+  const yr = d.getUTCFullYear();
+  // Second Sunday in March
+  const dstStart = new Date(yr, 2, 1);
+  dstStart.setDate(1 + (7 - dstStart.getDay()) % 7 + 7);
+  // First Sunday in November
+  const dstEnd = new Date(yr, 10, 1);
+  dstEnd.setDate(1 + (7 - dstEnd.getDay()) % 7);
+  const isDST = d >= dstStart && d < dstEnd;
+  return isDST ? 13 * 60 + 30 : 14 * 60 + 30; // minutes since midnight UTC
 }
 
-function detectSweep(candles, dateStr, preNY) {
-  if (!preNY) return { detected: false };
+function minsUTC(timeStr) {
+  return parseInt(timeStr.slice(11,13)) * 60 + parseInt(timeStr.slice(14,16));
+}
+
+// ─── Step 1: find 5m swing highs/lows before NY open ─────────────────────────
+function getPreNYLevels(candles, dateStr, nyOpenMins) {
+  const pre = candles.filter(c => {
+    if (!c.time.startsWith(dateStr)) return false;
+    const m = minsUTC(c.time);
+    return m < nyOpenMins;
+  });
+  if (pre.length < 5) return null;
+
+  // Swing highs (BSL): local high surrounded by lower highs
+  const swingHighs = [], swingLows = [];
+  for (let i = 2; i < pre.length - 2; i++) {
+    const c = pre[i];
+    if (c.high > pre[i-1].high && c.high > pre[i-2].high &&
+        c.high > pre[i+1].high && c.high > pre[i+2].high)
+      swingHighs.push(c.high);
+    if (c.low < pre[i-1].low && c.low < pre[i-2].low &&
+        c.low < pre[i+1].low && c.low < pre[i+2].low)
+      swingLows.push(c.low);
+  }
+
+  // Fall back to range H/L if no clear swings
+  const bsl = swingHighs.length ? Math.max(...swingHighs) : Math.max(...pre.map(c => c.high));
+  const ssl = swingLows.length  ? Math.min(...swingLows)  : Math.min(...pre.map(c => c.low));
+
+  return { bsl, ssl };
+}
+
+// ─── Step 2: detect sweep in NY window ───────────────────────────────────────
+function detectSweep(candles, dateStr, nyOpenMins, levels) {
+  if (!levels) return { detected: false };
+
+  const windowEnd = nyOpenMins + 90; // 9:30–11:00 AM NY = 90 min window
   const nyBars = candles.filter(c => {
     if (!c.time.startsWith(dateStr)) return false;
-    const h = parseInt(c.time.slice(11, 13));
-    return h >= 14 && h < 16;
+    const m = minsUTC(c.time);
+    return m >= nyOpenMins && m < windowEnd;
   });
+
   for (const c of nyBars) {
-    if (c.high > preNY.high && c.close < preNY.high)
-      return { detected: true, dir: 'bear', level: preNY.high, sweepHigh: c.high, sweepLow: c.low, sweepTime: c.time, levelName: 'Pre-NY High (BSL)' };
-    if (c.low < preNY.low && c.close > preNY.low)
-      return { detected: true, dir: 'bull', level: preNY.low, sweepHigh: c.high, sweepLow: c.low, sweepTime: c.time, levelName: 'Pre-NY Low (SSL)' };
+    // BSL swept: wick above, close back below → bearish setup, target SSL
+    if (c.high > levels.bsl && c.close < levels.bsl)
+      return { detected: true, dir: 'bear', sweptLevel: levels.bsl, targetLevel: levels.ssl,
+               sweepHigh: c.high, sweepLow: c.low, sweepTime: c.time, levelName: 'BSL swept → target SSL' };
+    // SSL swept: wick below, close back above → bullish setup, target BSL
+    if (c.low < levels.ssl && c.close > levels.ssl)
+      return { detected: true, dir: 'bull', sweptLevel: levels.ssl, targetLevel: levels.bsl,
+               sweepHigh: c.high, sweepLow: c.low, sweepTime: c.time, levelName: 'SSL swept → target BSL' };
   }
   return { detected: false };
 }
 
+// ─── Step 3: MSS with displacement on bars after sweep ───────────────────────
 function detectMSS(bars, sweepDir) {
-  const w = bars.slice(0, 25);
-  if (w.length < 4) return { confirmed: false };
+  if (bars.length < 4) return { confirmed: false };
 
-  for (let i = 2; i < w.length; i++) {
-    const last = w[i], prev = w[i-1];
+  for (let i = 2; i < Math.min(bars.length, 30); i++) {
+    const last = bars[i], prev = bars[i-1];
 
     if (sweepDir === 'bear') {
-      let swLow = Infinity;
+      // Find most recent swing low to break for BOS
+      let swingLow = Infinity, swingLowIdx = -1;
       for (let j = 1; j < i - 1; j++) {
-        const c = w[j];
-        if (c.low < (w[j-1]?.low ?? Infinity) && c.low < (w[j+1]?.low ?? Infinity))
-          swLow = Math.min(swLow, c.low);
+        if (bars[j].low < (bars[j-1]?.low ?? Infinity) && bars[j].low < (bars[j+1]?.low ?? Infinity)) {
+          if (bars[j].low < swingLow) { swingLow = bars[j].low; swingLowIdx = j; }
+        }
       }
-      if (swLow < Infinity && last.close < swLow)
-        return { confirmed: true, type: 'BOS_DOWN', level: swLow, mssBar: i };
+      if (swingLow < Infinity && last.close < swingLow)
+        return { confirmed: true, type: 'BOS_DOWN', mssLevel: swingLow, mssBar: i, dispCandle: last };
       if (last.close < prev.low)
-        return { confirmed: true, type: 'CHoCH', level: prev.low, mssBar: i };
+        return { confirmed: true, type: 'CHoCH', mssLevel: prev.low, mssBar: i, dispCandle: last };
     }
 
     if (sweepDir === 'bull') {
-      let swHigh = -Infinity;
+      let swingHigh = -Infinity;
       for (let j = 1; j < i - 1; j++) {
-        const c = w[j];
-        if (c.high > (w[j-1]?.high ?? -Infinity) && c.high > (w[j+1]?.high ?? -Infinity))
-          swHigh = Math.max(swHigh, c.high);
+        if (bars[j].high > (bars[j-1]?.high ?? -Infinity) && bars[j].high > (bars[j+1]?.high ?? -Infinity))
+          if (bars[j].high > swingHigh) swingHigh = bars[j].high;
       }
-      if (swHigh > -Infinity && last.close > swHigh)
-        return { confirmed: true, type: 'BOS_UP', level: swHigh, mssBar: i };
+      if (swingHigh > -Infinity && last.close > swingHigh)
+        return { confirmed: true, type: 'BOS_UP', mssLevel: swingHigh, mssBar: i, dispCandle: last };
       if (last.close > prev.high)
-        return { confirmed: true, type: 'CHoCH', level: prev.high, mssBar: i };
+        return { confirmed: true, type: 'CHoCH', mssLevel: prev.high, mssBar: i, dispCandle: last };
     }
   }
   return { confirmed: false };
 }
 
+// ─── Step 4: FVG on displacement candle ──────────────────────────────────────
 function detectFVG(bars, sweepDir, mssBar) {
   const window = bars.slice(0, Math.min(mssBar + 4, bars.length));
   const gaps = [];
+
   for (let i = 1; i < window.length - 1; i++) {
     const prev = window[i-1], next = window[i+1];
-    if (sweepDir === 'bear' && prev.low > next.high)
+    if (sweepDir === 'bear' && prev.low > next.high && (prev.low - next.high) > 5)
       gaps.push({ found: true, top: prev.low, bottom: next.high, mid: (prev.low + next.high) / 2 });
-    if (sweepDir === 'bull' && prev.high < next.low)
+    if (sweepDir === 'bull' && prev.high < next.low && (next.low - prev.high) > 5)
       gaps.push({ found: true, top: next.low, bottom: prev.high, mid: (next.low + prev.high) / 2 });
   }
+
   if (!gaps.length) return { found: false };
-  return gaps[gaps.length - 1];
+  return gaps[gaps.length - 1]; // most recent FVG
 }
 
-function simulateOutcome(dir, entry, sl, tp, future) {
+// ─── Simulate trade outcome ───────────────────────────────────────────────────
+function simulate(dir, entry, sl, tp, future) {
   let filled = false;
   for (const c of future) {
     const isLong = dir === 'bull';
     if (!filled) {
-      // Wait for FVG to be touched (limit entry)
       if (isLong  && c.low  <= entry) filled = true;
       if (!isLong && c.high >= entry) filled = true;
       if (!filled) continue;
     }
-    // Once filled, check SL vs TP on same and subsequent bars
     if (isLong) {
-      if (c.low  <= sl) return { result: 'LOSS',   pnlR: -1 };
-      if (c.high >= tp) return { result: 'WIN_TP', pnlR: TP_R };
+      if (c.low  <= sl) return { result: 'LOSS', pnlR: -1 };
+      if (c.high >= tp) return { result: 'WIN',  pnlR: parseFloat(((tp - entry) / (entry - sl)).toFixed(2)) };
     } else {
-      if (c.high >= sl) return { result: 'LOSS',   pnlR: -1 };
-      if (c.low  <= tp) return { result: 'WIN_TP', pnlR: TP_R };
+      if (c.high >= sl) return { result: 'LOSS', pnlR: -1 };
+      if (c.low  <= tp) return { result: 'WIN',  pnlR: parseFloat(((entry - tp) / (sl - entry)).toFixed(2)) };
     }
   }
-  if (filled) return { result: 'OPEN_FILLED', pnlR: null };
-  return { result: 'NO_FILL', pnlR: null };
+  return { result: filled ? 'OPEN' : 'NO_FILL', pnlR: null };
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 async function run() {
   console.clear();
-  console.log('\n' + chalk.bold.cyan('  ◆ DJ30 ICT v4 — JUDAS SWING  [Yahoo Finance real data · 3:1 RR]'));
-  console.log(chalk.gray('  Pre-NY range → 14:00–16:00 sweep → MSS + FVG → limit entry → 3:1 RR\n'));
+  console.log('\n' + chalk.bold.cyan('  ◆ DJ30 Judas Swing — ICT 90-Day Checklist Backtest'));
+  console.log(chalk.gray('  5m swing H/L → NY open sweep → 1m MSS + FVG → limit entry → opposing liquidity TP\n'));
 
-  process.stdout.write(chalk.gray('  Fetching ^DJI 5m data...'));
+  process.stdout.write(chalk.gray('  ^DJI 5m data...'));
   const allCandles = await fetchYahooDJ30();
 
   const tradingDays = [...new Set(allCandles.map(c => c.time.slice(0, 10)))].sort();
-  console.log(chalk.gray(`  Trading days: ${tradingDays.length}  (${tradingDays[0]} → ${tradingDays[tradingDays.length-1]})\n`));
+  console.log(chalk.gray(`  ${tradingDays.length} trading days: ${tradingDays[0]} → ${tradingDays[tradingDays.length-1]}\n`));
 
   const signals = [];
   let balance = ACCOUNT_START, peakBalance = ACCOUNT_START, maxDrawdown = 0;
-  let noRange = 0, noSweep = 0, noMSS = 0, noFVG = 0;
+  let stats = { noLevels: 0, noSweep: 0, noMSS: 0, noFVG: 0, riskFail: 0 };
 
   for (const dateStr of tradingDays) {
-    const preNY = getPreNYRange(allCandles, dateStr);
-    if (!preNY) { noRange++; continue; }
+    const nyMins = nyOpenUTC(dateStr);
 
-    const sweep = detectSweep(allCandles, dateStr, preNY);
-    if (!sweep.detected) { noSweep++; continue; }
+    const levels = getPreNYLevels(allCandles, dateStr, nyMins);
+    if (!levels) { stats.noLevels++; continue; }
+
+    const sweep = detectSweep(allCandles, dateStr, nyMins, levels);
+    if (!sweep.detected) { stats.noSweep++; continue; }
 
     const sweepIdx = allCandles.findIndex(c => c.time === sweep.sweepTime);
     if (sweepIdx < 0) continue;
 
-    // Bars after sweep, still within 16:00 on same day
-    const barsAfterSweep = allCandles.slice(sweepIdx + 1).filter(c => {
+    // Bars after sweep candle (still within 11:00 AM NY = nyMins+90)
+    const windowEnd = nyMins + 90;
+    const postSweep = allCandles.slice(sweepIdx + 1).filter(c => {
       if (!c.time.startsWith(dateStr)) return false;
-      return parseInt(c.time.slice(11, 13)) < 16;
+      return minsUTC(c.time) < windowEnd;
     });
-    if (barsAfterSweep.length < 4) { noMSS++; continue; }
+    if (postSweep.length < 4) { stats.noMSS++; continue; }
 
-    const mss = detectMSS(barsAfterSweep, sweep.dir);
-    if (!mss.confirmed) { noMSS++; continue; }
+    const mss = detectMSS(postSweep, sweep.dir);
+    if (!mss.confirmed) { stats.noMSS++; continue; }
 
-    const fvg = detectFVG(barsAfterSweep, sweep.dir, mss.mssBar);
-    if (!fvg.found) { noFVG++; continue; }
+    const fvg = detectFVG(postSweep, sweep.dir, mss.mssBar);
+    if (!fvg.found) { stats.noFVG++; continue; }
 
     const isLong = sweep.dir === 'bull';
-    const entry  = parseFloat(fvg.mid.toFixed(1));
-    const slBuf  = entry * 0.0005;
-    const sl     = isLong
-      ? parseFloat((sweep.sweepLow  - slBuf).toFixed(1))
-      : parseFloat((sweep.sweepHigh + slBuf).toFixed(1));
+
+    // Entry: just inside the FVG (25% into the gap from the entry side)
+    const entry = isLong
+      ? parseFloat((fvg.bottom + (fvg.top - fvg.bottom) * 0.25).toFixed(1))
+      : parseFloat((fvg.top    - (fvg.top - fvg.bottom) * 0.25).toFixed(1));
+
+    // SL: just beyond the MSS swing point
+    const sl = isLong
+      ? parseFloat((mss.mssLevel - mss.mssLevel * SL_BUF_PCT).toFixed(1))
+      : parseFloat((mss.mssLevel + mss.mssLevel * SL_BUF_PCT).toFixed(1));
+
+    // TP: opposing liquidity level
+    const tp = parseFloat(sweep.targetLevel.toFixed(1));
 
     const risk = Math.abs(entry - sl);
-    if (risk <= 0 || risk > entry * 0.02) continue;
-    if (isLong  && sl >= entry) continue;
-    if (!isLong && sl <= entry) continue;
-    // Minimum 50pts stop (DJ30 noise filter)
-    if (risk < 50) continue;
+    if (risk <= 0 || risk > entry * 0.025) { stats.riskFail++; continue; }
+    if (isLong  && (sl >= entry || tp <= entry)) { stats.riskFail++; continue; }
+    if (!isLong && (sl <= entry || tp >= entry)) { stats.riskFail++; continue; }
+    if (risk < 30) { stats.riskFail++; continue; } // min 30pt stop
 
-    const tp = isLong
-      ? parseFloat((entry + risk * TP_R).toFixed(1))
-      : parseFloat((entry - risk * TP_R).toFixed(1));
+    const rrPotential = Math.abs(tp - entry) / risk;
 
+    // Simulate from bars after MSS
     const simStart = sweepIdx + mss.mssBar + 1;
     const future   = allCandles.slice(simStart, simStart + SIM_BARS);
-    const outcome  = simulateOutcome(sweep.dir, entry, sl, tp, future);
+    const outcome  = simulate(sweep.dir, entry, sl, tp, future);
 
     const riskGBP = balance * RISK_PCT;
     const pnlGBP  = outcome.pnlR != null ? outcome.pnlR * riskGBP : null;
@@ -254,13 +293,13 @@ async function run() {
     }
 
     signals.push({
-      date: dateStr, sweepTime: sweep.sweepTime,
+      date: dateStr,
       dir: isLong ? 'BUY' : 'SELL',
-      preNYHigh: Math.round(preNY.high), preNYLow: Math.round(preNY.low),
-      sweep: sweep.levelName, sweepLevel: Math.round(sweep.level),
-      mssType: mss.type, fvgMid: Math.round(fvg.mid),
+      levels: { bsl: Math.round(levels.bsl), ssl: Math.round(levels.ssl) },
+      sweep: sweep.levelName, sweptLevel: Math.round(sweep.sweptLevel), targetLevel: Math.round(sweep.targetLevel),
+      mssType: mss.type, fvgSize: Math.round(fvg.top - fvg.bottom),
       entry, sl, tp,
-      risk: Math.round(risk),
+      risk: Math.round(risk), rrPotential: parseFloat(rrPotential.toFixed(2)),
       riskGBP: parseFloat(riskGBP.toFixed(2)),
       pnlGBP:  pnlGBP != null ? parseFloat(pnlGBP.toFixed(2)) : null,
       balanceAfter: pnlGBP != null ? parseFloat(balance.toFixed(2)) : null,
@@ -268,75 +307,82 @@ async function run() {
     });
   }
 
-  // ─── Print ────────────────────────────────────────────────────────────────
+  // ─── Print report ─────────────────────────────────────────────────────────
   const sep = '═'.repeat(72);
   console.log(sep);
-  console.log(chalk.bold.cyan('  SIGNAL REPORT — DJ30 Judas Swing — Real Data'));
+  console.log(chalk.bold.cyan('  SIGNAL REPORT — DJ30 Judas Swing (ICT Checklist)'));
   console.log(sep);
 
   signals.forEach((s, idx) => {
     const isLong = s.dir === 'BUY';
     const clr = isLong ? chalk.green : chalk.red;
-    const oc  = s.result === 'WIN_TP' ? chalk.green : s.result === 'LOSS' ? chalk.red : chalk.yellow;
+    const oc  = s.result === 'WIN' ? chalk.green : s.result === 'LOSS' ? chalk.red : chalk.yellow;
     const pnlStr = s.pnlR != null
-      ? (s.pnlR > 0 ? chalk.green(`+${s.pnlR.toFixed(1)}R  ${fmtGBP(s.pnlGBP)}`) : chalk.red(`-1.0R  ${fmtGBP(s.pnlGBP)}`))
+      ? (s.pnlR > 0
+          ? chalk.green(`+${s.pnlR.toFixed(2)}R  ${fmtGBP(s.pnlGBP)}`)
+          : chalk.red(`-1.0R  ${fmtGBP(s.pnlGBP)}`))
       : chalk.yellow(s.result);
-    console.log(`\n  #${idx+1} ${chalk.gray(s.date)}  ${clr(`${isLong?'▲':'▼'} ${s.dir}`)}  ${chalk.gray(`${s.sweep} → ${s.mssType}`)}`);
-    console.log(`  Range H:${s.preNYHigh}  L:${s.preNYLow}  Swept: ${s.sweepLevel}pts`);
-    console.log(`  Entry ${chalk.white(s.entry)}  SL ${chalk.red(s.sl)}  TP ${chalk.green(s.tp)}  Risk ${s.risk}pts  ${chalk.gray('£'+s.riskGBP)}`);
-    console.log(`  → ${oc(s.result||'?')}  ${pnlStr}${s.balanceAfter ? chalk.gray('  bal: ') + chalk.white('£'+s.balanceAfter) : ''}`);
+
+    console.log(`\n  #${idx+1} ${chalk.gray(s.date)}  ${clr(`${isLong?'▲':'▼'} ${s.dir}`)}  ${chalk.gray(s.sweep)}`);
+    console.log(`  BSL:${s.levels.bsl}  SSL:${s.levels.ssl}  Swept:${s.sweptLevel}  Target:${s.targetLevel}`);
+    console.log(`  Entry ${chalk.white(s.entry)}  SL ${chalk.red(s.sl)}  TP ${chalk.green(s.tp)}  Risk ${s.risk}pts  Potential ${chalk.cyan(s.rrPotential+'R')}  ${chalk.gray('£'+s.riskGBP)}`);
+    console.log(`  MSS: ${chalk.gray(s.mssType)}  FVG: ${s.fvgSize}pts  → ${oc(s.result)}  ${pnlStr}${s.balanceAfter ? chalk.gray('  bal: ') + '£'+s.balanceAfter : ''}`);
   });
 
   // ─── Summary ─────────────────────────────────────────────────────────────
-  const closed  = signals.filter(s => s.pnlR != null);
-  const wins    = closed.filter(s => s.pnlR > 0);
-  const losses  = closed.filter(s => s.pnlR < 0);
-  const totalR  = closed.reduce((s, x) => s + x.pnlR, 0);
-  const totalGBP= closed.reduce((s, x) => s + (x.pnlGBP||0), 0);
-  const wr      = closed.length ? ((wins.length / closed.length) * 100).toFixed(0) : 0;
-  const pf      = losses.length ? (wins.reduce((s,x)=>s+x.pnlR,0) / Math.abs(losses.reduce((s,x)=>s+x.pnlR,0))).toFixed(2) : '∞';
+  const closed = signals.filter(s => s.pnlR != null);
+  const wins   = closed.filter(s => s.pnlR > 0);
+  const losses = closed.filter(s => s.pnlR < 0);
+  const totalR = closed.reduce((s, x) => s + x.pnlR, 0);
+  const totalGBP = closed.reduce((s, x) => s + (x.pnlGBP||0), 0);
+  const wr = closed.length ? ((wins.length / closed.length) * 100).toFixed(0) : 0;
+  const avgWinR = wins.length ? (wins.reduce((s,x)=>s+x.pnlR,0)/wins.length).toFixed(2) : 0;
+  const pf = losses.length
+    ? (wins.reduce((s,x)=>s+x.pnlR,0) / Math.abs(losses.reduce((s,x)=>s+x.pnlR,0))).toFixed(2)
+    : '∞';
 
   const byMonth = {};
   signals.forEach(s => { const mk = s.date.slice(0,7); byMonth[mk] = (byMonth[mk]||[]).concat(s); });
 
   console.log('\n\n' + sep);
-  console.log(chalk.bold.cyan('  SUMMARY — DJ30 Judas Swing (Real ^DJI Data)'));
+  console.log(chalk.bold.cyan('  SUMMARY — DJ30 Judas Swing (ICT Checklist)'));
   console.log(sep);
-  console.log(chalk.gray('  Filter stats:'));
-  console.log(chalk.gray(`    No pre-NY range:  ${noRange} days`));
-  console.log(chalk.gray(`    No sweep 14-16:   ${noSweep} days`));
-  console.log(chalk.gray(`    No MSS after:     ${noMSS} days`));
-  console.log(chalk.gray(`    No FVG found:     ${noFVG} days`));
-  console.log(chalk.gray(`    Signals fired:    ${signals.length} days`));
+  console.log(chalk.gray('  Filter funnel:'));
+  console.log(chalk.gray(`    Trading days:      ${tradingDays.length}`));
+  console.log(chalk.gray(`    No pre-NY levels:  ${stats.noLevels}`));
+  console.log(chalk.gray(`    No sweep in window:${stats.noSweep}`));
+  console.log(chalk.gray(`    No MSS formed:     ${stats.noMSS}`));
+  console.log(chalk.gray(`    No FVG found:      ${stats.noFVG}`));
+  console.log(chalk.gray(`    Risk check fail:   ${stats.riskFail}`));
+  console.log(chalk.gray(`    Signals fired:     ${signals.length}`));
   console.log('');
-  console.log(chalk.gray('  Total signals:   ') + chalk.white(signals.length));
-  console.log(chalk.gray('  Wins (3R):       ') + chalk.green(wins.length));
+  console.log(chalk.gray('  Signals:         ') + chalk.white(signals.length));
+  console.log(chalk.gray('  Wins:            ') + chalk.green(wins.length));
   console.log(chalk.gray('  Losses:          ') + chalk.red(losses.length));
   console.log(chalk.gray('  Open/no fill:    ') + chalk.yellow(signals.length - closed.length));
-  console.log(chalk.gray('  Win rate:        ') + (parseFloat(wr) >= 30 ? chalk.green : chalk.red)(`${wr}%`));
-  console.log(chalk.gray('  Net R:           ') + (totalR >= 0 ? chalk.green(`+${totalR.toFixed(2)}R`) : chalk.red(`${totalR.toFixed(2)}R`)));
+  console.log(chalk.gray('  Win rate:        ') + (parseFloat(wr)>=30?chalk.green:chalk.red)(`${wr}%`));
+  console.log(chalk.gray('  Avg win R:       ') + chalk.cyan(avgWinR + 'R'));
+  console.log(chalk.gray('  Net R:           ') + (totalR>=0?chalk.green(`+${totalR.toFixed(2)}R`):chalk.red(`${totalR.toFixed(2)}R`)));
   console.log(chalk.gray('  Profit factor:   ') + chalk.cyan(pf));
-  console.log('\n' + chalk.bold.cyan('  ── ACCOUNT (£1,500 · 2% compounding) ──'));
-  console.log(chalk.gray('  Start:           ') + chalk.white('£1,500.00'));
-  console.log(chalk.gray('  End:             ') + (balance >= ACCOUNT_START ? chalk.green : chalk.red)('£'+balance.toFixed(2)));
-  console.log(chalk.gray('  Net P&L:         ') + (totalGBP >= 0 ? chalk.green : chalk.red)(fmtGBP(totalGBP)));
-  console.log(chalk.gray('  Return:          ') + (balance >= ACCOUNT_START ? chalk.green : chalk.red)(`${((balance-ACCOUNT_START)/ACCOUNT_START*100).toFixed(1)}%`));
-  console.log(chalk.gray('  Peak balance:    ') + chalk.white('£'+peakBalance.toFixed(2)));
+  console.log('\n' + chalk.bold.cyan('  ── ACCOUNT (£1,500 · 2% risk) ──'));
+  console.log(chalk.gray('  Start:           ') + '£1,500.00');
+  console.log(chalk.gray('  End:             ') + (balance>=ACCOUNT_START?chalk.green:chalk.red)('£'+balance.toFixed(2)));
+  console.log(chalk.gray('  Net P&L:         ') + (totalGBP>=0?chalk.green:chalk.red)(fmtGBP(totalGBP)));
+  console.log(chalk.gray('  Return:          ') + (balance>=ACCOUNT_START?chalk.green:chalk.red)(`${((balance-ACCOUNT_START)/ACCOUNT_START*100).toFixed(1)}%`));
+  console.log(chalk.gray('  Peak:            ') + '£'+peakBalance.toFixed(2));
   console.log(chalk.gray('  Max drawdown:    ') + chalk.yellow(`${maxDrawdown.toFixed(1)}%`));
 
   console.log(chalk.gray('\n  Month by month:'));
   Object.entries(byMonth).sort().forEach(([mo, sigs]) => {
-    const mW = sigs.filter(s => s.pnlR > 0).length;
-    const mL = sigs.filter(s => s.pnlR < 0).length;
-    const mR = sigs.reduce((s,x) => s+(x.pnlR||0), 0);
-    const mGBP = sigs.reduce((s,x) => s+(x.pnlGBP||0), 0);
-    const mWR = (mW+mL)>0 ? Math.round(mW/(mW+mL)*100) : 0;
+    const mW = sigs.filter(s=>s.pnlR>0).length, mL = sigs.filter(s=>s.pnlR<0).length;
+    const mR = sigs.reduce((s,x)=>s+(x.pnlR||0),0);
+    const mGBP = sigs.reduce((s,x)=>s+(x.pnlGBP||0),0);
+    const mWR = (mW+mL)>0?Math.round(mW/(mW+mL)*100):0;
     console.log(
-      chalk.gray(`    ${mo}  `) + chalk.white(`${sigs.length} signals`) +
-      chalk.gray('  ') + chalk.green(`${mW}W`) + chalk.gray('/') + chalk.red(`${mL}L`) +
-      chalk.gray(`  ${mWR}% WR  `) +
-      (mR>=0 ? chalk.green(`+${mR.toFixed(1)}R`) : chalk.red(`${mR.toFixed(1)}R`)) +
-      chalk.gray('  ') + (mGBP>=0 ? chalk.green(fmtGBP(mGBP)) : chalk.red(fmtGBP(mGBP)))
+      chalk.gray(`    ${mo}  `)+chalk.white(`${sigs.length} signals`)+chalk.gray('  ')+
+      chalk.green(`${mW}W`)+chalk.gray('/')+chalk.red(`${mL}L`)+
+      chalk.gray(`  ${mWR}% WR  `)+(mR>=0?chalk.green(`+${mR.toFixed(2)}R`):chalk.red(`${mR.toFixed(2)}R`))+
+      chalk.gray('  ')+(mGBP>=0?chalk.green(fmtGBP(mGBP)):chalk.red(fmtGBP(mGBP)))
     );
   });
 
@@ -345,9 +391,9 @@ async function run() {
     period: `${tradingDays[0]} → ${tradingDays[tradingDays.length-1]}`,
     generatedAt: new Date().toISOString(),
     dataSource: 'Yahoo Finance ^DJI 5m',
-    settings: { strategy: 'Judas Swing', rrTarget: TP_R, minStopPts: 50, startBalance: ACCOUNT_START, riskPct: RISK_PCT*100 },
+    strategy: 'ICT Judas Swing — 90-day checklist',
     account: { start: ACCOUNT_START, end: parseFloat(balance.toFixed(2)), netGBP: parseFloat(totalGBP.toFixed(2)), returnPct: parseFloat(((balance-ACCOUNT_START)/ACCOUNT_START*100).toFixed(1)), peakBalance: parseFloat(peakBalance.toFixed(2)), maxDrawdown: parseFloat(maxDrawdown.toFixed(1)) },
-    stats: { total: signals.length, wins: wins.length, losses: losses.length, winRate: wr+'%', netR: totalR.toFixed(2), profitFactor: pf },
+    stats: { total: signals.length, wins: wins.length, losses: losses.length, winRate: wr+'%', avgWinR, netR: totalR.toFixed(2), profitFactor: pf },
     signals
   }, null, 2));
 
