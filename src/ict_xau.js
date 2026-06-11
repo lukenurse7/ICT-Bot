@@ -466,55 +466,62 @@ function findH1SwingLevels(h1Candles, dir, lookback = 10) {
 // Returns { tp2, tp2Desc, tp3, tp3Desc }
 function liquidityTargets(dir, entry, risk, levels, candles5m, h1Candles) {
   const isLong = dir === 'bull';
-  const minR   = 1.5; // must be beyond TP1
-  const maxR   = 4.0; // cap — don't reach for daily moves on a 5m entry
 
-  function inRange(price) {
-    const r = Math.abs(price - entry) / risk;
-    return r > minR && r <= maxR;
-  }
+  // TP2: minimum 2.5R — target 1H swing levels and session highs/lows
+  // TP3: minimum 4R   — target PDH/PDL, PWH/PWL, or fixed 5R extension
+  // 5m equal lows/highs deliberately excluded — too close, creates clustered TPs
 
-  // Candidate pool — ordered from closest to furthest
-  const candidates = [];
+  const tp2MinR = 2.5;
+  const tp3MinR = 4.0;
+  const tp2MaxR = 6.0;
+  const tp3MaxR = 10.0;
 
-  // 1. 5m equal lows/highs (intraday liquidity pools, swept fast)
-  const eq5m = findEqualLevels(candles5m, isLong ? 'bull' : 'bear', 40, 2.5);
-  for (const l of eq5m) {
-    if (isLong ? l.price > entry : l.price < entry) candidates.push(l);
-  }
+  function rOf(price) { return Math.abs(price - entry) / risk; }
 
-  // 2. 1H swing lows/highs (session-level targets)
-  const h1Swings = findH1SwingLevels(h1Candles, isLong ? 'bull' : 'bear', 12);
+  // TP2 candidates — 1H swings and session levels (meaningful structure)
+  const tp2Candidates = [];
+
+  const h1Swings = findH1SwingLevels(h1Candles, isLong ? 'bull' : 'bear', 24);
   for (const l of h1Swings) {
-    if (isLong ? l.price > entry : l.price < entry) candidates.push(l);
+    const r = rOf(l.price);
+    if (r >= tp2MinR && r <= tp2MaxR && (isLong ? l.price > entry : l.price < entry))
+      tp2Candidates.push(l);
   }
 
-  // 3. Asia session high/low
-  if (levels.asiaHigh && isLong && levels.asiaHigh > entry) candidates.push({ price: levels.asiaHigh, source: 'Asia High (BSL)' });
-  if (levels.asiaLow  && !isLong && levels.asiaLow  < entry) candidates.push({ price: levels.asiaLow,  source: 'Asia Low (SSL)' });
+  if (levels.asiaHigh && isLong && rOf(levels.asiaHigh) >= tp2MinR && rOf(levels.asiaHigh) <= tp2MaxR)
+    tp2Candidates.push({ price: levels.asiaHigh, source: 'Asia High (BSL)' });
+  if (levels.asiaLow && !isLong && rOf(levels.asiaLow) >= tp2MinR && rOf(levels.asiaLow) <= tp2MaxR)
+    tp2Candidates.push({ price: levels.asiaLow, source: 'Asia Low (SSL)' });
 
-  // 4. PDH/PDL — only if within maxR
-  if (isLong && levels.pdh && levels.pdh > entry) candidates.push({ price: levels.pdh, source: 'PDH (BSL)' });
-  if (!isLong && levels.pdl && levels.pdl < entry) candidates.push({ price: levels.pdl, source: 'PDL (SSL)' });
+  tp2Candidates.sort((a, b) => Math.abs(a.price - entry) - Math.abs(b.price - entry));
+  const tp2Obj  = tp2Candidates[0];
+  const tp2     = tp2Obj ? tp2Obj.price : (isLong ? entry + risk * tp2MinR : entry - risk * tp2MinR);
+  const tp2Desc = tp2Obj ? tp2Obj.source : `Fixed ${tp2MinR}R`;
 
-  // Sort by distance from entry (nearest first)
-  candidates.sort((a, b) => Math.abs(a.price - entry) - Math.abs(b.price - entry));
+  // TP3 candidates — PDH/PDL, PWH/PWL, or further 1H swings beyond TP2
+  const tp3Candidates = [];
+  const tp2R = rOf(tp2);
 
-  // Pick TP2 = first candidate within range
-  const tp2Candidate = candidates.find(c => inRange(c.price));
-  const tp2     = tp2Candidate ? tp2Candidate.price : (isLong ? entry + risk * 2.5 : entry - risk * 2.5);
-  const tp2Desc = tp2Candidate ? tp2Candidate.source : 'Fixed 2.5R (no liquidity in range)';
+  if (isLong && levels.pdh && rOf(levels.pdh) > tp2R && rOf(levels.pdh) <= tp3MaxR)
+    tp3Candidates.push({ price: levels.pdh, source: 'Prev Day High' });
+  if (!isLong && levels.pdl && rOf(levels.pdl) > tp2R && rOf(levels.pdl) <= tp3MaxR)
+    tp3Candidates.push({ price: levels.pdl, source: 'Prev Day Low' });
+  if (isLong && levels.pwh && rOf(levels.pwh) > tp2R && rOf(levels.pwh) <= tp3MaxR)
+    tp3Candidates.push({ price: levels.pwh, source: 'Prev Week High' });
+  if (!isLong && levels.pwl && rOf(levels.pwl) > tp2R && rOf(levels.pwl) <= tp3MaxR)
+    tp3Candidates.push({ price: levels.pwl, source: 'Prev Week Low' });
 
-  // Pick TP3 = next candidate beyond TP2
-  const tp3Candidates = candidates.filter(c => {
-    const r = Math.abs(c.price - entry) / risk;
-    return r > Math.abs(tp2 - entry) / risk + 0.5 && r <= 6;
-  });
-  const tp3Candidate = tp3Candidates[0];
-  const tp3     = tp3Candidate ? tp3Candidate.price
-    : (isLong ? (levels.pwh && levels.pwh > tp2 ? levels.pwh : entry + risk * 5)
-              : (levels.pwl && levels.pwl < tp2 ? levels.pwl : entry - risk * 5));
-  const tp3Desc = tp3Candidate ? tp3Candidate.source : (isLong ? 'PWH extension' : 'PWL extension');
+  // Also consider 1H swings beyond TP2
+  for (const l of h1Swings) {
+    const r = rOf(l.price);
+    if (r > tp2R + 0.5 && r <= tp3MaxR && (isLong ? l.price > tp2 : l.price < tp2))
+      tp3Candidates.push(l);
+  }
+
+  tp3Candidates.sort((a, b) => Math.abs(a.price - entry) - Math.abs(b.price - entry));
+  const tp3Obj  = tp3Candidates[0];
+  const tp3     = tp3Obj ? tp3Obj.price : (isLong ? entry + risk * 5 : entry - risk * 5);
+  const tp3Desc = tp3Obj ? tp3Obj.source : 'Fixed 5R extension';
 
   return { tp2: parseFloat(tp2.toFixed(2)), tp2Desc, tp3: parseFloat(tp3.toFixed(2)), tp3Desc };
 }
