@@ -3,18 +3,10 @@
 // ═══════════════════════════════════════════════════════════════════════════
 //  XAUUSD ICT — LIMIT ORDER BACKTEST  (2% compounding risk, £1,500 start)
 //
-//  This is the most realistic test of the live strategy:
-//    1. Signal fires → limit placed at FVG optimalEntry
-//    2. Scan next FILL_WINDOW bars (12 = 1 hour) to see if price fills
-//    3. If filled → simulate trade with 2% of CURRENT balance as risk
-//    4. If not filled → MISSED (no P&L, no loss)
-//    5. Balance compounds every trade — risk grows as account grows
-//
-//  This is exactly how you are trading it live.
+//  Loads data from the same 1-year cache as backtest_xau_1yr.js so both
+//  backtests use identical underlying price data.
 // ═══════════════════════════════════════════════════════════════════════════
 
-require('dotenv').config();
-const axios = require('axios');
 const chalk = require('chalk');
 const fs    = require('fs');
 const path  = require('path');
@@ -25,19 +17,17 @@ const {
   liquidityTargets
 } = require('./ict_xau');
 
-const KEY    = process.env.TWELVEDATA_API_KEY;
-const BASE   = 'https://api.twelvedata.com';
-const SYMBOL = 'XAU/USD';
-
-const ACCOUNT_START = 1500;   // £1,500
-const RISK_PCT      = 0.02;   // 2% per trade, compounds
+const ACCOUNT_START = 1500;
+const RISK_PCT      = 0.02;
 const TP1_R         = 1.5;
 const TP2_R         = 2.5;
 const TP3_R         = 5.0;
-const SIM_BARS      = 288;    // max 24h to simulate outcome
+const SIM_BARS      = 288;
 const MIN_SCORE     = 80;
-const COOLDOWN      = 36;     // 3h cooldown between signals (in 5m bars)
-const FILL_WINDOW   = 12;     // bars to wait for limit fill (12 × 5m = 1 hour)
+const COOLDOWN      = 36;
+const FILL_WINDOW   = 12;
+
+const CACHE_DIR = path.join(__dirname, '..', '.cache');
 
 function fmt(d) {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
@@ -50,79 +40,26 @@ function fmtGBP(n) { return '£' + n.toFixed(2); }
 function fmtPct(n) { return (n >= 0 ? '+' : '') + n.toFixed(1) + '%'; }
 
 function threeMonthRange() {
-  // Fixed range matching NAS100 backtest — do not change to rolling window
   const start = new Date('2026-03-17T00:00:00Z');
   const end   = new Date('2026-06-10T23:59:59Z');
   return { start, end, label: `${fmt(start)} → ${fmt(end)}` };
 }
 
-const CACHE_DIR = path.join(__dirname, '..', '.cache');
-if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR);
-const wait = ms => new Promise(r => setTimeout(r, ms));
-
-async function fetchWithRetry(params, label) {
-  const cacheFile = path.join(CACHE_DIR, `3m_${label}.json`);
-  if (fs.existsSync(cacheFile)) {
-    process.stdout.write(chalk.gray(` (cached)\n`));
-    return JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
-  }
-  let lastErr;
-  for (let attempt = 0; attempt < 5; attempt++) {
-    if (attempt > 0) {
-      const delay = [30000, 60000, 90000, 120000][attempt-1] || 120000;
-      process.stdout.write(chalk.yellow(` rate-limited, retry in ${delay/1000}s...\n`));
-      await wait(delay);
-    }
-    try {
-      const r = await axios.get(`${BASE}/time_series`, {
-        params: { ...params, apikey: KEY, format: 'JSON', timezone: 'UTC' },
-        timeout: 25000
-      });
-      if (r.data.status === 'error') throw new Error(`TwelveData: ${r.data.message}`);
-      if (!r.data.values?.length) throw new Error('No data returned');
-      const candles = r.data.values.reverse().map(c => ({
-        time: c.datetime, open: parseFloat(c.open), high: parseFloat(c.high),
-        low: parseFloat(c.low), close: parseFloat(c.close), volume: parseFloat(c.volume || 0)
-      }));
-      fs.writeFileSync(cacheFile, JSON.stringify(candles));
-      process.stdout.write(chalk.green(` ✓ ${candles.length} bars\n`));
-      return candles;
-    } catch (e) {
-      if (e.response?.status === 429 || e.message.includes('429')) { lastErr = e; continue; }
-      throw e;
-    }
-  }
-  throw lastErr || new Error('Max retries exceeded');
-}
-
-async function fetchChunked(interval, outputsize, months) {
-  // Use fixed end date so chunks are stable and cover through Jun 10
-  const fixedEnd = new Date('2026-07-01T00:00:00Z');
-  const allCandles = [];
-  for (let m = months - 1; m >= 0; m--) {
-    const endDate = new Date(fixedEnd);
-    endDate.setUTCMonth(fixedEnd.getUTCMonth() - m);
-    endDate.setUTCDate(1); endDate.setUTCHours(0,0,0,0);
-    const startDate = new Date(endDate);
-    startDate.setUTCMonth(startDate.getUTCMonth() - 1);
-    const label = `${interval}_${fmt(startDate)}_${fmt(endDate)}`;
-    process.stdout.write(chalk.gray(`  ${interval} chunk ${fmt(startDate)}...`));
-    try {
-      const chunk = await fetchWithRetry({
-        symbol: SYMBOL, interval, outputsize,
-        start_date: `${fmt(startDate)} 00:00:00`,
-        end_date:   `${fmt(endDate)} 23:59:59`
-      }, label);
-      allCandles.push(...chunk);
-      await wait(8000);
-    } catch (e) {
-      process.stdout.write(chalk.yellow(` skipped: ${e.message.slice(0,50)}\n`));
-    }
+// Load from the same 1-year monthly chunk files as backtest_xau_1yr.js
+function loadChunks(prefix) {
+  const all = [];
+  for (let y = 2025, m = 6; !(y === 2026 && m === 7);) {
+    const s  = `${y}-${String(m).padStart(2,'0')}-01`;
+    const nm = m + 1 > 12 ? 1 : m + 1, ny = m + 1 > 12 ? y + 1 : y;
+    const e  = `${ny}-${String(nm).padStart(2,'0')}-01`;
+    const f  = path.join(CACHE_DIR, `${prefix}_${s}_${e}.json`);
+    if (fs.existsSync(f)) all.push(...JSON.parse(fs.readFileSync(f)));
+    m++; if (m > 12) { m = 1; y++; }
   }
   const seen = new Set();
-  return allCandles
+  return all
     .filter(c => { if (seen.has(c.time)) return false; seen.add(c.time); return true; })
-    .sort((a, b) => new Date(a.time) - new Date(b.time));
+    .sort((a, b) => a.time.localeCompare(b.time));
 }
 
 function rollup(src, factor) {
@@ -184,29 +121,22 @@ function simulateOutcome(dir, entry, sl, tp1, tp2, tp3, futureCandles) {
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
-async function run() {
-  console.clear();
+function run() {
   console.log('\n' + chalk.bold.yellow('  ◆ XAUUSD ICT — 3 MONTH BACKTEST  [LIMIT ORDER + 2% COMPOUNDING  [KZ ONLY — London+NY]]'));
   console.log(chalk.gray(`  Entry: limit @ FVG midpoint  |  Fill window: ${FILL_WINDOW} bars (${FILL_WINDOW*5}min)  |  2% risk  |  £1,500 start\n`));
 
   const range = threeMonthRange();
   console.log(chalk.gray(`  Period: ${range.label}\n`));
-  console.log(chalk.gray('  Loading data (cached where available)...\n'));
+  console.log(chalk.gray('  Loading data from 1-year cache...\n'));
 
-  const all5m  = await fetchChunked('5min',  4500, 4); await wait(15000);
-  const all15m = await fetchChunked('15min', 1500, 4); await wait(15000);
-  const allH1  = await fetchChunked('1h',    750,  4); await wait(15000);
+  const all5m    = loadChunks('xau1yr_5min');
+  const all15m   = loadChunks('xau1yr_15min');
+  const allH1    = loadChunks('xau1yr_1h');
+  const allH4    = rollup(allH1, 4);
+  const allDaily = rollup(allH1, 24);
 
-  process.stdout.write(chalk.gray('  Fetching 4H candles...'));
-  const allH4 = await fetchWithRetry({ symbol: SYMBOL, interval: '4h', outputsize: 200 }, '4h_3m')
-    .catch(() => { process.stdout.write(chalk.yellow(' rollup\n')); return rollup(allH1, 4); });
-  await wait(10000);
-
-  process.stdout.write(chalk.gray('  Fetching Daily candles...'));
-  const allDaily = await fetchWithRetry({ symbol: SYMBOL, interval: '1day', outputsize: 90 }, '1day_3m')
-    .catch(() => { process.stdout.write(chalk.yellow(' rollup\n')); return rollup(allH1, 24); });
-
-  console.log(chalk.green('\n  ✓ Data ready'));
+  console.log(chalk.green('  ✓ Data ready'));
+  console.log(chalk.gray(`  5m total: ${all5m.length}  1h total: ${allH1.length}`));
 
   const period5m = all5m.filter(c => {
     const t = new Date(c.time); return t >= range.start && t <= range.end;
@@ -497,7 +427,4 @@ async function run() {
   console.log(chalk.gray('  Report saved → backtest_report_limit_xau.json\n'));
 }
 
-run().catch(err => {
-  console.log(chalk.red(`\n  ✗ Fatal: ${err.message}\n`));
-  process.exit(1);
-});
+run();

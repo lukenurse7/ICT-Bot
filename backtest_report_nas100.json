@@ -1,6 +1,6 @@
 {
-  "period": "2026-03-18 → 2026-06-10",
-  "generatedAt": "2026-06-11T11:32:52.623Z",
+  "period": "2026-03-18 → 2026-06-11",
+  "generatedAt": "2026-06-11T14:11:42.549Z",
   "dataSource": "Yahoo Finance QQQ 5m pre-market + TwelveData QQQ 1m",
   "instrument": "NAS100 proxy via QQQ ETF",
   "strategy": "ICT NY Kill Zone — Asia/London 5m levels, 12-15 GMT sweep, 1m MSS+FVG, SL at sweep wick",

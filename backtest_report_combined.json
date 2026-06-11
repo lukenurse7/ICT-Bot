@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-11T11:58:50.214Z",
+  "generatedAt": "2026-06-11T14:11:47.443Z",
   "settings": {
     "startBalance": 2000,
     "riskPct": 0.03,
@@ -10,108 +10,120 @@
   },
   "account": {
     "start": 2000,
-    "end": 4097.6,
-    "peak": 4768.05,
-    "netPnl": 2097.6,
-    "returnPct": 104.88,
-    "maxDrawdown": 29.06
+    "end": 2740.29,
+    "peak": 2825.04,
+    "netPnl": 740.29,
+    "returnPct": 37.01,
+    "maxDrawdown": 40.44
   },
   "stats": {
-    "trades": 81,
-    "wins": 35,
-    "losses": 46,
-    "winRate": 43.2,
-    "netR": 28.26,
-    "profitFactor": 1.61,
-    "avgWinR": 2.12,
+    "trades": 78,
+    "wins": 27,
+    "losses": 51,
+    "winRate": 34.6,
+    "netR": 14.76,
+    "profitFactor": 1.29,
+    "avgWinR": 2.44,
     "avgLossR": 1
   },
   "byMonth": {
     "2026-03": {
       "trades": 13,
-      "wins": 5,
-      "losses": 8,
-      "netR": 1.4299999999999997,
-      "pnl": 62.3831785620112,
+      "wins": 2,
+      "losses": 11,
+      "netR": -7.57,
+      "pnl": -419.60020459193953,
       "nas": 3,
       "xau": 10
     },
     "2026-04": {
-      "trades": 29,
-      "wins": 14,
-      "losses": 15,
-      "netR": 13,
-      "pnl": 857.3194644008566,
+      "trades": 26,
+      "wins": 6,
+      "losses": 20,
+      "netR": -1.75,
+      "pnl": -137.08613478900668,
       "nas": 11,
-      "xau": 18
+      "xau": 15
     },
     "2026-05": {
-      "trades": 24,
-      "wins": 8,
-      "losses": 16,
-      "netR": 8.29,
-      "pnl": 596.3759785886004,
+      "trades": 23,
+      "wins": 10,
+      "losses": 13,
+      "netR": 15.29,
+      "pnl": 696.5061525984754,
       "nas": 8,
-      "xau": 16
+      "xau": 15
     },
     "2026-06": {
-      "trades": 15,
-      "wins": 8,
+      "trades": 16,
+      "wins": 9,
       "losses": 7,
-      "netR": 5.54,
-      "pnl": 581.5249337092156,
+      "netR": 8.79,
+      "pnl": 600.473043841923,
       "nas": 4,
-      "xau": 11
+      "xau": 12
     }
   },
   "trades": [
     {
-      "date": "2026-03-18",
+      "date": "2026-03-17",
       "market": "XAUUSD",
       "dir": "SELL",
-      "pnlR": 2,
-      "result": "WIN_TP2",
+      "pnlR": -1,
+      "result": "LOSS",
       "rrPot": null,
       "tradeNum": 1,
       "riskGBP": 60,
-      "pnlGBP": 120,
-      "balanceAfter": 2120
+      "pnlGBP": -60,
+      "balanceAfter": 1940
     },
     {
-      "date": "2026-03-20",
+      "date": "2026-03-18",
       "market": "XAUUSD",
       "dir": "SELL",
-      "pnlR": 2,
-      "result": "WIN_TP2",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
       "rrPot": null,
       "tradeNum": 2,
-      "riskGBP": 63.599999999999994,
-      "pnlGBP": 127.19999999999999,
-      "balanceAfter": 2247.2
+      "riskGBP": 58.199999999999996,
+      "pnlGBP": 43.65,
+      "balanceAfter": 1983.65
     },
     {
-      "date": "2026-03-24",
+      "date": "2026-03-19",
       "market": "XAUUSD",
       "dir": "SELL",
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": null,
       "tradeNum": 3,
-      "riskGBP": 67.416,
-      "pnlGBP": -67.416,
-      "balanceAfter": 2179.7839999999997
+      "riskGBP": 59.5095,
+      "pnlGBP": -59.5095,
+      "balanceAfter": 1924.1405
     },
     {
-      "date": "2026-03-25",
+      "date": "2026-03-20",
       "market": "XAUUSD",
       "dir": "SELL",
-      "pnlR": 2,
-      "result": "WIN_TP2",
+      "pnlR": -1,
+      "result": "LOSS",
       "rrPot": null,
       "tradeNum": 4,
-      "riskGBP": 65.39351999999998,
-      "pnlGBP": 130.78703999999996,
-      "balanceAfter": 2310.57104
+      "riskGBP": 57.724214999999994,
+      "pnlGBP": -57.724214999999994,
+      "balanceAfter": 1866.416285
+    },
+    {
+      "date": "2026-03-23",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "rrPot": null,
+      "tradeNum": 5,
+      "riskGBP": 55.99248855,
+      "pnlGBP": -55.99248855,
+      "balanceAfter": 1810.42379645
     },
     {
       "date": "2026-03-25",
@@ -120,10 +132,10 @@
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": null,
-      "tradeNum": 5,
-      "riskGBP": 69.31713119999999,
-      "pnlGBP": -69.31713119999999,
-      "balanceAfter": 2241.2539088
+      "tradeNum": 6,
+      "riskGBP": 54.312713893499996,
+      "pnlGBP": -54.312713893499996,
+      "balanceAfter": 1756.1110825565002
     },
     {
       "date": "2026-03-25",
@@ -132,10 +144,10 @@
       "pnlR": 2.68,
       "result": "WIN",
       "rrPot": 2.68,
-      "tradeNum": 6,
-      "riskGBP": 67.237617264,
-      "pnlGBP": 180.19681426751998,
-      "balanceAfter": 2421.45072306752
+      "tradeNum": 7,
+      "riskGBP": 52.683332476695,
+      "pnlGBP": 141.1913310375426,
+      "balanceAfter": 1897.3024135940427
     },
     {
       "date": "2026-03-26",
@@ -144,10 +156,10 @@
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": 3.1,
-      "tradeNum": 7,
-      "riskGBP": 72.6435216920256,
-      "pnlGBP": -72.6435216920256,
-      "balanceAfter": 2348.8072013754945
+      "tradeNum": 8,
+      "riskGBP": 56.91907240782128,
+      "pnlGBP": -56.91907240782128,
+      "balanceAfter": 1840.3833411862215
     },
     {
       "date": "2026-03-27",
@@ -156,22 +168,10 @@
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": null,
-      "tradeNum": 8,
-      "riskGBP": 70.46421604126483,
-      "pnlGBP": -70.46421604126483,
-      "balanceAfter": 2278.3429853342295
-    },
-    {
-      "date": "2026-03-30",
-      "market": "XAUUSD",
-      "dir": "SELL",
-      "pnlR": 0.75,
-      "result": "WIN_TP1_BE",
-      "rrPot": null,
       "tradeNum": 9,
-      "riskGBP": 68.35028956002688,
-      "pnlGBP": 51.26271717002016,
-      "balanceAfter": 2329.6057025042496
+      "riskGBP": 55.21150023558664,
+      "pnlGBP": -55.21150023558664,
+      "balanceAfter": 1785.1718409506348
     },
     {
       "date": "2026-03-30",
@@ -181,9 +181,9 @@
       "result": "LOSS",
       "rrPot": null,
       "tradeNum": 10,
-      "riskGBP": 69.88817107512749,
-      "pnlGBP": -69.88817107512749,
-      "balanceAfter": 2259.717531429122
+      "riskGBP": 53.55515522851904,
+      "pnlGBP": -53.55515522851904,
+      "balanceAfter": 1731.6166857221158
     },
     {
       "date": "2026-03-30",
@@ -193,9 +193,9 @@
       "result": "LOSS",
       "rrPot": 14.53,
       "tradeNum": 11,
-      "riskGBP": 67.79152594287366,
-      "pnlGBP": -67.79152594287366,
-      "balanceAfter": 2191.9260054862484
+      "riskGBP": 51.94850057166347,
+      "pnlGBP": -51.94850057166347,
+      "balanceAfter": 1679.6681851504522
     },
     {
       "date": "2026-03-31",
@@ -205,9 +205,9 @@
       "result": "LOSS",
       "rrPot": null,
       "tradeNum": 12,
-      "riskGBP": 65.75778016458744,
-      "pnlGBP": -65.75778016458744,
-      "balanceAfter": 2126.168225321661
+      "riskGBP": 50.39004555451356,
+      "pnlGBP": -50.39004555451356,
+      "balanceAfter": 1629.2781395959387
     },
     {
       "date": "2026-03-31",
@@ -217,9 +217,9 @@
       "result": "LOSS",
       "rrPot": null,
       "tradeNum": 13,
-      "riskGBP": 63.78504675964982,
-      "pnlGBP": -63.78504675964982,
-      "balanceAfter": 2062.383178562011
+      "riskGBP": 48.878344187878156,
+      "pnlGBP": -48.878344187878156,
+      "balanceAfter": 1580.3997954080605
     },
     {
       "date": "2026-04-01",
@@ -229,21 +229,9 @@
       "result": "LOSS",
       "rrPot": null,
       "tradeNum": 14,
-      "riskGBP": 61.87149535686032,
-      "pnlGBP": -61.87149535686032,
-      "balanceAfter": 2000.5116832051506
-    },
-    {
-      "date": "2026-04-01",
-      "market": "XAUUSD",
-      "dir": "SELL",
-      "pnlR": -1,
-      "result": "LOSS",
-      "rrPot": null,
-      "tradeNum": 15,
-      "riskGBP": 60.01535049615452,
-      "pnlGBP": -60.01535049615452,
-      "balanceAfter": 1940.496332708996
+      "riskGBP": 47.411993862241815,
+      "pnlGBP": -47.411993862241815,
+      "balanceAfter": 1532.9878015458187
     },
     {
       "date": "2026-04-02",
@@ -252,10 +240,10 @@
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": 2.54,
-      "tradeNum": 16,
-      "riskGBP": 58.21488998126988,
-      "pnlGBP": -58.21488998126988,
-      "balanceAfter": 1882.2814427277262
+      "tradeNum": 15,
+      "riskGBP": 45.98963404637456,
+      "pnlGBP": -45.98963404637456,
+      "balanceAfter": 1486.9981674994442
     },
     {
       "date": "2026-04-07",
@@ -264,10 +252,10 @@
       "pnlR": 1.98,
       "result": "WIN",
       "rrPot": 1.98,
-      "tradeNum": 17,
-      "riskGBP": 56.46844328183179,
-      "pnlGBP": 111.80751769802694,
-      "balanceAfter": 1994.0889604257532
+      "tradeNum": 16,
+      "riskGBP": 44.609945024983325,
+      "pnlGBP": 88.32769114946699,
+      "balanceAfter": 1575.3258586489112
     },
     {
       "date": "2026-04-13",
@@ -276,22 +264,34 @@
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": 18.16,
+      "tradeNum": 17,
+      "riskGBP": 47.25977575946733,
+      "pnlGBP": -47.25977575946733,
+      "balanceAfter": 1528.0660828894438
+    },
+    {
+      "date": "2026-04-15",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "rrPot": null,
       "tradeNum": 18,
-      "riskGBP": 59.82266881277259,
-      "pnlGBP": -59.82266881277259,
-      "balanceAfter": 1934.2662916129805
+      "riskGBP": 45.841982486683314,
+      "pnlGBP": -45.841982486683314,
+      "balanceAfter": 1482.2241004027605
     },
     {
       "date": "2026-04-16",
       "market": "XAUUSD",
       "dir": "SELL",
-      "pnlR": 2,
-      "result": "WIN_TP2",
+      "pnlR": -1,
+      "result": "LOSS",
       "rrPot": null,
       "tradeNum": 19,
-      "riskGBP": 58.02798874838941,
-      "pnlGBP": 116.05597749677882,
-      "balanceAfter": 2050.3222691097594
+      "riskGBP": 44.46672301208282,
+      "pnlGBP": -44.46672301208282,
+      "balanceAfter": 1437.7573773906777
     },
     {
       "date": "2026-04-17",
@@ -301,33 +301,21 @@
       "result": "LOSS",
       "rrPot": null,
       "tradeNum": 20,
-      "riskGBP": 61.50966807329278,
-      "pnlGBP": -61.50966807329278,
-      "balanceAfter": 1988.8126010364667
+      "riskGBP": 43.132721321720325,
+      "pnlGBP": -43.132721321720325,
+      "balanceAfter": 1394.6246560689574
     },
     {
       "date": "2026-04-17",
       "market": "XAUUSD",
       "dir": "SELL",
-      "pnlR": 0.75,
-      "result": "WIN_TP1_BE",
-      "rrPot": null,
-      "tradeNum": 21,
-      "riskGBP": 59.664378031094,
-      "pnlGBP": 44.7482835233205,
-      "balanceAfter": 2033.5608845597872
-    },
-    {
-      "date": "2026-04-20",
-      "market": "XAUUSD",
-      "dir": "SELL",
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": null,
-      "tradeNum": 22,
-      "riskGBP": 61.00682653679361,
-      "pnlGBP": -61.00682653679361,
-      "balanceAfter": 1972.5540580229936
+      "tradeNum": 21,
+      "riskGBP": 41.83873968206872,
+      "pnlGBP": -41.83873968206872,
+      "balanceAfter": 1352.7859163868886
     },
     {
       "date": "2026-04-20",
@@ -336,22 +324,34 @@
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": 7.05,
-      "tradeNum": 23,
-      "riskGBP": 59.176621740689804,
-      "pnlGBP": -59.176621740689804,
-      "balanceAfter": 1913.3774362823037
+      "tradeNum": 22,
+      "riskGBP": 40.583577491606654,
+      "pnlGBP": -40.583577491606654,
+      "balanceAfter": 1312.202338895282
     },
     {
       "date": "2026-04-21",
       "market": "XAUUSD",
       "dir": "SELL",
-      "pnlR": -1,
-      "result": "LOSS",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "rrPot": null,
+      "tradeNum": 23,
+      "riskGBP": 39.366070166858464,
+      "pnlGBP": 78.73214033371693,
+      "balanceAfter": 1390.934479228999
+    },
+    {
+      "date": "2026-04-21",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
       "rrPot": null,
       "tradeNum": 24,
-      "riskGBP": 57.40132308846911,
-      "pnlGBP": -57.40132308846911,
-      "balanceAfter": 1855.9761131938346
+      "riskGBP": 41.728034376869964,
+      "pnlGBP": 83.45606875373993,
+      "balanceAfter": 1474.3905479827388
     },
     {
       "date": "2026-04-21",
@@ -361,21 +361,33 @@
       "result": "LOSS",
       "rrPot": 7.95,
       "tradeNum": 25,
-      "riskGBP": 55.679283395815034,
-      "pnlGBP": -55.679283395815034,
-      "balanceAfter": 1800.2968297980196
+      "riskGBP": 44.23171643948216,
+      "pnlGBP": -44.23171643948216,
+      "balanceAfter": 1430.1588315432566
     },
     {
       "date": "2026-04-22",
       "market": "XAUUSD",
       "dir": "SELL",
-      "pnlR": 0.75,
-      "result": "WIN_TP1_BE",
+      "pnlR": -1,
+      "result": "LOSS",
       "rrPot": null,
       "tradeNum": 26,
-      "riskGBP": 54.00890489394059,
-      "pnlGBP": 40.50667867045544,
-      "balanceAfter": 1840.803508468475
+      "riskGBP": 42.904764946297696,
+      "pnlGBP": -42.904764946297696,
+      "balanceAfter": 1387.2540665969589
+    },
+    {
+      "date": "2026-04-22",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "rrPot": null,
+      "tradeNum": 27,
+      "riskGBP": 41.61762199790876,
+      "pnlGBP": -41.61762199790876,
+      "balanceAfter": 1345.63644459905
     },
     {
       "date": "2026-04-22",
@@ -384,34 +396,10 @@
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": 2.15,
-      "tradeNum": 27,
-      "riskGBP": 55.22410525405425,
-      "pnlGBP": -55.22410525405425,
-      "balanceAfter": 1785.5794032144208
-    },
-    {
-      "date": "2026-04-23",
-      "market": "XAUUSD",
-      "dir": "SELL",
-      "pnlR": -1,
-      "result": "LOSS",
-      "rrPot": null,
       "tradeNum": 28,
-      "riskGBP": 53.567382096432624,
-      "pnlGBP": -53.567382096432624,
-      "balanceAfter": 1732.0120211179883
-    },
-    {
-      "date": "2026-04-23",
-      "market": "XAUUSD",
-      "dir": "SELL",
-      "pnlR": 0.75,
-      "result": "WIN_TP1_BE",
-      "rrPot": null,
-      "tradeNum": 29,
-      "riskGBP": 51.96036063353964,
-      "pnlGBP": 38.970270475154734,
-      "balanceAfter": 1770.9822915931431
+      "riskGBP": 40.3690933379715,
+      "pnlGBP": -40.3690933379715,
+      "balanceAfter": 1305.2673512610786
     },
     {
       "date": "2026-04-23",
@@ -420,34 +408,22 @@
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": 2.61,
+      "tradeNum": 29,
+      "riskGBP": 39.15802053783236,
+      "pnlGBP": -39.15802053783236,
+      "balanceAfter": 1266.1093307232463
+    },
+    {
+      "date": "2026-04-24",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "rrPot": null,
       "tradeNum": 30,
-      "riskGBP": 53.12946874779429,
-      "pnlGBP": -53.12946874779429,
-      "balanceAfter": 1717.8528228453488
-    },
-    {
-      "date": "2026-04-24",
-      "market": "XAUUSD",
-      "dir": "SELL",
-      "pnlR": 0.75,
-      "result": "WIN_TP1_BE",
-      "rrPot": null,
-      "tradeNum": 31,
-      "riskGBP": 51.53558468536046,
-      "pnlGBP": 38.65168851402035,
-      "balanceAfter": 1756.5045113593692
-    },
-    {
-      "date": "2026-04-24",
-      "market": "XAUUSD",
-      "dir": "SELL",
-      "pnlR": 0.75,
-      "result": "WIN_TP1_BE",
-      "rrPot": null,
-      "tradeNum": 32,
-      "riskGBP": 52.69513534078107,
-      "pnlGBP": 39.521351505585805,
-      "balanceAfter": 1796.025862864955
+      "riskGBP": 37.98327992169739,
+      "pnlGBP": -37.98327992169739,
+      "balanceAfter": 1228.126050801549
     },
     {
       "date": "2026-04-24",
@@ -456,10 +432,10 @@
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": 2.46,
-      "tradeNum": 33,
-      "riskGBP": 53.880775885948644,
-      "pnlGBP": -53.880775885948644,
-      "balanceAfter": 1742.1450869790062
+      "tradeNum": 31,
+      "riskGBP": 36.84378152404646,
+      "pnlGBP": -36.84378152404646,
+      "balanceAfter": 1191.2822692775023
     },
     {
       "date": "2026-04-27",
@@ -468,34 +444,22 @@
       "pnlR": 2,
       "result": "WIN_TP2",
       "rrPot": null,
-      "tradeNum": 34,
-      "riskGBP": 52.264352609370185,
-      "pnlGBP": 104.52870521874037,
-      "balanceAfter": 1846.6737921977467
-    },
-    {
-      "date": "2026-04-27",
-      "market": "XAUUSD",
-      "dir": "SELL",
-      "pnlR": 2,
-      "result": "WIN_TP2",
-      "rrPot": null,
-      "tradeNum": 35,
-      "riskGBP": 55.4002137659324,
-      "pnlGBP": 110.8004275318648,
-      "balanceAfter": 1957.4742197296116
+      "tradeNum": 32,
+      "riskGBP": 35.73846807832507,
+      "pnlGBP": 71.47693615665014,
+      "balanceAfter": 1262.7592054341526
     },
     {
       "date": "2026-04-28",
       "market": "XAUUSD",
       "dir": "SELL",
-      "pnlR": 2,
-      "result": "WIN_TP2",
+      "pnlR": -1,
+      "result": "LOSS",
       "rrPot": null,
-      "tradeNum": 36,
-      "riskGBP": 58.724226591888346,
-      "pnlGBP": 117.44845318377669,
-      "balanceAfter": 2074.9226729133884
+      "tradeNum": 33,
+      "riskGBP": 37.88277616302457,
+      "pnlGBP": -37.88277616302457,
+      "balanceAfter": 1224.876429271128
     },
     {
       "date": "2026-04-28",
@@ -504,22 +468,34 @@
       "pnlR": 6.09,
       "result": "WIN",
       "rrPot": 6.09,
-      "tradeNum": 37,
-      "riskGBP": 62.24768018740165,
-      "pnlGBP": 379.08837234127606,
-      "balanceAfter": 2454.0110452546646
+      "tradeNum": 34,
+      "riskGBP": 36.746292878133836,
+      "pnlGBP": 223.78492362783507,
+      "balanceAfter": 1448.661352898963
     },
     {
       "date": "2026-04-29",
       "market": "XAUUSD",
       "dir": "SELL",
-      "pnlR": 2,
-      "result": "WIN_TP2",
+      "pnlR": -1,
+      "result": "LOSS",
       "rrPot": null,
-      "tradeNum": 38,
-      "riskGBP": 73.62033135763994,
-      "pnlGBP": 147.24066271527988,
-      "balanceAfter": 2601.2517079699446
+      "tradeNum": 35,
+      "riskGBP": 43.45984058696889,
+      "pnlGBP": -43.45984058696889,
+      "balanceAfter": 1405.201512311994
+    },
+    {
+      "date": "2026-04-29",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "rrPot": null,
+      "tradeNum": 36,
+      "riskGBP": 42.15604536935982,
+      "pnlGBP": -42.15604536935982,
+      "balanceAfter": 1363.0454669426342
     },
     {
       "date": "2026-04-29",
@@ -528,10 +504,10 @@
       "pnlR": 4.18,
       "result": "WIN",
       "rrPot": 4.18,
-      "tradeNum": 39,
-      "riskGBP": 78.03755123909833,
-      "pnlGBP": 326.196964179431,
-      "balanceAfter": 2927.448672149376
+      "tradeNum": 37,
+      "riskGBP": 40.89136400827903,
+      "pnlGBP": 170.92590155460633,
+      "balanceAfter": 1533.9713684972405
     },
     {
       "date": "2026-04-30",
@@ -540,22 +516,10 @@
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": null,
-      "tradeNum": 40,
-      "riskGBP": 87.82346016448128,
-      "pnlGBP": -87.82346016448128,
-      "balanceAfter": 2839.6252119848946
-    },
-    {
-      "date": "2026-04-30",
-      "market": "XAUUSD",
-      "dir": "SELL",
-      "pnlR": 2,
-      "result": "WIN_TP2",
-      "rrPot": null,
-      "tradeNum": 41,
-      "riskGBP": 85.18875635954683,
-      "pnlGBP": 170.37751271909366,
-      "balanceAfter": 3010.0027247039884
+      "tradeNum": 38,
+      "riskGBP": 46.01914105491721,
+      "pnlGBP": -46.01914105491721,
+      "balanceAfter": 1487.9522274423234
     },
     {
       "date": "2026-04-30",
@@ -564,10 +528,10 @@
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": 7.93,
-      "tradeNum": 42,
-      "riskGBP": 90.30008174111966,
-      "pnlGBP": -90.30008174111966,
-      "balanceAfter": 2919.7026429628686
+      "tradeNum": 39,
+      "riskGBP": 44.6385668232697,
+      "pnlGBP": -44.6385668232697,
+      "balanceAfter": 1443.3136606190537
     },
     {
       "date": "2026-05-01",
@@ -576,10 +540,22 @@
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": null,
-      "tradeNum": 43,
-      "riskGBP": 87.59107928888605,
-      "pnlGBP": -87.59107928888605,
-      "balanceAfter": 2832.1115636739823
+      "tradeNum": 40,
+      "riskGBP": 43.29940981857161,
+      "pnlGBP": -43.29940981857161,
+      "balanceAfter": 1400.0142508004822
+    },
+    {
+      "date": "2026-05-01",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "rrPot": null,
+      "tradeNum": 41,
+      "riskGBP": 42.00042752401446,
+      "pnlGBP": 84.00085504802892,
+      "balanceAfter": 1484.015105848511
     },
     {
       "date": "2026-05-04",
@@ -588,10 +564,10 @@
       "pnlR": 10.03,
       "result": "WIN",
       "rrPot": 10.03,
-      "tradeNum": 44,
-      "riskGBP": 84.96334691021947,
-      "pnlGBP": 852.1823695095012,
-      "balanceAfter": 3684.2939331834837
+      "tradeNum": 42,
+      "riskGBP": 44.52045317545533,
+      "pnlGBP": 446.54014534981695,
+      "balanceAfter": 1930.5552511983278
     },
     {
       "date": "2026-05-11",
@@ -600,10 +576,10 @@
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": 1.63,
-      "tradeNum": 45,
-      "riskGBP": 110.52881799550451,
-      "pnlGBP": -110.52881799550451,
-      "balanceAfter": 3573.765115187979
+      "tradeNum": 43,
+      "riskGBP": 57.91665753594983,
+      "pnlGBP": -57.91665753594983,
+      "balanceAfter": 1872.638593662378
     },
     {
       "date": "2026-05-12",
@@ -612,10 +588,10 @@
       "pnlR": 2.25,
       "result": "WIN",
       "rrPot": 2.25,
-      "tradeNum": 46,
-      "riskGBP": 107.21295345563937,
-      "pnlGBP": 241.22914527518856,
-      "balanceAfter": 3814.994260463168
+      "tradeNum": 44,
+      "riskGBP": 56.17915780987134,
+      "pnlGBP": 126.40310507221052,
+      "balanceAfter": 1999.0416987345886
     },
     {
       "date": "2026-05-14",
@@ -624,22 +600,34 @@
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": 1.67,
-      "tradeNum": 47,
-      "riskGBP": 114.44982781389503,
-      "pnlGBP": -114.44982781389503,
-      "balanceAfter": 3700.544432649273
+      "tradeNum": 45,
+      "riskGBP": 59.97125096203766,
+      "pnlGBP": -59.97125096203766,
+      "balanceAfter": 1939.070447772551
     },
     {
       "date": "2026-05-18",
       "market": "XAUUSD",
       "dir": "SELL",
-      "pnlR": 0.75,
-      "result": "WIN_TP1_BE",
+      "pnlR": 2,
+      "result": "WIN_TP2",
       "rrPot": null,
-      "tradeNum": 48,
-      "riskGBP": 111.01633297947818,
-      "pnlGBP": 83.26224973460863,
-      "balanceAfter": 3783.8066823838817
+      "tradeNum": 46,
+      "riskGBP": 58.17211343317653,
+      "pnlGBP": 116.34422686635305,
+      "balanceAfter": 2055.414674638904
+    },
+    {
+      "date": "2026-05-18",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "rrPot": null,
+      "tradeNum": 47,
+      "riskGBP": 61.662440239167125,
+      "pnlGBP": -61.662440239167125,
+      "balanceAfter": 1993.752234399737
     },
     {
       "date": "2026-05-18",
@@ -648,10 +636,10 @@
       "pnlR": 5.1,
       "result": "WIN",
       "rrPot": 5.1,
-      "tradeNum": 49,
-      "riskGBP": 113.51420047151645,
-      "pnlGBP": 578.9224224047339,
-      "balanceAfter": 4362.729104788616
+      "tradeNum": 48,
+      "riskGBP": 59.81256703199211,
+      "pnlGBP": 305.04409186315974,
+      "balanceAfter": 2298.796326262897
     },
     {
       "date": "2026-05-19",
@@ -660,10 +648,10 @@
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": null,
-      "tradeNum": 50,
-      "riskGBP": 130.88187314365845,
-      "pnlGBP": -130.88187314365845,
-      "balanceAfter": 4231.847231644957
+      "tradeNum": 49,
+      "riskGBP": 68.9638897878869,
+      "pnlGBP": -68.9638897878869,
+      "balanceAfter": 2229.83243647501
     },
     {
       "date": "2026-05-19",
@@ -672,34 +660,22 @@
       "pnlR": 2,
       "result": "WIN_TP2",
       "rrPot": null,
+      "tradeNum": 50,
+      "riskGBP": 66.8949730942503,
+      "pnlGBP": 133.7899461885006,
+      "balanceAfter": 2363.6223826635105
+    },
+    {
+      "date": "2026-05-20",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "rrPot": null,
       "tradeNum": 51,
-      "riskGBP": 126.9554169493487,
-      "pnlGBP": 253.9108338986974,
-      "balanceAfter": 4485.758065543654
-    },
-    {
-      "date": "2026-05-20",
-      "market": "XAUUSD",
-      "dir": "SELL",
-      "pnlR": -1,
-      "result": "LOSS",
-      "rrPot": null,
-      "tradeNum": 52,
-      "riskGBP": 134.57274196630962,
-      "pnlGBP": -134.57274196630962,
-      "balanceAfter": 4351.185323577344
-    },
-    {
-      "date": "2026-05-20",
-      "market": "XAUUSD",
-      "dir": "SELL",
-      "pnlR": -1,
-      "result": "LOSS",
-      "rrPot": null,
-      "tradeNum": 53,
-      "riskGBP": 130.53555970732032,
-      "pnlGBP": -130.53555970732032,
-      "balanceAfter": 4220.649763870024
+      "riskGBP": 70.90867147990531,
+      "pnlGBP": -70.90867147990531,
+      "balanceAfter": 2292.713711183605
     },
     {
       "date": "2026-05-20",
@@ -708,34 +684,22 @@
       "pnlR": 1.41,
       "result": "WIN",
       "rrPot": 1.41,
-      "tradeNum": 54,
-      "riskGBP": 126.61949291610071,
-      "pnlGBP": 178.533485011702,
-      "balanceAfter": 4399.183248881726
+      "tradeNum": 52,
+      "riskGBP": 68.78141133550815,
+      "pnlGBP": 96.98178998306649,
+      "balanceAfter": 2389.6955011666714
     },
     {
       "date": "2026-05-21",
       "market": "XAUUSD",
       "dir": "SELL",
-      "pnlR": 2,
-      "result": "WIN_TP2",
+      "pnlR": -1,
+      "result": "LOSS",
       "rrPot": null,
-      "tradeNum": 55,
-      "riskGBP": 131.97549746645177,
-      "pnlGBP": 263.95099493290354,
-      "balanceAfter": 4663.134243814629
-    },
-    {
-      "date": "2026-05-21",
-      "market": "XAUUSD",
-      "dir": "SELL",
-      "pnlR": 0.75,
-      "result": "WIN_TP1_BE",
-      "rrPot": null,
-      "tradeNum": 56,
-      "riskGBP": 139.8940273144389,
-      "pnlGBP": 104.92052048582917,
-      "balanceAfter": 4768.054764300458
+      "tradeNum": 53,
+      "riskGBP": 71.69086503500014,
+      "pnlGBP": -71.69086503500014,
+      "balanceAfter": 2318.0046361316713
     },
     {
       "date": "2026-05-21",
@@ -744,10 +708,10 @@
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": 2.59,
-      "tradeNum": 57,
-      "riskGBP": 143.04164292901373,
-      "pnlGBP": -143.04164292901373,
-      "balanceAfter": 4625.013121371445
+      "tradeNum": 54,
+      "riskGBP": 69.54013908395014,
+      "pnlGBP": -69.54013908395014,
+      "balanceAfter": 2248.464497047721
     },
     {
       "date": "2026-05-22",
@@ -756,22 +720,10 @@
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": null,
-      "tradeNum": 58,
-      "riskGBP": 138.75039364114335,
-      "pnlGBP": -138.75039364114335,
-      "balanceAfter": 4486.262727730302
-    },
-    {
-      "date": "2026-05-22",
-      "market": "XAUUSD",
-      "dir": "SELL",
-      "pnlR": -1,
-      "result": "LOSS",
-      "rrPot": null,
-      "tradeNum": 59,
-      "riskGBP": 134.58788183190904,
-      "pnlGBP": -134.58788183190904,
-      "balanceAfter": 4351.674845898393
+      "tradeNum": 55,
+      "riskGBP": 67.45393491143163,
+      "pnlGBP": -67.45393491143163,
+      "balanceAfter": 2181.0105621362895
     },
     {
       "date": "2026-05-25",
@@ -780,34 +732,22 @@
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": null,
-      "tradeNum": 60,
-      "riskGBP": 130.55024537695178,
-      "pnlGBP": -130.55024537695178,
-      "balanceAfter": 4221.124600521442
+      "tradeNum": 56,
+      "riskGBP": 65.43031686408868,
+      "pnlGBP": -65.43031686408868,
+      "balanceAfter": 2115.580245272201
     },
     {
       "date": "2026-05-26",
       "market": "XAUUSD",
       "dir": "SELL",
-      "pnlR": -1,
-      "result": "LOSS",
+      "pnlR": 2,
+      "result": "WIN_TP2",
       "rrPot": null,
-      "tradeNum": 61,
-      "riskGBP": 126.63373801564325,
-      "pnlGBP": -126.63373801564325,
-      "balanceAfter": 4094.4908625057983
-    },
-    {
-      "date": "2026-05-26",
-      "market": "XAUUSD",
-      "dir": "SELL",
-      "pnlR": -1,
-      "result": "LOSS",
-      "rrPot": null,
-      "tradeNum": 62,
-      "riskGBP": 122.83472587517394,
-      "pnlGBP": -122.83472587517394,
-      "balanceAfter": 3971.656136630624
+      "tradeNum": 57,
+      "riskGBP": 63.46740735816603,
+      "pnlGBP": 126.93481471633206,
+      "balanceAfter": 2242.515059988533
     },
     {
       "date": "2026-05-26",
@@ -816,34 +756,46 @@
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": 3.2,
-      "tradeNum": 63,
-      "riskGBP": 119.14968409891873,
-      "pnlGBP": -119.14968409891873,
-      "balanceAfter": 3852.5064525317052
+      "tradeNum": 58,
+      "riskGBP": 67.27545179965598,
+      "pnlGBP": -67.27545179965598,
+      "balanceAfter": 2175.239608188877
     },
     {
-      "date": "2026-05-28",
+      "date": "2026-05-27",
       "market": "XAUUSD",
       "dir": "SELL",
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": null,
-      "tradeNum": 64,
-      "riskGBP": 115.57519357595115,
-      "pnlGBP": -115.57519357595115,
-      "balanceAfter": 3736.931258955754
+      "tradeNum": 59,
+      "riskGBP": 65.2571882456663,
+      "pnlGBP": -65.2571882456663,
+      "balanceAfter": 2109.9824199432105
+    },
+    {
+      "date": "2026-05-27",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "rrPot": null,
+      "tradeNum": 60,
+      "riskGBP": 63.29947259829631,
+      "pnlGBP": 47.47460444872223,
+      "balanceAfter": 2157.457024391933
     },
     {
       "date": "2026-05-28",
       "market": "XAUUSD",
       "dir": "SELL",
-      "pnlR": -1,
-      "result": "LOSS",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
       "rrPot": null,
-      "tradeNum": 65,
-      "riskGBP": 112.10793776867261,
-      "pnlGBP": -112.10793776867261,
-      "balanceAfter": 3624.8233211870815
+      "tradeNum": 61,
+      "riskGBP": 64.72371073175799,
+      "pnlGBP": 48.54278304881849,
+      "balanceAfter": 2205.9998074407513
     },
     {
       "date": "2026-05-29",
@@ -852,22 +804,10 @@
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": null,
-      "tradeNum": 66,
-      "riskGBP": 108.74469963561245,
-      "pnlGBP": -108.74469963561245,
-      "balanceAfter": 3516.078621551469
-    },
-    {
-      "date": "2026-06-01",
-      "market": "XAUUSD",
-      "dir": "SELL",
-      "pnlR": 0.75,
-      "result": "WIN_TP1_BE",
-      "rrPot": null,
-      "tradeNum": 67,
-      "riskGBP": 105.48235864654407,
-      "pnlGBP": 79.11176898490805,
-      "balanceAfter": 3595.190390536377
+      "tradeNum": 62,
+      "riskGBP": 66.17999422322254,
+      "pnlGBP": -66.17999422322254,
+      "balanceAfter": 2139.819813217529
     },
     {
       "date": "2026-06-01",
@@ -876,10 +816,22 @@
       "pnlR": 2,
       "result": "WIN_TP2",
       "rrPot": null,
-      "tradeNum": 68,
-      "riskGBP": 107.8557117160913,
-      "pnlGBP": 215.7114234321826,
-      "balanceAfter": 3810.9018139685595
+      "tradeNum": 63,
+      "riskGBP": 64.19459439652587,
+      "pnlGBP": 128.38918879305174,
+      "balanceAfter": 2268.2090020105807
+    },
+    {
+      "date": "2026-06-01",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "rrPot": null,
+      "tradeNum": 64,
+      "riskGBP": 68.04627006031741,
+      "pnlGBP": 136.09254012063482,
+      "balanceAfter": 2404.3015421312157
     },
     {
       "date": "2026-06-01",
@@ -888,82 +840,58 @@
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": 3.13,
+      "tradeNum": 65,
+      "riskGBP": 72.12904626393647,
+      "pnlGBP": -72.12904626393647,
+      "balanceAfter": 2332.1724958672794
+    },
+    {
+      "date": "2026-06-02",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "rrPot": null,
+      "tradeNum": 66,
+      "riskGBP": 69.96517487601838,
+      "pnlGBP": -69.96517487601838,
+      "balanceAfter": 2262.207320991261
+    },
+    {
+      "date": "2026-06-03",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "rrPot": null,
+      "tradeNum": 67,
+      "riskGBP": 67.86621962973783,
+      "pnlGBP": 135.73243925947565,
+      "balanceAfter": 2397.9397602507365
+    },
+    {
+      "date": "2026-06-04",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "rrPot": null,
+      "tradeNum": 68,
+      "riskGBP": 71.9381928075221,
+      "pnlGBP": -71.9381928075221,
+      "balanceAfter": 2326.0015674432143
+    },
+    {
+      "date": "2026-06-04",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "rrPot": null,
       "tradeNum": 69,
-      "riskGBP": 114.32705441905678,
-      "pnlGBP": -114.32705441905678,
-      "balanceAfter": 3696.5747595495027
-    },
-    {
-      "date": "2026-06-02",
-      "market": "XAUUSD",
-      "dir": "SELL",
-      "pnlR": 2,
-      "result": "WIN_TP2",
-      "rrPot": null,
-      "tradeNum": 70,
-      "riskGBP": 110.89724278648508,
-      "pnlGBP": 221.79448557297016,
-      "balanceAfter": 3918.369245122473
-    },
-    {
-      "date": "2026-06-02",
-      "market": "XAUUSD",
-      "dir": "SELL",
-      "pnlR": 2,
-      "result": "WIN_TP2",
-      "rrPot": null,
-      "tradeNum": 71,
-      "riskGBP": 117.55107735367419,
-      "pnlGBP": 235.10215470734838,
-      "balanceAfter": 4153.471399829821
-    },
-    {
-      "date": "2026-06-03",
-      "market": "XAUUSD",
-      "dir": "SELL",
-      "pnlR": 0.75,
-      "result": "WIN_TP1_BE",
-      "rrPot": null,
-      "tradeNum": 72,
-      "riskGBP": 124.60414199489463,
-      "pnlGBP": 93.45310649617097,
-      "balanceAfter": 4246.924506325992
-    },
-    {
-      "date": "2026-06-03",
-      "market": "XAUUSD",
-      "dir": "SELL",
-      "pnlR": 2,
-      "result": "WIN_TP2",
-      "rrPot": null,
-      "tradeNum": 73,
-      "riskGBP": 127.40773518977977,
-      "pnlGBP": 254.81547037955954,
-      "balanceAfter": 4501.739976705552
-    },
-    {
-      "date": "2026-06-04",
-      "market": "XAUUSD",
-      "dir": "SELL",
-      "pnlR": -1,
-      "result": "LOSS",
-      "rrPot": null,
-      "tradeNum": 74,
-      "riskGBP": 135.05219930116655,
-      "pnlGBP": -135.05219930116655,
-      "balanceAfter": 4366.687777404386
-    },
-    {
-      "date": "2026-06-04",
-      "market": "XAUUSD",
-      "dir": "SELL",
-      "pnlR": -1,
-      "result": "LOSS",
-      "rrPot": null,
-      "tradeNum": 75,
-      "riskGBP": 131.00063332213156,
-      "pnlGBP": -131.00063332213156,
-      "balanceAfter": 4235.687144082254
+      "riskGBP": 69.78004702329643,
+      "pnlGBP": -69.78004702329643,
+      "balanceAfter": 2256.221520419918
     },
     {
       "date": "2026-06-04",
@@ -972,22 +900,34 @@
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": 4.91,
-      "tradeNum": 76,
-      "riskGBP": 127.07061432246762,
-      "pnlGBP": -127.07061432246762,
-      "balanceAfter": 4108.616529759786
+      "tradeNum": 70,
+      "riskGBP": 67.68664561259753,
+      "pnlGBP": -67.68664561259753,
+      "balanceAfter": 2188.53487480732
     },
     {
       "date": "2026-06-05",
       "market": "XAUUSD",
       "dir": "SELL",
-      "pnlR": -1,
-      "result": "LOSS",
+      "pnlR": 2,
+      "result": "WIN_TP2",
       "rrPot": null,
-      "tradeNum": 77,
-      "riskGBP": 123.25849589279359,
-      "pnlGBP": -123.25849589279359,
-      "balanceAfter": 3985.3580338669926
+      "tradeNum": 71,
+      "riskGBP": 65.65604624421961,
+      "pnlGBP": 131.31209248843922,
+      "balanceAfter": 2319.8469672957594
+    },
+    {
+      "date": "2026-06-05",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "rrPot": null,
+      "tradeNum": 72,
+      "riskGBP": 69.59540901887279,
+      "pnlGBP": 52.19655676415459,
+      "balanceAfter": 2372.043524059914
     },
     {
       "date": "2026-06-08",
@@ -996,10 +936,22 @@
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": null,
-      "tradeNum": 78,
-      "riskGBP": 119.56074101600977,
-      "pnlGBP": -119.56074101600977,
-      "balanceAfter": 3865.797292850983
+      "tradeNum": 73,
+      "riskGBP": 71.16130572179742,
+      "pnlGBP": -71.16130572179742,
+      "balanceAfter": 2300.8822183381167
+    },
+    {
+      "date": "2026-06-08",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "rrPot": null,
+      "tradeNum": 74,
+      "riskGBP": 69.0264665501435,
+      "pnlGBP": 138.052933100287,
+      "balanceAfter": 2438.935151438404
     },
     {
       "date": "2026-06-09",
@@ -1008,10 +960,10 @@
       "pnlR": 0.75,
       "result": "WIN_TP1_BE",
       "rrPot": null,
-      "tradeNum": 79,
-      "riskGBP": 115.97391878552949,
-      "pnlGBP": 86.98043908914713,
-      "balanceAfter": 3952.7777319401303
+      "tradeNum": 75,
+      "riskGBP": 73.16805454315211,
+      "pnlGBP": 54.876040907364086,
+      "balanceAfter": 2493.811192345768
     },
     {
       "date": "2026-06-09",
@@ -1020,10 +972,22 @@
       "pnlR": 2.29,
       "result": "WIN",
       "rrPot": 2.29,
-      "tradeNum": 80,
-      "riskGBP": 118.5833319582039,
-      "pnlGBP": 271.55583018428695,
-      "balanceAfter": 4224.333562124417
+      "tradeNum": 76,
+      "riskGBP": 74.81433577037305,
+      "pnlGBP": 171.3248289141543,
+      "balanceAfter": 2665.1360212599225
+    },
+    {
+      "date": "2026-06-10",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "rrPot": null,
+      "tradeNum": 77,
+      "riskGBP": 79.95408063779767,
+      "pnlGBP": 159.90816127559535,
+      "balanceAfter": 2825.044182535518
     },
     {
       "date": "2026-06-10",
@@ -1032,10 +996,10 @@
       "pnlR": -1,
       "result": "LOSS",
       "rrPot": 10.24,
-      "tradeNum": 81,
-      "riskGBP": 126.7300068637325,
-      "pnlGBP": -126.7300068637325,
-      "balanceAfter": 4097.6035552606845
+      "tradeNum": 78,
+      "riskGBP": 84.75132547606553,
+      "pnlGBP": -84.75132547606553,
+      "balanceAfter": 2740.292857059452
     }
   ]
 }
