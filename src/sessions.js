@@ -10,9 +10,9 @@
 const SESSIONS = {
   asia_kz:            { start: 2,  end: 5,  label: '🔵 Asia Kill Zone',         active: true  },
   london:             { start: 7,  end: 9,  label: '🟡 London Kill Zone',        active: true  },
-  silver_bullet_am:   { start: 10, end: 11, label: '⚡ Silver Bullet AM',        active: true  },
+  silver_bullet_am:   { start: 10, end: 11, label: '⚡ Silver Bullet AM',        active: false },
   new_york:           { start: 12, end: 15, label: '🟢 NY Kill Zone',            active: true  },
-  silver_bullet_pm:   { start: 14, end: 15, label: '⚡ Silver Bullet PM',        active: true  },
+  silver_bullet_pm:   { start: 14, end: 15, label: '⚡ Silver Bullet PM',        active: false },
   london_close:       { start: 15, end: 16, label: 'London Close',               active: false },
 };
 
@@ -58,10 +58,9 @@ function sessionStatus() {
   // Find next kill zone
   const totalMins = h * 60 + m;
   const kzList = [
-    { name: 'Asia',          start: 2  * 60 },
-    { name: 'London',        start: 7  * 60 },
-    { name: 'Silver Bullet', start: 10 * 60 },
-    { name: 'NY',            start: 12 * 60 },
+    { name: 'Asia',   start: 2  * 60 },
+    { name: 'London', start: 7  * 60 },
+    { name: 'NY',     start: 12 * 60 },
   ];
   const next = kzList.find(kz => kz.start > totalMins);
   if (next) {

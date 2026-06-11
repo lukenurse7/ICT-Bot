@@ -27,7 +27,6 @@ function signalMessage(sig) {
   const grade  = sig.grade || '—';
   const score  = sig.confluence || sig.confluence || '—';
 
-  const entry = parseFloat(sig.entry).toFixed(2);
   const sl    = parseFloat(sig.sl).toFixed(2);
   const tp1   = parseFloat(sig.tp1).toFixed(2);
   const tp2   = parseFloat(sig.tp2).toFixed(2);
@@ -45,11 +44,11 @@ function signalMessage(sig) {
 📊 Confluence: <b>${score}%</b>  Grade: <b>${grade}</b>
 🕐 ${time}
 
-💰 <b>ENTRY</b>    <code>$${entry}</code>
+⚡ <b>ENTRY</b>     MARKET EXECUTION — enter now
 🛑 <b>STOP LOSS</b> <code>$${sl}</code>
-🎯 <b>TP1</b>      <code>$${tp1}</code>  <i>(1:1.5R — partial close)</i>
-🎯 <b>TP2</b>      <code>$${tp2}</code>  <i>(1:${rr}R — full target)</i>
-🎯 <b>TP3</b>      <code>$${tp3}</code>  <i>(extension)</i>
+🎯 <b>TP1</b>      <code>$${tp1}</code>  <i>(1:1.5R — close 50%, move SL to BE)</i>
+🎯 <b>TP2</b>      <code>$${tp2}</code>  <i>(close 25%)</i>
+🎯 <b>TP3</b>      <code>$${tp3}</code>  <i>(close final 25%)</i>
 
 📋 <b>Setup</b>
 • Sweep: ${sweep}
