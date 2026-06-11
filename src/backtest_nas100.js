@@ -242,16 +242,21 @@ function simulate(dir, entry, sl, tp, futureBars) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 async function run() {
   console.clear();
-  console.log('\n' + chalk.bold.cyan('  ◆ NAS100 Judas Swing — ICT Checklist (CORRECTED)'));
-  console.log(chalk.gray('  Closest 5m swing H/L → 5m sweep 14:00–16:00 GMT → 2m MSS + FVG → limit entry\n'));
+  console.log('\n' + chalk.bold.cyan('  ◆ NAS100 Judas Swing — ICT Checklist'));
+  console.log(chalk.gray('  Closest 5m swing H/L → 5m sweep 14:00–16:00 GMT → 1m MSS + FVG → limit entry\n'));
 
   // Fetch 5m with pre-market (for pre-NY levels + sweep)
   process.stdout.write(chalk.gray('  QQQ 5m (pre-market)...'));
   const c5m = await fetchYahoo('QQQ', '5m', '60d', true, 'qqq_5m_pre');
 
-  // Fetch 2m regular hours (for post-sweep MSS + FVG — 2m ≈ 1m proxy, 60 days)
-  process.stdout.write(chalk.gray('  QQQ 2m (regular hours)...'));
-  const c2m = await fetchYahoo('QQQ', '2m', '60d', false, 'qqq_2m_reg');
+  // Load TwelveData 1m (regular hours, paginated, cached by fetch script)
+  const c1mFile = path.join(CACHE_DIR, 'twelvedata_qqq_1m.json');
+  if (!fs.existsSync(c1mFile)) {
+    console.error(chalk.red('\n  ✗ TwelveData 1m cache missing. Run fetch script first.\n'));
+    process.exit(1);
+  }
+  const c2m = JSON.parse(fs.readFileSync(c1mFile, 'utf8'));
+  console.log(chalk.gray(`  TwelveData QQQ 1m... ✓ ${c2m.length} bars (${c2m[0].time.slice(0,10)} → ${c2m[c2m.length-1].time.slice(0,10)})`));
 
   const tradingDays = [...new Set(
     c5m.filter(c => minsUTC(c.time) >= 13 * 60).map(c => c.time.slice(0, 10))
@@ -277,11 +282,11 @@ async function run() {
     // Find where the sweep candle sits in time, then get 2m bars after it
     const sweepMins = minsUTC(sweep.sweepTime);
 
-    // Post-sweep 2m bars: same date, after sweep candle, within 16:00 UTC
+    // Post-sweep 1m bars: same date, after sweep candle, within 45 minutes of sweep
     const post2m = c2m.filter(c => {
       if (!c.time.startsWith(dateStr)) return false;
       const m = minsUTC(c.time);
-      return m > sweepMins && m < 16 * 60;
+      return m > sweepMins && m <= sweepMins + 45;
     });
 
     if (post2m.length < 4) { stats.noMSS++; continue; }
@@ -313,6 +318,8 @@ async function run() {
     if (isLong  && (sl >= entry || tp <= entry))  { stats.riskFail++; continue; }
     if (!isLong && (sl <= entry || tp >= entry))  { stats.riskFail++; continue; }
     if (Math.abs(tp - entry) < MIN_TP_DIST)       { stats.riskFail++; continue; }
+    // Entry must be within 2% of swept level (no chasing far-away FVGs)
+    if (Math.abs(entry - sweep.sweptLevel) / sweep.sweptLevel > 0.02) { stats.riskFail++; continue; }
 
     const rrPot = parseFloat((Math.abs(tp - entry) / risk).toFixed(2));
 
@@ -354,7 +361,7 @@ async function run() {
   // ─── Print report ─────────────────────────────────────────────────────────
   const sep = '═'.repeat(72);
   console.log(sep);
-  console.log(chalk.bold.cyan('  SIGNAL REPORT — NAS100 Judas Swing (5m levels + 2m MSS/FVG)'));
+  console.log(chalk.bold.cyan('  SIGNAL REPORT — NAS100 Judas Swing (5m levels + 1m MSS/FVG)'));
   console.log(sep);
 
   signals.forEach((s, idx) => {
@@ -389,14 +396,14 @@ async function run() {
   signals.forEach(s => { const mk=s.date.slice(0,7); byMonth[mk]=(byMonth[mk]||[]).concat(s); });
 
   console.log('\n\n' + sep);
-  console.log(chalk.bold.cyan('  SUMMARY — NAS100 Judas Swing (5m + 2m)'));
+  console.log(chalk.bold.cyan('  SUMMARY — NAS100 Judas Swing (5m + 1m TwelveData)'));
   console.log(sep);
   console.log(chalk.gray('  Filter funnel:'));
   console.log(chalk.gray(`    Trading days:          ${tradingDays.length}`));
   console.log(chalk.gray(`    No pre-NY levels:      ${stats.noLevels}`));
   console.log(chalk.gray(`    No 5m sweep 14-16:     ${stats.noSweep}`));
-  console.log(chalk.gray(`    No 2m MSS after sweep: ${stats.noMSS}`));
-  console.log(chalk.gray(`    No 2m FVG found:       ${stats.noFVG}`));
+  console.log(chalk.gray(`    No 1m MSS after sweep: ${stats.noMSS}`));
+  console.log(chalk.gray(`    No 1m FVG found:       ${stats.noFVG}`));
   console.log(chalk.gray(`    Risk check fail:       ${stats.riskFail}`));
   console.log(chalk.gray(`    Signals fired:         ${signals.length}`));
   console.log('');
