@@ -1,8 +1,14 @@
 'use strict';
 
 // ─── DJ30 ICT Analysis Engine ─────────────────────────────────────────────────
-// Same methodology as ict_xau.js: HTF Bias → Sweep → MSS → FVG entry
-// Kill zone (London 07-09 UTC / NY 12-15 UTC) is enforced by the caller
+// Strategy: KZ + Fresh Sweep (≤6 bars) + MSS → enter on MSS bar close
+//
+// Key difference from XAUUSD:
+//   • DJ30 impulses sharply at NY open — does NOT retrace into FVGs
+//   • FVG confirmation gate removed entirely
+//   • Entry is the MSS confirmation bar itself (not a limit/pullback)
+//   • Sweep must be fresh (within 6 bars) to avoid stale setups
+//   • HTF bias used as a bonus score point, NOT a hard gate
 
 // ─── HTF Bias ─────────────────────────────────────────────────────────────────
 function htfBias(dailyCandles, h4Candles) {
@@ -12,14 +18,12 @@ function htfBias(dailyCandles, h4Candles) {
       const c = arr[i];
       if (c.high > arr[i-1].high && c.high > arr[i-2].high && c.high > arr[i+1].high && c.high > arr[i+2].high)
         highs.push(c.high);
-      if (c.low  < arr[i-1].low  && c.low  < arr[i-2].low  && c.low  < arr[i+1].low  && c.low  < arr[i+2].low)
+      if (c.low < arr[i-1].low && c.low < arr[i-2].low && c.low < arr[i+1].low && c.low < arr[i+2].low)
         lows.push(c.low);
     }
     return { highs, lows };
   }
-
-  function bias(swg) {
-    const { highs, lows } = swg;
+  function bias({ highs, lows }) {
     if (highs.length < 2 || lows.length < 2) return 'ranging';
     const hh = highs[highs.length-1] > highs[highs.length-2];
     const hl = lows[lows.length-1]   > lows[lows.length-2];
@@ -29,80 +33,62 @@ function htfBias(dailyCandles, h4Candles) {
     if (lh && ll) return 'bearish';
     return 'ranging';
   }
-
-  const daily = bias(swings(dailyCandles));
-  const h4    = bias(swings(h4Candles));
-
-  if (daily === 'bullish' && h4 === 'bullish') return 'bullish';
-  if (daily === 'bearish' && h4 === 'bearish') return 'bearish';
-  if (daily === 'bullish' && h4 === 'bearish') return 'pullback_in_bull';
-  if (daily === 'bearish' && h4 === 'bullish') return 'pullback_in_bear';
+  const d = bias(swings(dailyCandles));
+  const h = bias(swings(h4Candles));
+  if (d === 'bullish' && h === 'bullish') return 'bullish';
+  if (d === 'bearish' && h === 'bearish') return 'bearish';
+  if (d === 'bullish' && h === 'bearish') return 'pullback_in_bull';
+  if (d === 'bearish' && h === 'bullish') return 'pullback_in_bear';
   return 'ranging';
 }
 
 // ─── Liquidity Sweep Detection ────────────────────────────────────────────────
-function detectSweep(candles15m, candles5m) {
-  const LOOKBACK = 50;
-  const recent15 = candles15m.slice(-LOOKBACK);
-  const last5    = candles5m[candles5m.length - 1];
+// Fresh sweep only: wicked beyond level and CLOSED back within last FRESH_BARS bars
+const FRESH_BARS = 6;
 
-  // Collect significant swing levels from 15m
-  const levels = [];
+function detectSweep(candles15m, candles5m) {
+  const recent15 = candles15m.slice(-50);
+  const levels   = [];
 
   // Equal highs (BSL)
   for (let i = 2; i < recent15.length - 1; i++) {
-    const c = recent15[i];
+    const c    = recent15[i];
     const prev = recent15.slice(Math.max(0, i-10), i);
-    const eqHigh = prev.find(p => Math.abs(p.high - c.high) / c.high < 0.0005);
-    if (eqHigh) levels.push({ price: Math.max(c.high, eqHigh.high), type: 'BSL', name: 'Equal Highs (BSL)' });
+    const eqH  = prev.find(p => Math.abs(p.high - c.high) / c.high < 0.0005);
+    if (eqH) levels.push({ price: Math.max(c.high, eqH.high), type: 'BSL', name: 'Equal Highs (BSL)' });
   }
 
   // Equal lows (SSL)
   for (let i = 2; i < recent15.length - 1; i++) {
-    const c = recent15[i];
+    const c    = recent15[i];
     const prev = recent15.slice(Math.max(0, i-10), i);
-    const eqLow = prev.find(p => Math.abs(p.low - c.low) / c.low < 0.0005);
-    if (eqLow) levels.push({ price: Math.min(c.low, eqLow.low), type: 'SSL', name: 'Equal Lows (SSL)' });
+    const eqL  = prev.find(p => Math.abs(p.low - c.low) / c.low < 0.0005);
+    if (eqL) levels.push({ price: Math.min(c.low, eqL.low), type: 'SSL', name: 'Equal Lows (SSL)' });
   }
 
   // Prev day high/low
   const yesterday = candles15m.slice(-100).filter(c => {
-    const d = new Date(c.time); return d.getUTCHours() >= 21 || d.getUTCHours() < 2;
+    const h = new Date(c.time).getUTCHours(); return h >= 21 || h < 2;
   });
   if (yesterday.length) {
-    const pdh = Math.max(...yesterday.map(c => c.high));
-    const pdl = Math.min(...yesterday.map(c => c.low));
-    levels.push({ price: pdh, type: 'BSL', name: 'Prev Day High' });
-    levels.push({ price: pdl, type: 'SSL', name: 'Prev Day Low' });
+    levels.push({ price: Math.max(...yesterday.map(c => c.high)), type: 'BSL', name: 'Prev Day High' });
+    levels.push({ price: Math.min(...yesterday.map(c => c.low)),  type: 'SSL', name: 'Prev Day Low' });
   }
 
-  // Check for sweep: last 5m candle wicked above BSL or below SSL then closed back
+  // Scan only last FRESH_BARS 5m candles for sweep
   const results = [];
-  for (const lvl of levels) {
-    if (lvl.type === 'BSL' && last5.high > lvl.price && last5.close < lvl.price) {
-      results.push({ dir: 'bear', level: lvl.price, levelName: lvl.name, barsAgo: 0 });
-    }
-    if (lvl.type === 'SSL' && last5.low < lvl.price && last5.close > lvl.price) {
-      results.push({ dir: 'bull', level: lvl.price, levelName: lvl.name, barsAgo: 0 });
-    }
-  }
-
-  // Also check recent 5m history for sweeps in last 12 bars
-  for (let back = 1; back <= 12; back++) {
+  for (let back = 0; back <= FRESH_BARS; back++) {
     const idx = candles5m.length - 1 - back;
     if (idx < 0) break;
     const c = candles5m[idx];
     for (const lvl of levels) {
-      if (lvl.type === 'BSL' && c.high > lvl.price && c.close < lvl.price) {
+      if (lvl.type === 'BSL' && c.high > lvl.price && c.close < lvl.price)
         results.push({ dir: 'bear', level: lvl.price, levelName: lvl.name, barsAgo: back });
-      }
-      if (lvl.type === 'SSL' && c.low < lvl.price && c.close > lvl.price) {
+      if (lvl.type === 'SSL' && c.low < lvl.price && c.close > lvl.price)
         results.push({ dir: 'bull', level: lvl.price, levelName: lvl.name, barsAgo: back });
-      }
     }
   }
 
-  // Most recent sweep
   if (!results.length) return { detected: false };
   results.sort((a, b) => a.barsAgo - b.barsAgo);
   return { detected: true, ...results[0] };
@@ -112,169 +98,131 @@ function detectSweep(candles15m, candles5m) {
 function detectMSS(candles5m, sweepDir) {
   const window = candles5m.slice(-20);
   if (window.length < 5) return { confirmed: false };
+  const last = window[window.length - 1];
+  const prev = window[window.length - 2];
 
   if (sweepDir === 'bear') {
-    // After BSL sweep, look for BOS down (close below recent swing low) or CHoCH
+    // BOS down: close below a recent swing low
     let swingLow = Infinity;
     for (let i = 0; i < window.length - 3; i++) {
       const c = window[i];
-      if (c.low < window[Math.max(0,i-1)]?.low && c.low < window[i+1]?.low) {
+      if (c.low < (window[i-1]?.low ?? Infinity) && c.low < (window[i+1]?.low ?? Infinity))
         swingLow = Math.min(swingLow, c.low);
-      }
     }
-    const last = window[window.length - 1];
-    if (swingLow < Infinity && last.close < swingLow) {
-      return { confirmed: true, type: 'BOS_DOWN', level: swingLow, description: 'Broke below swing low' };
-    }
-    // CHoCH: last candle closes below prev candle low after sweep
-    const prev = window[window.length - 2];
-    if (last.close < prev.low) {
-      return { confirmed: true, type: 'CHoCH', level: prev.low, description: 'Change of character down' };
-    }
+    if (swingLow < Infinity && last.close < swingLow)
+      return { confirmed: true, type: 'BOS_DOWN', level: swingLow, entryClose: last.close, description: 'Broke below swing low' };
+    // CHoCH: close below prev candle low
+    if (last.close < prev.low)
+      return { confirmed: true, type: 'CHoCH', level: prev.low, entryClose: last.close, description: 'Change of character down' };
   }
 
   if (sweepDir === 'bull') {
     let swingHigh = -Infinity;
     for (let i = 0; i < window.length - 3; i++) {
       const c = window[i];
-      if (c.high > window[Math.max(0,i-1)]?.high && c.high > window[i+1]?.high) {
+      if (c.high > (window[i-1]?.high ?? -Infinity) && c.high > (window[i+1]?.high ?? -Infinity))
         swingHigh = Math.max(swingHigh, c.high);
-      }
     }
-    const last = window[window.length - 1];
-    if (swingHigh > -Infinity && last.close > swingHigh) {
-      return { confirmed: true, type: 'BOS_UP', level: swingHigh, description: 'Broke above swing high' };
-    }
-    const prev = window[window.length - 2];
-    if (last.close > prev.high) {
-      return { confirmed: true, type: 'CHoCH', level: prev.high, description: 'Change of character up' };
-    }
+    if (swingHigh > -Infinity && last.close > swingHigh)
+      return { confirmed: true, type: 'BOS_UP', level: swingHigh, entryClose: last.close, description: 'Broke above swing high' };
+    if (last.close > prev.high)
+      return { confirmed: true, type: 'CHoCH', level: prev.high, entryClose: last.close, description: 'Change of character up' };
   }
 
   return { confirmed: false };
 }
 
-// ─── FVG with Confirmation Candle ─────────────────────────────────────────────
-function detectFVG(candles5m, sweepDir) {
-  const window = candles5m.slice(-30);
+// ─── TP Levels — meaningful structure, min R floors ──────────────────────────
+function calcTPs(dir, entry, risk, candles5m, h1Candles, candles15m) {
+  const isLong  = dir === 'bull';
+  const tp2MinR = 2.5;
+  const tp3MinR = 4.0;
+  const tp2MaxR = 8.0;
+  const tp3MaxR = 12.0;
 
-  const candidates = [];
-  for (let i = 0; i < window.length - 2; i++) {
-    const c0 = window[i], c2 = window[i + 2];
-    if (sweepDir === 'bear' && c2.high < c0.low) {
-      const size = c0.low - c2.high;
-      if (size > 0) candidates.push({ top: c0.low, bottom: c2.high, size, idx: i + 1 });
-    }
-    if (sweepDir === 'bull' && c2.low > c0.high) {
-      const size = c2.low - c0.high;
-      if (size > 0) candidates.push({ top: c2.low, bottom: c0.high, size, idx: i + 1 });
-    }
+  function rOf(price) { return Math.abs(price - entry) / risk; }
+
+  // 1H swing levels (session structure)
+  const c1h = h1Candles.slice(-48);
+  const h1Levels = [];
+  for (let i = 2; i < c1h.length - 2; i++) {
+    const c = c1h[i];
+    if (isLong && c.high > c1h[i-1].high && c.high > c1h[i-2].high && c.high > c1h[i+1].high)
+      h1Levels.push({ price: c.high, source: '1H swing high' });
+    if (!isLong && c.low < c1h[i-1].low && c.low < c1h[i-2].low && c.low < c1h[i+1].low)
+      h1Levels.push({ price: c.low, source: '1H swing low' });
   }
 
-  if (!candidates.length) return { found: false };
+  // Prev day high/low from 15m
+  const yesterday = candles15m.slice(-100).filter(c => {
+    const h = new Date(c.time).getUTCHours(); return h >= 21 || h < 2;
+  });
+  const pdh = yesterday.length ? Math.max(...yesterday.map(c => c.high)) : null;
+  const pdl = yesterday.length ? Math.min(...yesterday.map(c => c.low))  : null;
 
-  // Best = largest unfilled FVG
-  const best = candidates.slice(-3).sort((a, b) => b.size - a.size)[0];
+  // TP2 — 1H swing levels within 2.5–8R
+  const tp2Cands = h1Levels.filter(l => {
+    const r = rOf(l.price);
+    return r >= tp2MinR && r <= tp2MaxR && (isLong ? l.price > entry : l.price < entry);
+  }).sort((a, b) => Math.abs(a.price - entry) - Math.abs(b.price - entry));
 
-  // Confirmation candle: prev candle wicked into FVG and closed back out
-  const prevCandle = window[window.length - 2];
-  let confirmedEntry = false;
+  const tp2Obj  = tp2Cands[0];
+  const tp2     = tp2Obj ? tp2Obj.price : (isLong ? entry + risk * tp2MinR : entry - risk * tp2MinR);
+  const tp2Desc = tp2Obj ? tp2Obj.source : `Fixed ${tp2MinR}R`;
+  const tp2R    = rOf(tp2);
 
-  if (sweepDir === 'bear') {
-    const wickedIn  = prevCandle.high >= best.bottom;
-    const closedBack = prevCandle.close <= best.top;
-    const wickDepth = prevCandle.high - best.bottom;
-    confirmedEntry = wickedIn && closedBack && wickDepth >= best.size * 0.5;
-  } else {
-    const wickedIn  = prevCandle.low <= best.top;
-    const closedBack = prevCandle.close >= best.bottom;
-    const wickDepth = best.top - prevCandle.low;
-    confirmedEntry = wickedIn && closedBack && wickDepth >= best.size * 0.5;
+  // TP3 — PDH/PDL first, then further 1H swings, min 4R and beyond TP2
+  const tp3Cands = [];
+  if (isLong  && pdh && rOf(pdh) > tp2R && rOf(pdh) <= tp3MaxR) tp3Cands.push({ price: pdh, source: 'Prev Day High' });
+  if (!isLong && pdl && rOf(pdl) > tp2R && rOf(pdl) <= tp3MaxR) tp3Cands.push({ price: pdl, source: 'Prev Day Low' });
+  for (const l of h1Levels) {
+    const r = rOf(l.price);
+    if (r >= tp3MinR && r > tp2R + 0.5 && r <= tp3MaxR && (isLong ? l.price > tp2 : l.price < tp2))
+      tp3Cands.push(l);
   }
+  tp3Cands.sort((a, b) => Math.abs(a.price - entry) - Math.abs(b.price - entry));
+
+  const tp3Obj  = tp3Cands[0];
+  const tp3     = tp3Obj ? tp3Obj.price : (isLong ? entry + risk * 5 : entry - risk * 5);
+  const tp3Desc = tp3Obj ? tp3Obj.source : 'Fixed 5R extension';
 
   return {
-    found: true,
-    top: best.top,
-    bottom: best.bottom,
-    size: best.size,
-    entryZone: `${best.bottom.toFixed(2)}–${best.top.toFixed(2)}`,
-    inFVG: confirmedEntry
+    tp2: parseFloat(tp2.toFixed(2)), tp2Desc,
+    tp3: parseFloat(tp3.toFixed(2)), tp3Desc
   };
 }
 
-// ─── Liquidity-based TPs ──────────────────────────────────────────────────────
-function liquidityTPs(dir, entry, risk, candles5m, h1Candles) {
-  const isLong = dir === 'bull';
-  const minTP = isLong ? entry + risk * 1.5 : entry - risk * 1.5;
-  const maxR  = 4.0;
-
-  const candidates = [];
-
-  // 5m equal lows/highs
-  const c5 = candles5m.slice(-60);
-  for (let i = 2; i < c5.length - 1; i++) {
-    const c = c5[i];
-    const prev = c5.slice(Math.max(0, i-8), i);
-    if (isLong) {
-      const eq = prev.find(p => Math.abs(p.high - c.high) / c.high < 0.001);
-      if (eq) candidates.push({ price: Math.max(c.high, eq.high), desc: '5m equal highs' });
-    } else {
-      const eq = prev.find(p => Math.abs(p.low - c.low) / c.low < 0.001);
-      if (eq) candidates.push({ price: Math.min(c.low, eq.low), desc: '5m equal lows' });
-    }
-  }
-
-  // 1H swing highs/lows
-  const c1h = h1Candles.slice(-24);
-  for (let i = 2; i < c1h.length - 2; i++) {
-    const c = c1h[i];
-    if (isLong) {
-      if (c.high > c1h[i-1].high && c.high > c1h[i-2].high && c.high > c1h[i+1].high)
-        candidates.push({ price: c.high, desc: '1H swing high' });
-    } else {
-      if (c.low < c1h[i-1].low && c.low < c1h[i-2].low && c.low < c1h[i+1].low)
-        candidates.push({ price: c.low, desc: '1H swing low' });
-    }
-  }
-
-  // Filter: must be in trade direction and within max R
-  const valid = candidates
-    .filter(t => isLong ? t.price > minTP && t.price < entry + risk * maxR
-                        : t.price < minTP && t.price > entry - risk * maxR)
-    .sort((a, b) => isLong ? a.price - b.price : b.price - a.price);
-
-  const tp2obj = valid[0] || { price: isLong ? entry + risk*2.5 : entry - risk*2.5, desc: 'Fixed 2.5R (no liquidity)' };
-  const tp3obj = valid[1] || { price: isLong ? entry + risk*3.5 : entry - risk*3.5, desc: 'Fixed 3.5R (no liquidity)' };
-
-  return { tp2: tp2obj.price, tp2Desc: tp2obj.desc, tp3: tp3obj.price, tp3Desc: tp3obj.desc };
-}
-
 // ─── Confluence Score ─────────────────────────────────────────────────────────
-function scoreConfluence(sweep, mss, fvg) {
-  let score = 25;  // KZ = 25pts — enforced by caller, replaces HTF bias gate
+function scoreConfluence(sweep, mss, htfBiasVal, dir) {
+  // All three core conditions required: KZ (enforced by caller) + Sweep + MSS
+  // HTF alignment is a bonus — not a gate
+  let score = 30;        // KZ base
   const tags = ['KZ'];
 
-  if (sweep.detected)    { score += 25; tags.push('SWEEP'); }
-  if (mss.confirmed)     { score += 25; tags.push('MSS'); }
-  if (fvg.found)         { score += 15; tags.push('FVG'); }
-  if (fvg.inFVG)         { score += 10; tags.push('CONF_CANDLE'); }
+  if (sweep.detected) { score += 35; tags.push('SWEEP'); }
+  if (mss.confirmed)  { score += 35; tags.push('MSS'); }
+
+  // Bonus: HTF bias aligned with trade direction
+  const aligned = dir && (
+    (dir === 'bull' && (htfBiasVal === 'bullish' || htfBiasVal === 'pullback_in_bear')) ||
+    (dir === 'bear' && (htfBiasVal === 'bearish' || htfBiasVal === 'pullback_in_bull'))
+  );
+  if (aligned) { score = Math.min(score + 10, 100); tags.push('HTF_ALIGNED'); }
 
   const grade = score >= 90 ? 'A+' : score >= 80 ? 'A' : score >= 70 ? 'B' : score >= 60 ? 'C' : 'D';
-  return { score: Math.min(score, 100), grade, tags };
+  return { score, grade, tags };
 }
 
 // ─── Main Analysis ────────────────────────────────────────────────────────────
 function runICTAnalysis(data) {
   const { daily, h4, h1, candles15m, candles5m } = data;
 
-  const bias    = htfBias(daily, h4);
-  const sweep   = detectSweep(candles15m, candles5m);
-  const mss     = sweep.detected ? detectMSS(candles5m, sweep.dir) : { confirmed: false };
-  const fvg     = (sweep.detected && mss.confirmed) ? detectFVG(candles5m, sweep.dir) : { found: false };
-  const dir     = sweep.dir || null;
-  const conf    = dir ? scoreConfluence(sweep, mss, fvg) : { score: 0, grade: 'D', tags: [] };
+  const bias  = htfBias(daily, h4);
+  const sweep = detectSweep(candles15m, candles5m);
+  const mss   = sweep.detected ? detectMSS(candles5m, sweep.dir) : { confirmed: false };
+  const dir   = sweep.dir || null;
+  const conf  = scoreConfluence(sweep, mss, bias, dir);
 
-  // Informational only — NOT a signal gate for DJ30 (KZ is the bias filter)
   const htfAligned = dir && (
     (dir === 'bull' && (bias === 'bullish' || bias === 'pullback_in_bear')) ||
     (dir === 'bear' && (bias === 'bearish' || bias === 'pullback_in_bull'))
@@ -282,41 +230,52 @@ function runICTAnalysis(data) {
 
   let signal = null;
 
-  if (dir && mss.confirmed && fvg.inFVG && conf.score >= 80) {
+  // Gate: sweep detected + MSS confirmed + min 80% score (KZ+Sweep+MSS = 100, or 90 without HTF)
+  if (dir && sweep.detected && mss.confirmed && conf.score >= 80) {
     const lastCandle = candles5m[candles5m.length - 1];
-    const isLong = dir === 'bull';
-    const entry  = isLong ? fvg.bottom + fvg.size * 0.5 : fvg.top - fvg.size * 0.5;
+    const isLong     = dir === 'bull';
+
+    // Entry = close of MSS confirmation bar (market execution)
+    const entry = mss.entryClose || lastCandle.close;
 
     // SL: just beyond the sweep level
-    const sl = isLong
-      ? sweep.level - (sweep.level * 0.001)
-      : sweep.level + (sweep.level * 0.001);
+    const slBuf = entry * 0.0012;
+    const sl    = isLong
+      ? sweep.level - slBuf
+      : sweep.level + slBuf;
 
     const risk = Math.abs(entry - sl);
-    const tp1  = isLong ? entry + risk * 1.5 : entry - risk * 1.5;
 
-    const { tp2, tp2Desc, tp3, tp3Desc } = liquidityTPs(dir, entry, risk, candles5m, h1);
+    // Sanity check: SL shouldn't be more than 1% away (DJ30 is ~500pts wide)
+    if (risk <= 0 || risk > entry * 0.012) {
+      return { bias, sweep, mss, fvg: { found: false }, confluence: conf, htfAligned: !!htfAligned, signal: null, signals: [], liquidity: {}, structure: { bias, mss: null } };
+    }
+
+    const tp1 = isLong ? entry + risk * 1.5 : entry - risk * 1.5;
+    const { tp2, tp2Desc, tp3, tp3Desc } = calcTPs(dir, entry, risk, candles5m, h1, candles15m);
 
     signal = {
-      direction: isLong ? 'BUY' : 'SELL',
-      entry:    parseFloat(entry.toFixed(2)),
-      sl:       parseFloat(sl.toFixed(2)),
-      tp1:      parseFloat(tp1.toFixed(2)),
-      tp2:      parseFloat(tp2.toFixed(2)),
-      tp3:      parseFloat(tp3.toFixed(2)),
-      tp2Desc, tp3Desc,
-      rr:       '1.5',
-      rr1:      '1.5',
-      stopPoints: Math.round(Math.abs(entry - sl)),
-      confluence: conf.score,
-      grade:    conf.grade,
-      tags:     conf.tags,
-      sweep:    sweep.levelName,
-      mssType:  mss.type,
-      htfBias:  bias,
-      hasFVG:   true,
-      timestamp: new Date().toISOString(),
-      price:    lastCandle.close
+      direction:   isLong ? 'BUY' : 'SELL',
+      entry:       parseFloat(entry.toFixed(2)),
+      sl:          parseFloat(sl.toFixed(2)),
+      tp1:         parseFloat(tp1.toFixed(2)),
+      tp2:         parseFloat(tp2.toFixed(2)),
+      tp3:         parseFloat(tp3.toFixed(2)),
+      tp2Desc,
+      tp3Desc,
+      rr:          '1.5',
+      rr1:         '1.5',
+      stopPoints:  Math.round(risk),
+      confluence:  conf.score,
+      grade:       conf.grade,
+      tags:        conf.tags,
+      sweep:       sweep.levelName,
+      mssType:     mss.type,
+      htfBias:     bias,
+      htfAligned:  !!htfAligned,
+      hasFVG:      false,
+      timestamp:   new Date().toISOString(),
+      price:       lastCandle.close
     };
   }
 
@@ -324,11 +283,10 @@ function runICTAnalysis(data) {
     bias,
     sweep,
     mss,
-    fvg,
+    fvg: { found: false },
     confluence: conf,
     htfAligned: !!htfAligned,
     signal,
-    // legacy compat
     signals: signal ? [signal] : [],
     liquidity: { nearestBSL: null, nearestSSL: null },
     structure: { bias, mss: mss.confirmed ? mss : null }
@@ -337,8 +295,8 @@ function runICTAnalysis(data) {
 
 module.exports = {
   runICTAnalysis,
-  detectMarketStructure: (c) => { const s = { highs: [], lows: [] }; return s; },
-  findOrderBlocks: () => ({ bullish: null, bearish: null }),
-  findFairValueGaps: () => ({ bullish: null, bearish: null, all: [] }),
-  findLiquidityPools: () => ({ bsl: [], ssl: [], nearestBSL: null, nearestSSL: null })
+  detectMarketStructure: () => ({ highs: [], lows: [] }),
+  findOrderBlocks:       () => ({ bullish: null, bearish: null }),
+  findFairValueGaps:     () => ({ bullish: null, bearish: null, all: [] }),
+  findLiquidityPools:    () => ({ bsl: [], ssl: [], nearestBSL: null, nearestSSL: null })
 };
