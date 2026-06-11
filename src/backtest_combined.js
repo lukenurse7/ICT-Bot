@@ -31,7 +31,7 @@ const nas100Signals = nas100Report.signals
   }));
 
 // ─── Load XAUUSD signals ─────────────────────────────────────────────────
-const xauReport = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'backtest_report_limit_xau.json'), 'utf8'));
+const xauReport = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'backtest_report_limit_xau_kz.json'), 'utf8'));
 const xauSignals = xauReport.signals
   .filter(s => !['MISSED', 'NO_FILL', 'SKIP', 'FILTERED'].includes(s.result) && s.pnlR != null)
   .map(s => ({

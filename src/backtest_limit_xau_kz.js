@@ -96,11 +96,12 @@ async function fetchWithRetry(params, label) {
 }
 
 async function fetchChunked(interval, outputsize, months) {
-  const now = new Date();
+  // Use fixed end date so chunks are stable and cover through Jun 10
+  const fixedEnd = new Date('2026-07-01T00:00:00Z');
   const allCandles = [];
   for (let m = months - 1; m >= 0; m--) {
-    const endDate = new Date(now);
-    endDate.setUTCMonth(now.getUTCMonth() - m);
+    const endDate = new Date(fixedEnd);
+    endDate.setUTCMonth(fixedEnd.getUTCMonth() - m);
     endDate.setUTCDate(1); endDate.setUTCHours(0,0,0,0);
     const startDate = new Date(endDate);
     startDate.setUTCMonth(startDate.getUTCMonth() - 1);
