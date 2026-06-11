@@ -86,32 +86,35 @@ function minsUTC(timeStr) {
   return parseInt(timeStr.slice(11,13)) * 60 + parseInt(timeStr.slice(14,16));
 }
 
-// ─── Step 1: find 5m swing highs/lows before NY open ─────────────────────────
-function getPreNYLevels(candles, dateStr, nyOpenMins) {
-  const pre = candles.filter(c => {
-    if (!c.time.startsWith(dateStr)) return false;
-    const m = minsUTC(c.time);
-    return m < nyOpenMins;
-  });
-  if (pre.length < 5) return null;
+// ─── Step 1: previous day's swing highs/lows as BSL/SSL ──────────────────────
+// Yahoo Finance ^DJI only has regular hours data (13:30+ UTC), so we use the
+// prior trading session's swing H/L as the reference liquidity levels.
+function getPreNYLevels(candles, dateStr) {
+  // Find the previous trading day's candles
+  const allDays = [...new Set(candles.map(c => c.time.slice(0,10)))].sort();
+  const todayIdx = allDays.indexOf(dateStr);
+  if (todayIdx < 1) return null;
+  const prevDay = allDays[todayIdx - 1];
 
-  // Swing highs (BSL): local high surrounded by lower highs
+  const prev = candles.filter(c => c.time.startsWith(prevDay));
+  if (prev.length < 5) return null;
+
+  // Swing highs (BSL) and swing lows (SSL) from prior session
   const swingHighs = [], swingLows = [];
-  for (let i = 2; i < pre.length - 2; i++) {
-    const c = pre[i];
-    if (c.high > pre[i-1].high && c.high > pre[i-2].high &&
-        c.high > pre[i+1].high && c.high > pre[i+2].high)
+  for (let i = 2; i < prev.length - 2; i++) {
+    const c = prev[i];
+    if (c.high > prev[i-1].high && c.high > prev[i-2].high &&
+        c.high > prev[i+1].high && c.high > prev[i+2].high)
       swingHighs.push(c.high);
-    if (c.low < pre[i-1].low && c.low < pre[i-2].low &&
-        c.low < pre[i+1].low && c.low < pre[i+2].low)
+    if (c.low < prev[i-1].low && c.low < prev[i-2].low &&
+        c.low < prev[i+1].low && c.low < prev[i+2].low)
       swingLows.push(c.low);
   }
 
-  // Fall back to range H/L if no clear swings
-  const bsl = swingHighs.length ? Math.max(...swingHighs) : Math.max(...pre.map(c => c.high));
-  const ssl = swingLows.length  ? Math.min(...swingLows)  : Math.min(...pre.map(c => c.low));
+  const bsl = swingHighs.length ? Math.max(...swingHighs) : Math.max(...prev.map(c => c.high));
+  const ssl = swingLows.length  ? Math.min(...swingLows)  : Math.min(...prev.map(c => c.low));
 
-  return { bsl, ssl };
+  return { bsl, ssl, prevDay };
 }
 
 // ─── Step 2: detect sweep in NY window ───────────────────────────────────────
@@ -231,7 +234,7 @@ async function run() {
   for (const dateStr of tradingDays) {
     const nyMins = nyOpenUTC(dateStr);
 
-    const levels = getPreNYLevels(allCandles, dateStr, nyMins);
+    const levels = getPreNYLevels(allCandles, dateStr);
     if (!levels) { stats.noLevels++; continue; }
 
     const sweep = detectSweep(allCandles, dateStr, nyMins, levels);
