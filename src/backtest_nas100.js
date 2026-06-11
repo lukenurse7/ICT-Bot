@@ -36,7 +36,8 @@ const SL_BUF_PCT    = 0.0003;     // 0.03% buffer beyond swing extreme
 const MIN_STOP_PCT  = 0.0005;     // minimum stop = 0.05% of price
 const MIN_FVG_PTS   = 0.10;       // minimum FVG size on 2m ($0.10 on QQQ)
 const MIN_RANGE_PCT = 0.001;      // pre-NY swing range must be ≥ 0.1% wide
-const MIN_TP_DIST   = 1.50;       // TP must be at least $1.50 from entry
+const MIN_TP_DIST   = 0.80;       // TP must be at least $0.80 from entry
+const MIN_RR        = 1.0;        // minimum reward:risk ratio
 
 function fmtGBP(n) { return (n >= 0 ? '+' : '-') + '£' + Math.abs(n).toFixed(2); }
 
@@ -345,14 +346,16 @@ async function run() {
 
     // Validity checks — log reason for debug
     const tpDist = Math.abs(tp - entry);
+    const rrPotCheck = tpDist / risk;
     const failReason =
       risk < entry * MIN_STOP_PCT              ? `stop_too_small (risk=$${risk.toFixed(3)}, min=$${(entry*MIN_STOP_PCT).toFixed(3)})` :
       risk > entry * 0.04                      ? `stop_too_large (risk=$${risk.toFixed(3)})` :
       isLong  && sl >= entry                   ? `bull_sl_above_entry (sl=$${sl} entry=$${entry})` :
-      isLong  && tp <= entry                   ? `bull_tp_below_entry` :
+      isLong  && tp <= entry                   ? `bull_tp_below_entry (tp=$${tp} entry=$${entry})` :
       !isLong && sl <= entry                   ? `bear_sl_below_entry (sl=$${sl} entry=$${entry})` :
       !isLong && tp >= entry                   ? `bear_tp_above_entry (tp=$${tp} entry=$${entry})` :
-      tpDist < MIN_TP_DIST                     ? `tp_too_close (dist=$${tpDist.toFixed(3)})` : null;
+      tpDist < MIN_TP_DIST                     ? `tp_too_close (dist=$${tpDist.toFixed(3)})` :
+      rrPotCheck < MIN_RR                      ? `rr_too_low (${rrPotCheck.toFixed(2)}R < ${MIN_RR}R)` : null;
     if (failReason) {
       stats.riskFail++;
       stats.riskFailLog = stats.riskFailLog || [];
@@ -361,7 +364,7 @@ async function run() {
       continue;
     }
 
-    const rrPot = parseFloat((Math.abs(tp - entry) / risk).toFixed(2));
+    const rrPot = parseFloat(rrPotCheck.toFixed(2));
 
     // Simulate on 2m bars from after the MSS bar
     const simStart2m = c2m.indexOf(post1m[mss.mssBar]) + 1;
