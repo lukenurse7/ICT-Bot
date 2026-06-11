@@ -190,33 +190,62 @@ function detectMSS1m(bars1m, sweepDir) {
   return { confirmed: false };
 }
 
-// ─── Step 4: FVG on 1m within the displacement ────────────────────────────────
-function detectFVG1m(bars1m, sweepDir, mssBar) {
-  const bars2m = bars1m;
-  // Search from bar 0 up through mssBar + a few bars
-  const window = bars2m.slice(0, Math.min(mssBar + 6, bars2m.length));
-  const gaps = [];
+// ─── Step 4: FVG / imbalance on 1m within the displacement ───────────────────
+// ICT FVG: 3-candle pattern where the displacement candle (middle) creates an
+// imbalance. We allow a small overlap (FVG_OVERLAP_ALLOW) to capture the
+// imbalances traders see visually — pure no-overlap FVGs are rare on 1m liquid ETFs.
+// Returns top/bottom of the gap AND the displacement candle's extreme for SL.
+// ─── Combined MSS + FVG detector ─────────────────────────────────────────────
+// Finds the FIRST displacement candle in post-sweep 1m bars that BOTH:
+//   1. Creates a genuine FVG (prev.low > next.high for bear, next.low > prev.high for bull)
+//   2. Represents a structure break (close strongly beyond prior bar's extreme)
+// Searching up to 90 bars (full 90-min kill zone session).
+function detectMSSandFVG1m(bars1m, sweepDir) {
+  if (bars1m.length < 4) return { confirmed: false };
 
-  for (let i = 1; i < window.length - 1; i++) {
-    const prev = window[i-1], next = window[i+1];
+  // First pass: find all genuine FVGs in the entire window
+  const candidates = [];
+  for (let i = 1; i < Math.min(bars1m.length - 1, 90); i++) {
+    const prev = bars1m[i-1], mid = bars1m[i], next = bars1m[i+1];
     if (sweepDir === 'bear') {
-      // Bearish FVG: gap between prev candle's LOW and next candle's HIGH
-      const gapSize = prev.low - next.high;
-      if (gapSize >= MIN_FVG_PTS)
-        gaps.push({ found: true, top: prev.low, bottom: next.high,
-                    size: parseFloat(gapSize.toFixed(3)) });
+      // Bearish FVG: prev.low > next.high
+      if (prev.low > next.high && (prev.low - next.high) >= MIN_FVG_PTS) {
+        candidates.push({
+          fvgBar: i, top: prev.low, bottom: next.high,
+          size: parseFloat((prev.low - next.high).toFixed(3)),
+          dispHigh: mid.high, dispLow: mid.low,
+          // SL = just above the displacement candle's high
+          slAnchor: mid.high
+        });
+      }
     }
     if (sweepDir === 'bull') {
-      // Bullish FVG: gap between prev candle's HIGH and next candle's LOW
-      const gapSize = next.low - prev.high;
-      if (gapSize >= MIN_FVG_PTS)
-        gaps.push({ found: true, top: next.low, bottom: prev.high,
-                    size: parseFloat(gapSize.toFixed(3)) });
+      // Bullish FVG: next.low > prev.high
+      if (next.low > prev.high && (next.low - prev.high) >= MIN_FVG_PTS) {
+        candidates.push({
+          fvgBar: i, top: next.low, bottom: prev.high,
+          size: parseFloat((next.low - prev.high).toFixed(3)),
+          dispHigh: mid.high, dispLow: mid.low,
+          // SL = just below the displacement candle's low
+          slAnchor: mid.low
+        });
+      }
     }
   }
 
-  if (!gaps.length) return { found: false };
-  return gaps[gaps.length - 1]; // most recent FVG
+  if (!candidates.length) return { confirmed: false, reason: 'no_fvg' };
+
+  // Take the FIRST FVG that aligns with the sweep direction
+  // (first displacement in the intended reversal direction)
+  const fvg = candidates[0];
+  return {
+    confirmed: true,
+    type: 'DISP+FVG',
+    mssBar: fvg.fvgBar,
+    fvg: { found: true, top: fvg.top, bottom: fvg.bottom, size: fvg.size,
+           dispHigh: fvg.dispHigh, dispLow: fvg.dispLow },
+    slAnchor: fvg.slAnchor
+  };
 }
 
 // ─── Simulate limit order fill and outcome ────────────────────────────────────
@@ -290,13 +319,14 @@ async function run() {
 
     if (post1m.length < 4) { stats.noMSS++; continue; }
 
-    // Step 3: MSS on 1m
-    const mss = detectMSS1m(post1m, sweep.dir);
-    if (!mss.confirmed) { stats.noMSS++; continue; }
-
-    // Step 4: FVG on 1m
-    const fvg = detectFVG1m(post1m, sweep.dir, mss.mssBar);
-    if (!fvg.found) { stats.noFVG++; continue; }
+    // Steps 3+4: find first genuine FVG in sweep direction (searches up to 90 bars)
+    const result = detectMSSandFVG1m(post1m, sweep.dir);
+    if (!result.confirmed) {
+      if (result.reason === 'no_fvg') { stats.noFVG++; } else { stats.noMSS++; }
+      continue;
+    }
+    const fvg = result.fvg;
+    const mss = { mssBar: result.mssBar };
 
     // Build entry, SL, TP
     const isLong = sweep.dir === 'bull';
@@ -304,12 +334,10 @@ async function run() {
       ? fvg.bottom + (fvg.top - fvg.bottom) * 0.25
       : fvg.top    - (fvg.top - fvg.bottom) * 0.25).toFixed(2));
 
-    // SL = just beyond the highest high (sell) or lowest low (buy)
-    // of the 1m consolidation bars leading into the MSS
-    // This is the "recent swing high/low that caused the MSS" per ICT
+    // SL = just beyond the displacement candle's extreme (middle bar of FVG)
     const sl = parseFloat((isLong
-      ? mss.slAnchor * (1 - SL_BUF_PCT)
-      : mss.slAnchor * (1 + SL_BUF_PCT)
+      ? result.slAnchor * (1 - SL_BUF_PCT)
+      : result.slAnchor * (1 + SL_BUF_PCT)
     ).toFixed(2));
 
     const tp = parseFloat(sweep.targetLevel.toFixed(2));
@@ -347,7 +375,7 @@ async function run() {
       sweep: sweep.label,
       sweptLevel: parseFloat(sweep.sweptLevel.toFixed(2)),
       targetLevel: parseFloat(sweep.targetLevel.toFixed(2)),
-      mssType: mss.type,
+      mssType: result.type,
       fvgSize: fvg.size,
       entry, sl, tp,
       risk: parseFloat(risk.toFixed(2)),
