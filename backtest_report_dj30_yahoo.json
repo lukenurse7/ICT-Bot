@@ -1,23 +1,23 @@
 {
   "period": "2026-04-01 → 2026-06-10",
-  "generatedAt": "2026-06-11T10:08:49.894Z",
+  "generatedAt": "2026-06-11T10:22:12.171Z",
   "dataSource": "Yahoo Finance YM=F (Dow futures, 24hr)",
   "strategy": "ICT Judas Swing — 90-day checklist",
   "account": {
     "start": 1500,
-    "end": 1355.88,
-    "netGBP": -144.12,
-    "returnPct": -9.6,
+    "end": 1302.19,
+    "netGBP": -197.82,
+    "returnPct": -13.2,
     "peakBalance": 1500,
-    "maxDrawdown": 9.6
+    "maxDrawdown": 13.2
   },
   "stats": {
-    "total": 5,
+    "total": 7,
     "wins": 0,
-    "losses": 5,
+    "losses": 7,
     "winRate": "0%",
     "avgWinR": "0",
-    "netR": "-5.00",
+    "netR": "-7.00",
     "profitFactor": "0.00"
   },
   "signals": [
@@ -68,29 +68,6 @@
       "pnlR": -1
     },
     {
-      "date": "2026-04-09",
-      "dir": "SELL",
-      "levels": {
-        "bsl": 48016,
-        "ssl": 47902
-      },
-      "sweep": "BSL swept → target SSL",
-      "sweptLevel": 48016,
-      "targetLevel": 47902,
-      "mssType": "CHoCH",
-      "fvgSize": 24,
-      "entry": 48038,
-      "sl": 48077.4,
-      "tp": 47902,
-      "risk": 39,
-      "rrPotential": 3.45,
-      "riskGBP": 28.81,
-      "pnlGBP": -28.81,
-      "balanceAfter": 1411.79,
-      "result": "LOSS",
-      "pnlR": -1
-    },
-    {
       "date": "2026-04-20",
       "dir": "SELL",
       "levels": {
@@ -107,9 +84,55 @@
       "tp": 49318,
       "risk": 89,
       "rrPotential": 2.62,
+      "riskGBP": 28.81,
+      "pnlGBP": -28.81,
+      "balanceAfter": 1411.79,
+      "result": "LOSS",
+      "pnlR": -1
+    },
+    {
+      "date": "2026-04-21",
+      "dir": "SELL",
+      "levels": {
+        "bsl": 49961,
+        "ssl": 49682
+      },
+      "sweep": "BSL swept → target SSL",
+      "sweptLevel": 49961,
+      "targetLevel": 49682,
+      "mssType": "CHoCH",
+      "fvgSize": 6,
+      "entry": 49810.5,
+      "sl": 49881,
+      "tp": 49682,
+      "risk": 71,
+      "rrPotential": 1.82,
       "riskGBP": 28.24,
       "pnlGBP": -28.24,
       "balanceAfter": 1383.55,
+      "result": "LOSS",
+      "pnlR": -1
+    },
+    {
+      "date": "2026-05-01",
+      "dir": "SELL",
+      "levels": {
+        "bsl": 50092,
+        "ssl": 49860
+      },
+      "sweep": "BSL swept → target SSL",
+      "sweptLevel": 50092,
+      "targetLevel": 49860,
+      "mssType": "CHoCH",
+      "fvgSize": 25,
+      "entry": 50004.8,
+      "sl": 50087,
+      "tp": 49860,
+      "risk": 82,
+      "rrPotential": 1.76,
+      "riskGBP": 27.67,
+      "pnlGBP": -27.67,
+      "balanceAfter": 1355.88,
       "result": "LOSS",
       "pnlR": -1
     },
@@ -130,9 +153,32 @@
       "tp": 49702,
       "risk": 89,
       "rrPotential": 2.38,
-      "riskGBP": 27.67,
-      "pnlGBP": -27.67,
-      "balanceAfter": 1355.88,
+      "riskGBP": 27.12,
+      "pnlGBP": -27.12,
+      "balanceAfter": 1328.76,
+      "result": "LOSS",
+      "pnlR": -1
+    },
+    {
+      "date": "2026-06-09",
+      "dir": "SELL",
+      "levels": {
+        "bsl": 51094,
+        "ssl": 50834
+      },
+      "sweep": "BSL swept → target SSL",
+      "sweptLevel": 51094,
+      "targetLevel": 50834,
+      "mssType": "CHoCH",
+      "fvgSize": 106,
+      "entry": 50956.5,
+      "sl": 51097.3,
+      "tp": 50834,
+      "risk": 141,
+      "rrPotential": 0.87,
+      "riskGBP": 26.58,
+      "pnlGBP": -26.58,
+      "balanceAfter": 1302.19,
       "result": "LOSS",
       "pnlR": -1
     }

@@ -82,6 +82,8 @@ function minsUTC(timeStr) {
   return parseInt(timeStr.slice(11,13)) * 60 + parseInt(timeStr.slice(14,16));
 }
 
+const MIN_RANGE_PTS = 200; // BSL-SSL must be at least 200pts for meaningful TP distance
+
 // ─── Step 1: 5m swing H/L from London session (07:00–NY open) ────────────────
 function getPreNYLevels(candles, dateStr, nyOpenMins) {
   const session = candles.filter(c => {
@@ -108,7 +110,8 @@ function getPreNYLevels(candles, dateStr, nyOpenMins) {
   const ssl = swingLows.length  ? Math.min(...swingLows)  : Math.min(...session.map(c => c.low));
 
   if (bsl <= ssl) return null;
-  return { bsl, ssl, sessionBars: session.length };
+  if (bsl - ssl < MIN_RANGE_PTS) return null; // skip days with tiny range
+  return { bsl, ssl, sessionBars: session.length, rangePts: Math.round(bsl - ssl) };
 }
 
 // ─── Step 2: detect sweep in NY window (13:30–15:00 UTC) ─────────────────────
@@ -259,8 +262,6 @@ async function run() {
     if (risk < MIN_STOP_PTS || risk > entry * 0.025)       { stats.riskFail++; continue; }
     if (isLong  && (sl >= entry || tp <= entry))            { stats.riskFail++; continue; }
     if (!isLong && (sl <= entry || tp >= entry))            { stats.riskFail++; continue; }
-    // Skip if opposing liquidity TP gives less than 2R — not worth taking
-    if (Math.abs(tp - entry) / risk < 2.0)                 { stats.riskFail++; continue; }
 
     const rrPotential = parseFloat((Math.abs(tp - entry) / risk).toFixed(2));
 
