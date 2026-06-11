@@ -229,11 +229,13 @@ function simulateOutcome(dir, entry, sl, tp1, tp2, tp3, future) {
 function isKZ(iso) { const h=new Date(iso).getUTCHours(); return (h>=7&&h<9)||(h>=12&&h<15); }
 function sessLabel(iso) { const h=new Date(iso).getUTCHours(); return h>=7&&h<9?'🟡 London KZ':h>=12&&h<15?'🟢 NY KZ':'Off'; }
 
+const MIN_STOP_PCT = 0.005; // 0.5% minimum stop — eliminates sub-noise entries
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 async function run() {
   console.clear();
-  console.log('\n'+chalk.bold.cyan('  ◆ DJ30 ICT v2 — 3 MONTH BACKTEST  [MSS entry · 2% compounding]'));
-  console.log(chalk.gray('  Entry: MSS bar close  |  Fresh sweep ≤6 bars  |  No FVG gate  |  2% risk  |  £1,500\n'));
+  console.log('\n'+chalk.bold.cyan('  ◆ DJ30 ICT v2b — 3 MONTH BACKTEST  [HTF gate · min stop · 2% compounding]'));
+  console.log(chalk.gray('  Entry: MSS bar close  |  Fresh sweep ≤6 bars  |  HTF bias hard gate  |  Min stop 0.5%  |  2% risk  |  £1,500\n'));
 
   const range = threeMonthRange();
   console.log(chalk.gray(`  Period: ${range.label}\n`));
@@ -289,6 +291,10 @@ async function run() {
     const dir=sweep.dir;
     if(!dir||!sweep.detected||!mss.confirmed||conf.score<MIN_SCORE) continue;
 
+    // Hard HTF gate: trade must align with D+H4 bias
+    const htfAligned=(dir==='bull'&&(bias==='bullish'||bias==='pullback_in_bear'))||(dir==='bear'&&(bias==='bearish'||bias==='pullback_in_bull'));
+    if(!htfAligned) continue;
+
     const isLong=dir==='bull';
     // Entry = MSS bar close (current bar — market execution at signal fire)
     const entry=mss.entryClose||bar.close;
@@ -296,6 +302,9 @@ async function run() {
     const sl=isLong?sweep.level-slBuf:sweep.level+slBuf;
     const risk=Math.abs(entry-sl);
     if(risk<=0||risk>entry*0.012) continue;
+
+    // Hard minimum stop: must be at least 0.5% of entry to avoid noise
+    if(risk<entry*MIN_STOP_PCT) continue;
 
     const tp1=isLong?entry+risk*TP1_R:entry-risk*TP1_R;
     const {tp2,tp2Desc,tp3,tp3Desc}=calcTPs(dir,entry,risk,sliceH1,slice15m);
@@ -362,7 +371,7 @@ async function run() {
   signals.forEach(s=>{const d=new Date(s.time);const mk=`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;byMonth[mk]=(byMonth[mk]||[]).concat(s);});
 
   console.log('\n\n'+sep);
-  console.log(chalk.bold.cyan('  3-MONTH SUMMARY — DJ30 v2'));
+  console.log(chalk.bold.cyan('  3-MONTH SUMMARY — DJ30 v2b (HTF gate + min stop 0.5%)'));
   console.log(sep);
   console.log(chalk.gray('  Total signals:   ')+chalk.white(signals.length));
   console.log(chalk.gray('  Wins:            ')+chalk.green(wins.length));
