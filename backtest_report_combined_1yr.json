@@ -1,0 +1,3229 @@
+{
+  "period": "2025-06-11 → 2026-06-10",
+  "generatedAt": "2026-06-11T13:42:26.184Z",
+  "settings": {
+    "startBalance": 2000,
+    "riskPct": 0.03,
+    "markets": [
+      "NAS100",
+      "XAUUSD"
+    ]
+  },
+  "account": {
+    "start": 2000,
+    "end": 595.76,
+    "peak": 2763.77,
+    "netPnl": -1404.24,
+    "returnPct": -70.21,
+    "maxDrawdown": 83.14
+  },
+  "stats": {
+    "trades": 308,
+    "wins": 98,
+    "losses": 210,
+    "winRate": 31.8,
+    "netR": -29.5,
+    "profitFactor": 0.86
+  },
+  "byMonth": {
+    "2025-06": {
+      "trades": 27,
+      "wins": 10,
+      "losses": 17,
+      "netR": 9.805,
+      "pnl": 522.4207780243638,
+      "nas": 6,
+      "xau": 21
+    },
+    "2025-07": {
+      "trades": 25,
+      "wins": 8,
+      "losses": 17,
+      "netR": 0.19500000000000028,
+      "pnl": -45.28938107348664,
+      "nas": 2,
+      "xau": 23
+    },
+    "2025-08": {
+      "trades": 35,
+      "wins": 14,
+      "losses": 21,
+      "netR": -7.77,
+      "pnl": -547.1867902965838,
+      "nas": 4,
+      "xau": 31
+    },
+    "2025-09": {
+      "trades": 30,
+      "wins": 5,
+      "losses": 25,
+      "netR": -18.75,
+      "pnl": -847.4147548657887,
+      "nas": 2,
+      "xau": 28
+    },
+    "2025-10": {
+      "trades": 26,
+      "wins": 10,
+      "losses": 16,
+      "netR": -1.625,
+      "pnl": -70.3714541182671,
+      "nas": 3,
+      "xau": 23
+    },
+    "2025-11": {
+      "trades": 21,
+      "wins": 8,
+      "losses": 13,
+      "netR": 3.8200000000000003,
+      "pnl": 97.47657937447788,
+      "nas": 5,
+      "xau": 16
+    },
+    "2025-12": {
+      "trades": 20,
+      "wins": 8,
+      "losses": 12,
+      "netR": -1.6950000000000003,
+      "pnl": -68.68748427372071,
+      "nas": 4,
+      "xau": 16
+    },
+    "2026-01": {
+      "trades": 18,
+      "wins": 3,
+      "losses": 15,
+      "netR": -11.5,
+      "pnl": -310.41870272082025,
+      "nas": 5,
+      "xau": 13
+    },
+    "2026-02": {
+      "trades": 27,
+      "wins": 11,
+      "losses": 16,
+      "netR": 12.835,
+      "pnl": 276.67531780788846,
+      "nas": 8,
+      "xau": 19
+    },
+    "2026-03": {
+      "trades": 15,
+      "wins": 1,
+      "losses": 14,
+      "netR": -13.25,
+      "pnl": -334.87009138158777,
+      "nas": 4,
+      "xau": 11
+    },
+    "2026-04": {
+      "trades": 23,
+      "wins": 4,
+      "losses": 19,
+      "netR": -9.46,
+      "pnl": -175.74251172487695,
+      "nas": 8,
+      "xau": 15
+    },
+    "2026-05": {
+      "trades": 25,
+      "wins": 8,
+      "losses": 17,
+      "netR": 2.4,
+      "pnl": 15.954669645095054,
+      "nas": 10,
+      "xau": 15
+    },
+    "2026-06": {
+      "trades": 16,
+      "wins": 8,
+      "losses": 8,
+      "netR": 5.5,
+      "pnl": 83.21019664440578,
+      "nas": 4,
+      "xau": 12
+    }
+  },
+  "trades": [
+    {
+      "date": "2025-06-11",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 60,
+      "pnlGBP": -60,
+      "balanceAfter": 1940
+    },
+    {
+      "date": "2025-06-12",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 58.199999999999996,
+      "pnlGBP": 43.65,
+      "balanceAfter": 1983.65
+    },
+    {
+      "date": "2025-06-13",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 59.5095,
+      "pnlGBP": -59.5095,
+      "balanceAfter": 1924.1405
+    },
+    {
+      "date": "2025-06-13",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 57.724214999999994,
+      "pnlGBP": -57.724214999999994,
+      "balanceAfter": 1866.416285
+    },
+    {
+      "date": "2025-06-14",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 55.99248855,
+      "pnlGBP": -55.99248855,
+      "balanceAfter": 1810.42379645
+    },
+    {
+      "date": "2025-06-14",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 54.312713893499996,
+      "pnlGBP": -54.312713893499996,
+      "balanceAfter": 1756.1110825565002
+    },
+    {
+      "date": "2025-06-16",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 52.683332476695,
+      "pnlGBP": 105.36666495339,
+      "balanceAfter": 1861.4777475098902
+    },
+    {
+      "date": "2025-06-17",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 55.844332425296706,
+      "pnlGBP": -55.844332425296706,
+      "balanceAfter": 1805.6334150845935
+    },
+    {
+      "date": "2025-06-17",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 54.1690024525378,
+      "pnlGBP": -54.1690024525378,
+      "balanceAfter": 1751.4644126320557
+    },
+    {
+      "date": "2025-06-18",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 52.54393237896167,
+      "pnlGBP": -52.54393237896167,
+      "balanceAfter": 1698.920480253094
+    },
+    {
+      "date": "2025-06-18",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": 10.3,
+      "result": "WIN",
+      "riskGBP": 50.96761440759282,
+      "pnlGBP": 524.9664283982061,
+      "balanceAfter": 2223.8869086513
+    },
+    {
+      "date": "2025-06-19",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 66.716607259539,
+      "pnlGBP": 133.433214519078,
+      "balanceAfter": 2357.320123170378
+    },
+    {
+      "date": "2025-06-21",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 70.71960369511133,
+      "pnlGBP": -70.71960369511133,
+      "balanceAfter": 2286.6005194752665
+    },
+    {
+      "date": "2025-06-23",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 68.598015584258,
+      "pnlGBP": 137.196031168516,
+      "balanceAfter": 2423.7965506437827
+    },
+    {
+      "date": "2025-06-23",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 72.71389651931348,
+      "pnlGBP": 145.42779303862696,
+      "balanceAfter": 2569.2243436824097
+    },
+    {
+      "date": "2025-06-23",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 77.07673031047229,
+      "pnlGBP": -77.07673031047229,
+      "balanceAfter": 2492.1476133719375
+    },
+    {
+      "date": "2025-06-24",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 74.76442840115813,
+      "pnlGBP": -74.76442840115813,
+      "balanceAfter": 2417.3831849707794
+    },
+    {
+      "date": "2025-06-25",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 72.52149554912339,
+      "pnlGBP": 54.39112166184254,
+      "balanceAfter": 2471.774306632622
+    },
+    {
+      "date": "2025-06-25",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 74.15322919897866,
+      "pnlGBP": -74.15322919897866,
+      "balanceAfter": 2397.621077433643
+    },
+    {
+      "date": "2025-06-26",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 71.9286323230093,
+      "pnlGBP": -71.9286323230093,
+      "balanceAfter": 2325.692445110634
+    },
+    {
+      "date": "2025-06-26",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 69.77077335331902,
+      "pnlGBP": -69.77077335331902,
+      "balanceAfter": 2255.921671757315
+    },
+    {
+      "date": "2025-06-27",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 67.67765015271945,
+      "pnlGBP": 135.3553003054389,
+      "balanceAfter": 2391.276972062754
+    },
+    {
+      "date": "2025-06-27",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": 2.38,
+      "result": "WIN",
+      "riskGBP": 71.73830916188261,
+      "pnlGBP": 170.7371758052806,
+      "balanceAfter": 2562.0141478680343
+    },
+    {
+      "date": "2025-06-28",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2.625,
+      "result": "WIN_TP3",
+      "riskGBP": 76.86042443604103,
+      "pnlGBP": 201.7586141446077,
+      "balanceAfter": 2763.772762012642
+    },
+    {
+      "date": "2025-06-30",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 82.91318286037925,
+      "pnlGBP": -82.91318286037925,
+      "balanceAfter": 2680.859579152263
+    },
+    {
+      "date": "2025-06-30",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 80.42578737456789,
+      "pnlGBP": -80.42578737456789,
+      "balanceAfter": 2600.433791777695
+    },
+    {
+      "date": "2025-06-30",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 78.01301375333085,
+      "pnlGBP": -78.01301375333085,
+      "balanceAfter": 2522.420778024364
+    },
+    {
+      "date": "2025-07-01",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 75.67262334073092,
+      "pnlGBP": -75.67262334073092,
+      "balanceAfter": 2446.7481546836334
+    },
+    {
+      "date": "2025-07-01",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 73.402444640509,
+      "pnlGBP": -73.402444640509,
+      "balanceAfter": 2373.345710043124
+    },
+    {
+      "date": "2025-07-12",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 71.20037130129373,
+      "pnlGBP": -71.20037130129373,
+      "balanceAfter": 2302.1453387418305
+    },
+    {
+      "date": "2025-07-14",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 69.06436016225491,
+      "pnlGBP": -69.06436016225491,
+      "balanceAfter": 2233.0809785795755
+    },
+    {
+      "date": "2025-07-15",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 66.99242935738727,
+      "pnlGBP": -66.99242935738727,
+      "balanceAfter": 2166.0885492221882
+    },
+    {
+      "date": "2025-07-15",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 64.98265647666564,
+      "pnlGBP": -64.98265647666564,
+      "balanceAfter": 2101.1058927455224
+    },
+    {
+      "date": "2025-07-16",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 63.03317678236567,
+      "pnlGBP": -63.03317678236567,
+      "balanceAfter": 2038.0727159631567
+    },
+    {
+      "date": "2025-07-17",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 61.1421814788947,
+      "pnlGBP": -61.1421814788947,
+      "balanceAfter": 1976.9305344842621
+    },
+    {
+      "date": "2025-07-18",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 59.307916034527864,
+      "pnlGBP": -59.307916034527864,
+      "balanceAfter": 1917.6226184497343
+    },
+    {
+      "date": "2025-07-18",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": 2.57,
+      "result": "WIN",
+      "riskGBP": 57.52867855349203,
+      "pnlGBP": 147.8487038824745,
+      "balanceAfter": 2065.4713223322087
+    },
+    {
+      "date": "2025-07-19",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 61.96413966996626,
+      "pnlGBP": -61.96413966996626,
+      "balanceAfter": 2003.5071826622425
+    },
+    {
+      "date": "2025-07-21",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 60.10521547986727,
+      "pnlGBP": -60.10521547986727,
+      "balanceAfter": 1943.4019671823753
+    },
+    {
+      "date": "2025-07-22",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 58.30205901547126,
+      "pnlGBP": -58.30205901547126,
+      "balanceAfter": 1885.099908166904
+    },
+    {
+      "date": "2025-07-23",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 56.55299724500712,
+      "pnlGBP": -56.55299724500712,
+      "balanceAfter": 1828.5469109218968
+    },
+    {
+      "date": "2025-07-24",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 54.8564073276569,
+      "pnlGBP": 109.7128146553138,
+      "balanceAfter": 1938.2597255772107
+    },
+    {
+      "date": "2025-07-24",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 58.14779176731632,
+      "pnlGBP": 116.29558353463264,
+      "balanceAfter": 2054.555309111843
+    },
+    {
+      "date": "2025-07-25",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 61.63665927335529,
+      "pnlGBP": 123.27331854671058,
+      "balanceAfter": 2177.8286276585536
+    },
+    {
+      "date": "2025-07-26",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 65.33485882975661,
+      "pnlGBP": 130.66971765951322,
+      "balanceAfter": 2308.4983453180666
+    },
+    {
+      "date": "2025-07-26",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 69.254950359542,
+      "pnlGBP": -69.254950359542,
+      "balanceAfter": 2239.2433949585247
+    },
+    {
+      "date": "2025-07-28",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 67.17730184875575,
+      "pnlGBP": 134.3546036975115,
+      "balanceAfter": 2373.597998656036
+    },
+    {
+      "date": "2025-07-29",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 71.20793995968107,
+      "pnlGBP": -71.20793995968107,
+      "balanceAfter": 2302.390058696355
+    },
+    {
+      "date": "2025-07-30",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2.625,
+      "result": "WIN_TP3",
+      "riskGBP": 69.07170176089065,
+      "pnlGBP": 181.31321712233796,
+      "balanceAfter": 2483.703275818693
+    },
+    {
+      "date": "2025-07-30",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 74.51109827456078,
+      "pnlGBP": 149.02219654912156,
+      "balanceAfter": 2632.7254723678143
+    },
+    {
+      "date": "2025-07-30",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 78.98176417103443,
+      "pnlGBP": -78.98176417103443,
+      "balanceAfter": 2553.74370819678
+    },
+    {
+      "date": "2025-07-31",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 76.6123112459034,
+      "pnlGBP": -76.6123112459034,
+      "balanceAfter": 2477.1313969508765
+    },
+    {
+      "date": "2025-08-01",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 74.31394190852629,
+      "pnlGBP": 55.73545643139472,
+      "balanceAfter": 2532.866853382271
+    },
+    {
+      "date": "2025-08-01",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 75.98600560146814,
+      "pnlGBP": -75.98600560146814,
+      "balanceAfter": 2456.880847780803
+    },
+    {
+      "date": "2025-08-12",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 73.70642543342409,
+      "pnlGBP": -73.70642543342409,
+      "balanceAfter": 2383.174422347379
+    },
+    {
+      "date": "2025-08-12",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 71.49523267042136,
+      "pnlGBP": -71.49523267042136,
+      "balanceAfter": 2311.6791896769573
+    },
+    {
+      "date": "2025-08-13",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 69.35037569030872,
+      "pnlGBP": -69.35037569030872,
+      "balanceAfter": 2242.3288139866486
+    },
+    {
+      "date": "2025-08-13",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 67.26986441959946,
+      "pnlGBP": -67.26986441959946,
+      "balanceAfter": 2175.0589495670492
+    },
+    {
+      "date": "2025-08-14",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 65.25176848701147,
+      "pnlGBP": -65.25176848701147,
+      "balanceAfter": 2109.807181080038
+    },
+    {
+      "date": "2025-08-14",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": 2.23,
+      "result": "WIN",
+      "riskGBP": 63.29421543240114,
+      "pnlGBP": 141.14610041425453,
+      "balanceAfter": 2250.9532814942922
+    },
+    {
+      "date": "2025-08-15",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 67.52859844482876,
+      "pnlGBP": -67.52859844482876,
+      "balanceAfter": 2183.4246830494635
+    },
+    {
+      "date": "2025-08-15",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 65.5027404914839,
+      "pnlGBP": -65.5027404914839,
+      "balanceAfter": 2117.9219425579795
+    },
+    {
+      "date": "2025-08-16",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 63.537658276739386,
+      "pnlGBP": 47.65324370755454,
+      "balanceAfter": 2165.575186265534
+    },
+    {
+      "date": "2025-08-18",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 64.96725558796601,
+      "pnlGBP": -64.96725558796601,
+      "balanceAfter": 2100.6079306775678
+    },
+    {
+      "date": "2025-08-18",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 63.01823792032703,
+      "pnlGBP": -63.01823792032703,
+      "balanceAfter": 2037.5896927572408
+    },
+    {
+      "date": "2025-08-18",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 61.127690782717224,
+      "pnlGBP": -61.127690782717224,
+      "balanceAfter": 1976.4620019745234
+    },
+    {
+      "date": "2025-08-19",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 59.2938600592357,
+      "pnlGBP": -59.2938600592357,
+      "balanceAfter": 1917.1681419152878
+    },
+    {
+      "date": "2025-08-19",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 57.515044257458634,
+      "pnlGBP": 43.13628319309397,
+      "balanceAfter": 1960.3044251083818
+    },
+    {
+      "date": "2025-08-19",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 58.809132753251454,
+      "pnlGBP": -58.809132753251454,
+      "balanceAfter": 1901.4952923551302
+    },
+    {
+      "date": "2025-08-20",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 57.0448587706539,
+      "pnlGBP": 42.78364407799043,
+      "balanceAfter": 1944.2789364331206
+    },
+    {
+      "date": "2025-08-20",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 58.328368092993614,
+      "pnlGBP": 43.74627606974521,
+      "balanceAfter": 1988.0252125028658
+    },
+    {
+      "date": "2025-08-21",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 59.64075637508597,
+      "pnlGBP": 44.73056728131448,
+      "balanceAfter": 2032.7557797841803
+    },
+    {
+      "date": "2025-08-21",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 60.9826733935254,
+      "pnlGBP": 121.9653467870508,
+      "balanceAfter": 2154.7211265712313
+    },
+    {
+      "date": "2025-08-22",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 64.64163379713693,
+      "pnlGBP": 48.4812253478527,
+      "balanceAfter": 2203.202351919084
+    },
+    {
+      "date": "2025-08-22",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 66.09607055757252,
+      "pnlGBP": 49.57205291817939,
+      "balanceAfter": 2252.7744048372633
+    },
+    {
+      "date": "2025-08-22",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 67.5832321451179,
+      "pnlGBP": -67.5832321451179,
+      "balanceAfter": 2185.1911726921453
+    },
+    {
+      "date": "2025-08-23",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 65.55573518076436,
+      "pnlGBP": 49.166801385573265,
+      "balanceAfter": 2234.3579740777186
+    },
+    {
+      "date": "2025-08-23",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 67.03073922233156,
+      "pnlGBP": 50.27305441674867,
+      "balanceAfter": 2284.6310284944675
+    },
+    {
+      "date": "2025-08-25",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 68.53893085483402,
+      "pnlGBP": -68.53893085483402,
+      "balanceAfter": 2216.0920976396333
+    },
+    {
+      "date": "2025-08-26",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 66.482762929189,
+      "pnlGBP": -66.482762929189,
+      "balanceAfter": 2149.6093347104443
+    },
+    {
+      "date": "2025-08-26",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 64.48828004131333,
+      "pnlGBP": -64.48828004131333,
+      "balanceAfter": 2085.121054669131
+    },
+    {
+      "date": "2025-08-27",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 62.553631640073924,
+      "pnlGBP": -62.553631640073924,
+      "balanceAfter": 2022.567423029057
+    },
+    {
+      "date": "2025-08-28",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 60.67702269087171,
+      "pnlGBP": -60.67702269087171,
+      "balanceAfter": 1961.8904003381851
+    },
+    {
+      "date": "2025-08-28",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 58.85671201014555,
+      "pnlGBP": 44.142534007609164,
+      "balanceAfter": 2006.0329343457943
+    },
+    {
+      "date": "2025-08-29",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 60.180988030373825,
+      "pnlGBP": -60.180988030373825,
+      "balanceAfter": 1945.8519463154205
+    },
+    {
+      "date": "2025-08-29",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 58.37555838946261,
+      "pnlGBP": 43.78166879209696,
+      "balanceAfter": 1989.6336151075175
+    },
+    {
+      "date": "2025-08-30",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 59.68900845322552,
+      "pnlGBP": -59.68900845322552,
+      "balanceAfter": 1929.9446066542919
+    },
+    {
+      "date": "2025-09-01",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 57.89833819962875,
+      "pnlGBP": -57.89833819962875,
+      "balanceAfter": 1872.046268454663
+    },
+    {
+      "date": "2025-09-01",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 56.16138805363989,
+      "pnlGBP": -56.16138805363989,
+      "balanceAfter": 1815.884880401023
+    },
+    {
+      "date": "2025-09-11",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 54.47654641203069,
+      "pnlGBP": 108.95309282406139,
+      "balanceAfter": 1924.8379732250844
+    },
+    {
+      "date": "2025-09-12",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 57.74513919675253,
+      "pnlGBP": -57.74513919675253,
+      "balanceAfter": 1867.092834028332
+    },
+    {
+      "date": "2025-09-12",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 56.012785020849954,
+      "pnlGBP": -56.012785020849954,
+      "balanceAfter": 1811.0800490074819
+    },
+    {
+      "date": "2025-09-13",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 54.332401470224454,
+      "pnlGBP": -54.332401470224454,
+      "balanceAfter": 1756.7476475372573
+    },
+    {
+      "date": "2025-09-15",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 52.70242942611772,
+      "pnlGBP": 39.52682206958829,
+      "balanceAfter": 1796.2744696068455
+    },
+    {
+      "date": "2025-09-16",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 53.888234088205365,
+      "pnlGBP": -53.888234088205365,
+      "balanceAfter": 1742.3862355186402
+    },
+    {
+      "date": "2025-09-16",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 52.2715870655592,
+      "pnlGBP": -52.2715870655592,
+      "balanceAfter": 1690.114648453081
+    },
+    {
+      "date": "2025-09-17",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 50.70343945359242,
+      "pnlGBP": -50.70343945359242,
+      "balanceAfter": 1639.4112089994885
+    },
+    {
+      "date": "2025-09-17",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 49.18233626998465,
+      "pnlGBP": -49.18233626998465,
+      "balanceAfter": 1590.2288727295038
+    },
+    {
+      "date": "2025-09-18",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 47.70686618188511,
+      "pnlGBP": 35.78014963641383,
+      "balanceAfter": 1626.0090223659176
+    },
+    {
+      "date": "2025-09-18",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 48.78027067097753,
+      "pnlGBP": -48.78027067097753,
+      "balanceAfter": 1577.22875169494
+    },
+    {
+      "date": "2025-09-19",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 47.3168625508482,
+      "pnlGBP": -47.3168625508482,
+      "balanceAfter": 1529.911889144092
+    },
+    {
+      "date": "2025-09-20",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 45.89735667432276,
+      "pnlGBP": -45.89735667432276,
+      "balanceAfter": 1484.0145324697692
+    },
+    {
+      "date": "2025-09-20",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 44.520435974093076,
+      "pnlGBP": -44.520435974093076,
+      "balanceAfter": 1439.494096495676
+    },
+    {
+      "date": "2025-09-22",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 43.18482289487028,
+      "pnlGBP": -43.18482289487028,
+      "balanceAfter": 1396.309273600806
+    },
+    {
+      "date": "2025-09-22",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 41.88927820802417,
+      "pnlGBP": -41.88927820802417,
+      "balanceAfter": 1354.4199953927816
+    },
+    {
+      "date": "2025-09-24",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 40.63259986178345,
+      "pnlGBP": -40.63259986178345,
+      "balanceAfter": 1313.787395530998
+    },
+    {
+      "date": "2025-09-24",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 39.41362186592994,
+      "pnlGBP": 78.82724373185988,
+      "balanceAfter": 1392.614639262858
+    },
+    {
+      "date": "2025-09-24",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 41.77843917788574,
+      "pnlGBP": -41.77843917788574,
+      "balanceAfter": 1350.8362000849722
+    },
+    {
+      "date": "2025-09-25",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 40.525086002549166,
+      "pnlGBP": -40.525086002549166,
+      "balanceAfter": 1310.311114082423
+    },
+    {
+      "date": "2025-09-25",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 39.30933342247269,
+      "pnlGBP": -39.30933342247269,
+      "balanceAfter": 1271.0017806599503
+    },
+    {
+      "date": "2025-09-26",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 38.13005341979851,
+      "pnlGBP": -38.13005341979851,
+      "balanceAfter": 1232.8717272401518
+    },
+    {
+      "date": "2025-09-26",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 36.98615181720455,
+      "pnlGBP": 27.73961386290341,
+      "balanceAfter": 1260.611341103055
+    },
+    {
+      "date": "2025-09-26",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 37.818340233091654,
+      "pnlGBP": -37.818340233091654,
+      "balanceAfter": 1222.7930008699634
+    },
+    {
+      "date": "2025-09-27",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 36.6837900260989,
+      "pnlGBP": -36.6837900260989,
+      "balanceAfter": 1186.1092108438645
+    },
+    {
+      "date": "2025-09-29",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 35.583276325315936,
+      "pnlGBP": -35.583276325315936,
+      "balanceAfter": 1150.5259345185486
+    },
+    {
+      "date": "2025-09-30",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 34.51577803555646,
+      "pnlGBP": -34.51577803555646,
+      "balanceAfter": 1116.0101564829922
+    },
+    {
+      "date": "2025-09-30",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 33.48030469448977,
+      "pnlGBP": -33.48030469448977,
+      "balanceAfter": 1082.5298517885024
+    },
+    {
+      "date": "2025-10-01",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 32.47589555365507,
+      "pnlGBP": 24.356921665241302,
+      "balanceAfter": 1106.8867734537437
+    },
+    {
+      "date": "2025-10-01",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 33.20660320361231,
+      "pnlGBP": -33.20660320361231,
+      "balanceAfter": 1073.6801702501314
+    },
+    {
+      "date": "2025-10-13",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 32.21040510750394,
+      "pnlGBP": -32.21040510750394,
+      "balanceAfter": 1041.4697651426275
+    },
+    {
+      "date": "2025-10-14",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 31.244092954278823,
+      "pnlGBP": -31.244092954278823,
+      "balanceAfter": 1010.2256721883487
+    },
+    {
+      "date": "2025-10-15",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 30.30677016565046,
+      "pnlGBP": 22.730077624237843,
+      "balanceAfter": 1032.9557498125864
+    },
+    {
+      "date": "2025-10-15",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 30.988672494377592,
+      "pnlGBP": -30.988672494377592,
+      "balanceAfter": 1001.9670773182088
+    },
+    {
+      "date": "2025-10-16",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2.625,
+      "result": "WIN_TP3",
+      "riskGBP": 30.059012319546262,
+      "pnlGBP": 78.90490733880894,
+      "balanceAfter": 1080.8719846570177
+    },
+    {
+      "date": "2025-10-16",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 32.42615953971053,
+      "pnlGBP": 24.319619654782898,
+      "balanceAfter": 1105.1916043118006
+    },
+    {
+      "date": "2025-10-17",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 33.155748129354016,
+      "pnlGBP": -33.155748129354016,
+      "balanceAfter": 1072.0358561824467
+    },
+    {
+      "date": "2025-10-18",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 32.1610756854734,
+      "pnlGBP": -32.1610756854734,
+      "balanceAfter": 1039.8747804969732
+    },
+    {
+      "date": "2025-10-20",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 31.196243414909198,
+      "pnlGBP": -31.196243414909198,
+      "balanceAfter": 1008.678537082064
+    },
+    {
+      "date": "2025-10-20",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 30.26035611246192,
+      "pnlGBP": -30.26035611246192,
+      "balanceAfter": 978.4181809696022
+    },
+    {
+      "date": "2025-10-21",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 29.352545429088064,
+      "pnlGBP": 58.70509085817613,
+      "balanceAfter": 1037.1232718277784
+    },
+    {
+      "date": "2025-10-21",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 31.11369815483335,
+      "pnlGBP": -31.11369815483335,
+      "balanceAfter": 1006.009573672945
+    },
+    {
+      "date": "2025-10-21",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 30.180287210188347,
+      "pnlGBP": -30.180287210188347,
+      "balanceAfter": 975.8292864627566
+    },
+    {
+      "date": "2025-10-22",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 29.274878593882697,
+      "pnlGBP": -29.274878593882697,
+      "balanceAfter": 946.5544078688739
+    },
+    {
+      "date": "2025-10-22",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 28.396632236066218,
+      "pnlGBP": -28.396632236066218,
+      "balanceAfter": 918.1577756328077
+    },
+    {
+      "date": "2025-10-23",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 27.544733268984228,
+      "pnlGBP": 20.65854995173817,
+      "balanceAfter": 938.8163255845459
+    },
+    {
+      "date": "2025-10-23",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 28.164489767536377,
+      "pnlGBP": -28.164489767536377,
+      "balanceAfter": 910.6518358170096
+    },
+    {
+      "date": "2025-10-23",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 27.319555074510287,
+      "pnlGBP": -27.319555074510287,
+      "balanceAfter": 883.3322807424993
+    },
+    {
+      "date": "2025-10-24",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 26.49996842227498,
+      "pnlGBP": 52.99993684454996,
+      "balanceAfter": 936.3322175870493
+    },
+    {
+      "date": "2025-10-25",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 28.089966527611477,
+      "pnlGBP": 56.17993305522295,
+      "balanceAfter": 992.5121506422722
+    },
+    {
+      "date": "2025-10-30",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 29.775364519268166,
+      "pnlGBP": 22.331523389451124,
+      "balanceAfter": 1014.8436740317234
+    },
+    {
+      "date": "2025-10-31",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 30.4453102209517,
+      "pnlGBP": 60.8906204419034,
+      "balanceAfter": 1075.7342944736267
+    },
+    {
+      "date": "2025-10-31",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 32.272028834208804,
+      "pnlGBP": -32.272028834208804,
+      "balanceAfter": 1043.4622656394179
+    },
+    {
+      "date": "2025-10-31",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 31.303867969182534,
+      "pnlGBP": -31.303867969182534,
+      "balanceAfter": 1012.1583976702353
+    },
+    {
+      "date": "2025-11-01",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 30.364751930107058,
+      "pnlGBP": -30.364751930107058,
+      "balanceAfter": 981.7936457401282
+    },
+    {
+      "date": "2025-11-01",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2.625,
+      "result": "WIN_TP3",
+      "riskGBP": 29.453809372203846,
+      "pnlGBP": 77.3162496020351,
+      "balanceAfter": 1059.1098953421633
+    },
+    {
+      "date": "2025-11-12",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 31.7732968602649,
+      "pnlGBP": 23.829972645198673,
+      "balanceAfter": 1082.939867987362
+    },
+    {
+      "date": "2025-11-12",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 32.48819603962086,
+      "pnlGBP": -32.48819603962086,
+      "balanceAfter": 1050.4516719477413
+    },
+    {
+      "date": "2025-11-13",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 31.51355015843224,
+      "pnlGBP": -31.51355015843224,
+      "balanceAfter": 1018.938121789309
+    },
+    {
+      "date": "2025-11-14",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 30.568143653679268,
+      "pnlGBP": -30.568143653679268,
+      "balanceAfter": 988.3699781356297
+    },
+    {
+      "date": "2025-11-14",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 29.65109934406889,
+      "pnlGBP": -29.65109934406889,
+      "balanceAfter": 958.7188787915608
+    },
+    {
+      "date": "2025-11-17",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2.625,
+      "result": "WIN_TP3",
+      "riskGBP": 28.761566363746823,
+      "pnlGBP": 75.49911170483541,
+      "balanceAfter": 1034.2179904963962
+    },
+    {
+      "date": "2025-11-18",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2.625,
+      "result": "WIN_TP3",
+      "riskGBP": 31.026539714891882,
+      "pnlGBP": 81.44466675159119,
+      "balanceAfter": 1115.6626572479875
+    },
+    {
+      "date": "2025-11-19",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 33.469879717439625,
+      "pnlGBP": -33.469879717439625,
+      "balanceAfter": 1082.1927775305478
+    },
+    {
+      "date": "2025-11-19",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": 2.21,
+      "result": "WIN",
+      "riskGBP": 32.46578332591643,
+      "pnlGBP": 71.74938115027531,
+      "balanceAfter": 1153.942158680823
+    },
+    {
+      "date": "2025-11-20",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 34.61826476042469,
+      "pnlGBP": -34.61826476042469,
+      "balanceAfter": 1119.3238939203984
+    },
+    {
+      "date": "2025-11-21",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2.625,
+      "result": "WIN_TP3",
+      "riskGBP": 33.57971681761195,
+      "pnlGBP": 88.14675664623138,
+      "balanceAfter": 1207.4706505666297
+    },
+    {
+      "date": "2025-11-21",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 36.22411951699889,
+      "pnlGBP": -36.22411951699889,
+      "balanceAfter": 1171.246531049631
+    },
+    {
+      "date": "2025-11-25",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 35.137395931488925,
+      "pnlGBP": -35.137395931488925,
+      "balanceAfter": 1136.109135118142
+    },
+    {
+      "date": "2025-11-25",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 34.08327405354426,
+      "pnlGBP": -34.08327405354426,
+      "balanceAfter": 1102.0258610645976
+    },
+    {
+      "date": "2025-11-26",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 33.060775831937924,
+      "pnlGBP": -33.060775831937924,
+      "balanceAfter": 1068.9650852326597
+    },
+    {
+      "date": "2025-11-26",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": 1.36,
+      "result": "WIN",
+      "riskGBP": 32.06895255697979,
+      "pnlGBP": 43.61377547749252,
+      "balanceAfter": 1112.5788607101522
+    },
+    {
+      "date": "2025-11-27",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 33.377365821304565,
+      "pnlGBP": 66.75473164260913,
+      "balanceAfter": 1179.3335923527613
+    },
+    {
+      "date": "2025-11-28",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 35.380007770582836,
+      "pnlGBP": -35.380007770582836,
+      "balanceAfter": 1143.9535845821786
+    },
+    {
+      "date": "2025-11-29",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 34.318607537465354,
+      "pnlGBP": -34.318607537465354,
+      "balanceAfter": 1109.6349770447132
+    },
+    {
+      "date": "2025-12-01",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 33.289049311341394,
+      "pnlGBP": -33.289049311341394,
+      "balanceAfter": 1076.3459277333718
+    },
+    {
+      "date": "2025-12-12",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 32.290377832001155,
+      "pnlGBP": -32.290377832001155,
+      "balanceAfter": 1044.0555499013706
+    },
+    {
+      "date": "2025-12-13",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 31.321666497041114,
+      "pnlGBP": -31.321666497041114,
+      "balanceAfter": 1012.7338834043295
+    },
+    {
+      "date": "2025-12-15",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 30.382016502129883,
+      "pnlGBP": -30.382016502129883,
+      "balanceAfter": 982.3518669021996
+    },
+    {
+      "date": "2025-12-16",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 29.470556007065987,
+      "pnlGBP": -29.470556007065987,
+      "balanceAfter": 952.8813108951337
+    },
+    {
+      "date": "2025-12-17",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 28.58643932685401,
+      "pnlGBP": -28.58643932685401,
+      "balanceAfter": 924.2948715682796
+    },
+    {
+      "date": "2025-12-17",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 27.728846147048387,
+      "pnlGBP": 20.79663461028629,
+      "balanceAfter": 945.091506178566
+    },
+    {
+      "date": "2025-12-18",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 28.352745185356977,
+      "pnlGBP": 21.26455888901773,
+      "balanceAfter": 966.3560650675837
+    },
+    {
+      "date": "2025-12-18",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 28.99068195202751,
+      "pnlGBP": -28.99068195202751,
+      "balanceAfter": 937.3653831155561
+    },
+    {
+      "date": "2025-12-19",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 28.120961493466684,
+      "pnlGBP": 21.090721120100014,
+      "balanceAfter": 958.4561042356562
+    },
+    {
+      "date": "2025-12-19",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 28.753683127069685,
+      "pnlGBP": 57.50736625413937,
+      "balanceAfter": 1015.9634704897956
+    },
+    {
+      "date": "2025-12-22",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 30.478904114693865,
+      "pnlGBP": -30.478904114693865,
+      "balanceAfter": 985.4845663751017
+    },
+    {
+      "date": "2025-12-22",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 29.56453699125305,
+      "pnlGBP": -29.56453699125305,
+      "balanceAfter": 955.9200293838487
+    },
+    {
+      "date": "2025-12-23",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 28.67760088151546,
+      "pnlGBP": -28.67760088151546,
+      "balanceAfter": 927.2424285023333
+    },
+    {
+      "date": "2025-12-24",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2.625,
+      "result": "WIN_TP3",
+      "riskGBP": 27.817272855069998,
+      "pnlGBP": 73.02034124455875,
+      "balanceAfter": 1000.262769746892
+    },
+    {
+      "date": "2025-12-29",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": 1.93,
+      "result": "WIN",
+      "riskGBP": 30.007883092406757,
+      "pnlGBP": 57.91521436834504,
+      "balanceAfter": 1058.177984115237
+    },
+    {
+      "date": "2025-12-30",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 31.74533952345711,
+      "pnlGBP": -31.74533952345711,
+      "balanceAfter": 1026.43264459178
+    },
+    {
+      "date": "2025-12-30",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 30.792979337753398,
+      "pnlGBP": 23.09473450331505,
+      "balanceAfter": 1049.527379095095
+    },
+    {
+      "date": "2025-12-30",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 31.48582137285285,
+      "pnlGBP": -31.48582137285285,
+      "balanceAfter": 1018.0415577222423
+    },
+    {
+      "date": "2025-12-31",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 30.541246731667268,
+      "pnlGBP": 22.90593504875045,
+      "balanceAfter": 1040.9474927709928
+    },
+    {
+      "date": "2026-01-01",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 31.228424783129782,
+      "pnlGBP": 23.421318587347336,
+      "balanceAfter": 1064.36881135834
+    },
+    {
+      "date": "2026-01-13",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 31.9310643407502,
+      "pnlGBP": -31.9310643407502,
+      "balanceAfter": 1032.4377470175898
+    },
+    {
+      "date": "2026-01-16",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 30.973132410527693,
+      "pnlGBP": -30.973132410527693,
+      "balanceAfter": 1001.4646146070621
+    },
+    {
+      "date": "2026-01-19",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 30.043938438211864,
+      "pnlGBP": -30.043938438211864,
+      "balanceAfter": 971.4206761688503
+    },
+    {
+      "date": "2026-01-20",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 29.142620285065508,
+      "pnlGBP": -29.142620285065508,
+      "balanceAfter": 942.2780558837848
+    },
+    {
+      "date": "2026-01-20",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 28.268341676513543,
+      "pnlGBP": -28.268341676513543,
+      "balanceAfter": 914.0097142072713
+    },
+    {
+      "date": "2026-01-20",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 27.420291426218135,
+      "pnlGBP": -27.420291426218135,
+      "balanceAfter": 886.5894227810531
+    },
+    {
+      "date": "2026-01-21",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 26.597682683431593,
+      "pnlGBP": -26.597682683431593,
+      "balanceAfter": 859.9917400976216
+    },
+    {
+      "date": "2026-01-21",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 25.799752202928648,
+      "pnlGBP": -25.799752202928648,
+      "balanceAfter": 834.1919878946929
+    },
+    {
+      "date": "2026-01-22",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 25.02575963684079,
+      "pnlGBP": -25.02575963684079,
+      "balanceAfter": 809.1662282578521
+    },
+    {
+      "date": "2026-01-22",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 24.274986847735562,
+      "pnlGBP": -24.274986847735562,
+      "balanceAfter": 784.8912414101165
+    },
+    {
+      "date": "2026-01-23",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 23.546737242303497,
+      "pnlGBP": -23.546737242303497,
+      "balanceAfter": 761.344504167813
+    },
+    {
+      "date": "2026-01-23",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 22.84033512503439,
+      "pnlGBP": -22.84033512503439,
+      "balanceAfter": 738.5041690427787
+    },
+    {
+      "date": "2026-01-26",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 22.15512507128336,
+      "pnlGBP": -22.15512507128336,
+      "balanceAfter": 716.3490439714953
+    },
+    {
+      "date": "2026-01-27",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 21.49047131914486,
+      "pnlGBP": 16.117853489358644,
+      "balanceAfter": 732.4668974608539
+    },
+    {
+      "date": "2026-01-27",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 21.974006923825616,
+      "pnlGBP": 43.94801384765123,
+      "balanceAfter": 776.4149113085052
+    },
+    {
+      "date": "2026-01-28",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 23.292447339255155,
+      "pnlGBP": -23.292447339255155,
+      "balanceAfter": 753.12246396925
+    },
+    {
+      "date": "2026-01-29",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 22.5936739190775,
+      "pnlGBP": -22.5936739190775,
+      "balanceAfter": 730.5287900501726
+    },
+    {
+      "date": "2026-02-10",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 21.915863701505177,
+      "pnlGBP": -21.915863701505177,
+      "balanceAfter": 708.6129263486674
+    },
+    {
+      "date": "2026-02-11",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": 8.41,
+      "result": "WIN",
+      "riskGBP": 21.258387790460024,
+      "pnlGBP": 178.7830413177688,
+      "balanceAfter": 887.3959676664363
+    },
+    {
+      "date": "2026-02-13",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 26.621879029993085,
+      "pnlGBP": -26.621879029993085,
+      "balanceAfter": 860.7740886364431
+    },
+    {
+      "date": "2026-02-13",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": 6.8,
+      "result": "WIN",
+      "riskGBP": 25.823222659093293,
+      "pnlGBP": 175.59791408183438,
+      "balanceAfter": 1036.3720027182776
+    },
+    {
+      "date": "2026-02-14",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 31.091160081548328,
+      "pnlGBP": -31.091160081548328,
+      "balanceAfter": 1005.2808426367293
+    },
+    {
+      "date": "2026-02-16",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 30.158425279101877,
+      "pnlGBP": 60.316850558203754,
+      "balanceAfter": 1065.597693194933
+    },
+    {
+      "date": "2026-02-17",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2.625,
+      "result": "WIN_TP3",
+      "riskGBP": 31.96793079584799,
+      "pnlGBP": 83.91581833910098,
+      "balanceAfter": 1149.513511534034
+    },
+    {
+      "date": "2026-02-17",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 34.48540534602102,
+      "pnlGBP": 68.97081069204204,
+      "balanceAfter": 1218.484322226076
+    },
+    {
+      "date": "2026-02-17",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 36.55452966678228,
+      "pnlGBP": -36.55452966678228,
+      "balanceAfter": 1181.929792559294
+    },
+    {
+      "date": "2026-02-18",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 35.45789377677882,
+      "pnlGBP": -35.45789377677882,
+      "balanceAfter": 1146.4718987825152
+    },
+    {
+      "date": "2026-02-18",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 34.39415696347545,
+      "pnlGBP": 25.79561772260659,
+      "balanceAfter": 1172.2675165051216
+    },
+    {
+      "date": "2026-02-19",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 35.16802549515365,
+      "pnlGBP": 26.37601912136524,
+      "balanceAfter": 1198.643535626487
+    },
+    {
+      "date": "2026-02-19",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 35.959306068794604,
+      "pnlGBP": -35.959306068794604,
+      "balanceAfter": 1162.6842295576923
+    },
+    {
+      "date": "2026-02-20",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 34.88052688673077,
+      "pnlGBP": -34.88052688673077,
+      "balanceAfter": 1127.8037026709615
+    },
+    {
+      "date": "2026-02-20",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 33.83411108012884,
+      "pnlGBP": -33.83411108012884,
+      "balanceAfter": 1093.9695915908326
+    },
+    {
+      "date": "2026-02-20",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 32.81908774772498,
+      "pnlGBP": -32.81908774772498,
+      "balanceAfter": 1061.1505038431076
+    },
+    {
+      "date": "2026-02-21",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 31.834515115293225,
+      "pnlGBP": -31.834515115293225,
+      "balanceAfter": 1029.3159887278143
+    },
+    {
+      "date": "2026-02-23",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 30.879479661834427,
+      "pnlGBP": 61.758959323668854,
+      "balanceAfter": 1091.0749480514833
+    },
+    {
+      "date": "2026-02-23",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 32.7322484415445,
+      "pnlGBP": -32.7322484415445,
+      "balanceAfter": 1058.3426996099388
+    },
+    {
+      "date": "2026-02-23",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 31.75028098829816,
+      "pnlGBP": -31.75028098829816,
+      "balanceAfter": 1026.5924186216407
+    },
+    {
+      "date": "2026-02-24",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 30.79777255864922,
+      "pnlGBP": -30.79777255864922,
+      "balanceAfter": 995.7946460629915
+    },
+    {
+      "date": "2026-02-25",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 29.873839381889745,
+      "pnlGBP": 22.405379536417307,
+      "balanceAfter": 1018.2000255994088
+    },
+    {
+      "date": "2026-02-25",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 30.546000767982264,
+      "pnlGBP": -30.546000767982264,
+      "balanceAfter": 987.6540248314266
+    },
+    {
+      "date": "2026-02-26",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 29.629620744942795,
+      "pnlGBP": 22.222215558707095,
+      "balanceAfter": 1009.8762403901337
+    },
+    {
+      "date": "2026-02-27",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 30.296287211704012,
+      "pnlGBP": 60.592574423408024,
+      "balanceAfter": 1070.4688148135417
+    },
+    {
+      "date": "2026-02-27",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 32.11406444440625,
+      "pnlGBP": -32.11406444440625,
+      "balanceAfter": 1038.3547503691354
+    },
+    {
+      "date": "2026-02-28",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 31.15064251107406,
+      "pnlGBP": -31.15064251107406,
+      "balanceAfter": 1007.2041078580614
+    },
+    {
+      "date": "2026-03-16",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 30.216123235741843,
+      "pnlGBP": -30.216123235741843,
+      "balanceAfter": 976.9879846223196
+    },
+    {
+      "date": "2026-03-17",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 29.309639538669586,
+      "pnlGBP": -29.309639538669586,
+      "balanceAfter": 947.67834508365
+    },
+    {
+      "date": "2026-03-18",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 28.4303503525095,
+      "pnlGBP": 21.322762764382126,
+      "balanceAfter": 969.0011078480321
+    },
+    {
+      "date": "2026-03-19",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 29.070033235440963,
+      "pnlGBP": -29.070033235440963,
+      "balanceAfter": 939.9310746125911
+    },
+    {
+      "date": "2026-03-20",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 28.197932238377735,
+      "pnlGBP": -28.197932238377735,
+      "balanceAfter": 911.7331423742135
+    },
+    {
+      "date": "2026-03-20",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 27.351994271226403,
+      "pnlGBP": -27.351994271226403,
+      "balanceAfter": 884.381148102987
+    },
+    {
+      "date": "2026-03-23",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 26.53143444308961,
+      "pnlGBP": -26.53143444308961,
+      "balanceAfter": 857.8497136598974
+    },
+    {
+      "date": "2026-03-25",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 25.73549140979692,
+      "pnlGBP": -25.73549140979692,
+      "balanceAfter": 832.1142222501004
+    },
+    {
+      "date": "2026-03-25",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 24.96342666750301,
+      "pnlGBP": -24.96342666750301,
+      "balanceAfter": 807.1507955825974
+    },
+    {
+      "date": "2026-03-26",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 24.214523867477922,
+      "pnlGBP": -24.214523867477922,
+      "balanceAfter": 782.9362717151195
+    },
+    {
+      "date": "2026-03-27",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 23.48808815145358,
+      "pnlGBP": -23.48808815145358,
+      "balanceAfter": 759.4481835636659
+    },
+    {
+      "date": "2026-03-30",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 22.783445506909977,
+      "pnlGBP": -22.783445506909977,
+      "balanceAfter": 736.6647380567559
+    },
+    {
+      "date": "2026-03-30",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 22.099942141702677,
+      "pnlGBP": -22.099942141702677,
+      "balanceAfter": 714.5647959150533
+    },
+    {
+      "date": "2026-03-31",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 21.436943877451597,
+      "pnlGBP": -21.436943877451597,
+      "balanceAfter": 693.1278520376018
+    },
+    {
+      "date": "2026-03-31",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 20.793835561128052,
+      "pnlGBP": -20.793835561128052,
+      "balanceAfter": 672.3340164764737
+    },
+    {
+      "date": "2026-04-01",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 20.17002049429421,
+      "pnlGBP": -20.17002049429421,
+      "balanceAfter": 652.1639959821795
+    },
+    {
+      "date": "2026-04-01",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 19.564919879465382,
+      "pnlGBP": -19.564919879465382,
+      "balanceAfter": 632.5990761027141
+    },
+    {
+      "date": "2026-04-15",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 18.97797228308142,
+      "pnlGBP": -18.97797228308142,
+      "balanceAfter": 613.6211038196327
+    },
+    {
+      "date": "2026-04-16",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 18.40863311458898,
+      "pnlGBP": -18.40863311458898,
+      "balanceAfter": 595.2124707050438
+    },
+    {
+      "date": "2026-04-16",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 17.856374121151312,
+      "pnlGBP": -17.856374121151312,
+      "balanceAfter": 577.3560965838924
+    },
+    {
+      "date": "2026-04-17",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 17.32068289751677,
+      "pnlGBP": -17.32068289751677,
+      "balanceAfter": 560.0354136863756
+    },
+    {
+      "date": "2026-04-17",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 16.801062410591268,
+      "pnlGBP": -16.801062410591268,
+      "balanceAfter": 543.2343512757843
+    },
+    {
+      "date": "2026-04-20",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 16.29703053827353,
+      "pnlGBP": -16.29703053827353,
+      "balanceAfter": 526.9373207375108
+    },
+    {
+      "date": "2026-04-21",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 15.808119622125325,
+      "pnlGBP": 31.61623924425065,
+      "balanceAfter": 558.5535599817615
+    },
+    {
+      "date": "2026-04-21",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 16.756606799452843,
+      "pnlGBP": 33.513213598905686,
+      "balanceAfter": 592.0667735806672
+    },
+    {
+      "date": "2026-04-22",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 17.762003207420015,
+      "pnlGBP": -17.762003207420015,
+      "balanceAfter": 574.3047703732473
+    },
+    {
+      "date": "2026-04-22",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 17.229143111197416,
+      "pnlGBP": -17.229143111197416,
+      "balanceAfter": 557.0756272620498
+    },
+    {
+      "date": "2026-04-24",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 16.712268817861492,
+      "pnlGBP": -16.712268817861492,
+      "balanceAfter": 540.3633584441883
+    },
+    {
+      "date": "2026-04-24",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 16.21090075332565,
+      "pnlGBP": -16.21090075332565,
+      "balanceAfter": 524.1524576908627
+    },
+    {
+      "date": "2026-04-27",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 15.72457373072588,
+      "pnlGBP": 31.44914746145176,
+      "balanceAfter": 555.6016051523144
+    },
+    {
+      "date": "2026-04-27",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 16.66804815456943,
+      "pnlGBP": -16.66804815456943,
+      "balanceAfter": 538.933556997745
+    },
+    {
+      "date": "2026-04-28",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 16.16800670993235,
+      "pnlGBP": -16.16800670993235,
+      "balanceAfter": 522.7655502878126
+    },
+    {
+      "date": "2026-04-28",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": 3.54,
+      "result": "WIN",
+      "riskGBP": 15.682966508634378,
+      "pnlGBP": 55.517701440565695,
+      "balanceAfter": 578.2832517283783
+    },
+    {
+      "date": "2026-04-29",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 17.34849755185135,
+      "pnlGBP": -17.34849755185135,
+      "balanceAfter": 560.934754176527
+    },
+    {
+      "date": "2026-04-29",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 16.828042625295808,
+      "pnlGBP": -16.828042625295808,
+      "balanceAfter": 544.1067115512312
+    },
+    {
+      "date": "2026-04-29",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 16.323201346536937,
+      "pnlGBP": -16.323201346536937,
+      "balanceAfter": 527.7835102046943
+    },
+    {
+      "date": "2026-04-30",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 15.833505306140827,
+      "pnlGBP": -15.833505306140827,
+      "balanceAfter": 511.95000489855346
+    },
+    {
+      "date": "2026-04-30",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 15.358500146956603,
+      "pnlGBP": -15.358500146956603,
+      "balanceAfter": 496.59150475159686
+    },
+    {
+      "date": "2026-05-01",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 14.897745142547905,
+      "pnlGBP": 29.79549028509581,
+      "balanceAfter": 526.3869950366927
+    },
+    {
+      "date": "2026-05-01",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 15.79160985110078,
+      "pnlGBP": -15.79160985110078,
+      "balanceAfter": 510.59538518559197
+    },
+    {
+      "date": "2026-05-14",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 15.317861555567758,
+      "pnlGBP": -15.317861555567758,
+      "balanceAfter": 495.27752363002423
+    },
+    {
+      "date": "2026-05-15",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 14.858325708900727,
+      "pnlGBP": -14.858325708900727,
+      "balanceAfter": 480.4191979211235
+    },
+    {
+      "date": "2026-05-18",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 14.412575937633704,
+      "pnlGBP": -14.412575937633704,
+      "balanceAfter": 466.0066219834898
+    },
+    {
+      "date": "2026-05-18",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 13.980198659504694,
+      "pnlGBP": 27.960397319009388,
+      "balanceAfter": 493.96701930249924
+    },
+    {
+      "date": "2026-05-18",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": 7.67,
+      "result": "WIN",
+      "riskGBP": 14.819010579074977,
+      "pnlGBP": 113.66181114150507,
+      "balanceAfter": 607.6288304440043
+    },
+    {
+      "date": "2026-05-19",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 18.228864913320127,
+      "pnlGBP": 36.457729826640254,
+      "balanceAfter": 644.0865602706446
+    },
+    {
+      "date": "2026-05-19",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 19.322596808119336,
+      "pnlGBP": -19.322596808119336,
+      "balanceAfter": 624.7639634625252
+    },
+    {
+      "date": "2026-05-19",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 18.742918903875758,
+      "pnlGBP": -18.742918903875758,
+      "balanceAfter": 606.0210445586495
+    },
+    {
+      "date": "2026-05-20",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 18.180631336759483,
+      "pnlGBP": -18.180631336759483,
+      "balanceAfter": 587.84041322189
+    },
+    {
+      "date": "2026-05-20",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 17.635212396656698,
+      "pnlGBP": -17.635212396656698,
+      "balanceAfter": 570.2052008252333
+    },
+    {
+      "date": "2026-05-21",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 17.106156024757,
+      "pnlGBP": -17.106156024757,
+      "balanceAfter": 553.0990448004763
+    },
+    {
+      "date": "2026-05-21",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 16.59297134401429,
+      "pnlGBP": -16.59297134401429,
+      "balanceAfter": 536.5060734564621
+    },
+    {
+      "date": "2026-05-22",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 16.095182203693863,
+      "pnlGBP": -16.095182203693863,
+      "balanceAfter": 520.4108912527682
+    },
+    {
+      "date": "2026-05-22",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 15.612326737583047,
+      "pnlGBP": -15.612326737583047,
+      "balanceAfter": 504.7985645151852
+    },
+    {
+      "date": "2026-05-25",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 15.143956935455556,
+      "pnlGBP": -15.143956935455556,
+      "balanceAfter": 489.65460757972966
+    },
+    {
+      "date": "2026-05-26",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 14.689638227391889,
+      "pnlGBP": 29.379276454783778,
+      "balanceAfter": 519.0338840345134
+    },
+    {
+      "date": "2026-05-26",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 15.571016521035403,
+      "pnlGBP": -15.571016521035403,
+      "balanceAfter": 503.46286751347805
+    },
+    {
+      "date": "2026-05-27",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 15.103886025404341,
+      "pnlGBP": 11.327914519053255,
+      "balanceAfter": 514.7907820325313
+    },
+    {
+      "date": "2026-05-27",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 15.443723460975939,
+      "pnlGBP": -15.443723460975939,
+      "balanceAfter": 499.34705857155535
+    },
+    {
+      "date": "2026-05-27",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 14.98041175714666,
+      "pnlGBP": -14.98041175714666,
+      "balanceAfter": 484.3666468144087
+    },
+    {
+      "date": "2026-05-28",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 14.53099940443226,
+      "pnlGBP": 10.898249553324195,
+      "balanceAfter": 495.2648963677329
+    },
+    {
+      "date": "2026-05-28",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": 2.23,
+      "result": "WIN",
+      "riskGBP": 14.857946891031986,
+      "pnlGBP": 33.13322156700133,
+      "balanceAfter": 528.3981179347343
+    },
+    {
+      "date": "2026-05-29",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 15.851943538042027,
+      "pnlGBP": -15.851943538042027,
+      "balanceAfter": 512.5461743966922
+    },
+    {
+      "date": "2026-06-01",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 15.376385231900766,
+      "pnlGBP": 30.752770463801532,
+      "balanceAfter": 543.2989448604937
+    },
+    {
+      "date": "2026-06-01",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 16.298968345814814,
+      "pnlGBP": 32.59793669162963,
+      "balanceAfter": 575.8968815521234
+    },
+    {
+      "date": "2026-06-01",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 17.276906446563704,
+      "pnlGBP": -17.276906446563704,
+      "balanceAfter": 558.6199751055598
+    },
+    {
+      "date": "2026-06-02",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 16.758599253166793,
+      "pnlGBP": -16.758599253166793,
+      "balanceAfter": 541.8613758523929
+    },
+    {
+      "date": "2026-06-03",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 16.255841275571786,
+      "pnlGBP": 32.51168255114357,
+      "balanceAfter": 574.3730584035366
+    },
+    {
+      "date": "2026-06-04",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 17.231191752106096,
+      "pnlGBP": -17.231191752106096,
+      "balanceAfter": 557.1418666514305
+    },
+    {
+      "date": "2026-06-04",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 16.714255999542914,
+      "pnlGBP": -16.714255999542914,
+      "balanceAfter": 540.4276106518876
+    },
+    {
+      "date": "2026-06-04",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 16.212828319556625,
+      "pnlGBP": -16.212828319556625,
+      "balanceAfter": 524.214782332331
+    },
+    {
+      "date": "2026-06-05",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 15.72644346996993,
+      "pnlGBP": 11.794832602477447,
+      "balanceAfter": 536.0096149348084
+    },
+    {
+      "date": "2026-06-05",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 16.08028844804425,
+      "pnlGBP": 32.1605768960885,
+      "balanceAfter": 568.1701918308969
+    },
+    {
+      "date": "2026-06-08",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 17.045105754926908,
+      "pnlGBP": 34.090211509853816,
+      "balanceAfter": 602.2604033407507
+    },
+    {
+      "date": "2026-06-08",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 18.067812100222522,
+      "pnlGBP": -18.067812100222522,
+      "balanceAfter": 584.1925912405281
+    },
+    {
+      "date": "2026-06-09",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 0.75,
+      "result": "WIN_TP1_BE",
+      "riskGBP": 17.525777737215844,
+      "pnlGBP": 13.144333302911882,
+      "balanceAfter": 597.33692454344
+    },
+    {
+      "date": "2026-06-09",
+      "market": "NAS100",
+      "dir": "SELL",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 17.920107736303198,
+      "pnlGBP": -17.920107736303198,
+      "balanceAfter": 579.4168168071368
+    },
+    {
+      "date": "2026-06-10",
+      "market": "XAUUSD",
+      "dir": "SELL",
+      "pnlR": 2,
+      "result": "WIN_TP2",
+      "riskGBP": 17.382504504214104,
+      "pnlGBP": 34.76500900842821,
+      "balanceAfter": 614.181825815565
+    },
+    {
+      "date": "2026-06-10",
+      "market": "NAS100",
+      "dir": "BUY",
+      "pnlR": -1,
+      "result": "LOSS",
+      "riskGBP": 18.42545477446695,
+      "pnlGBP": -18.42545477446695,
+      "balanceAfter": 595.7563710410981
+    }
+  ]
+}
