@@ -1,25 +1,26 @@
 'use strict';
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  NAS100 ICT — Judas Swing Backtest  (CORRECTED)
+//  NAS100 ICT — NY Kill Zone Judas Swing Backtest
 //  Data: Yahoo Finance QQQ
-//    • 5m with pre-market  → pre-NY swing levels + sweep detection
-//    • 2m regular hours    → MSS + FVG on lower timeframe (2m ≈ 1m proxy)
+//    • 5m with pre-market  → Asia + London session levels + sweep
+//    • TwelveData 1m       → MSS + FVG on 1m after sweep
 //
-//  Strategy:
-//    1. 5m chart: mark the CLOSEST (most recent) swing high (BSL) and
-//       swing low (SSL) formed before 14:00 GMT
-//    2. 5m chart, 14:00–16:00 GMT window: wait for a candle to wick
-//       BEYOND BSL or SSL and CLOSE back inside → sweep confirmed
-//    3. Switch to 2m chart: find MSS (CHoCH / BOS) in the direction
-//       opposite to the sweep
-//    4. 2m chart: the displacement creating the MSS must leave a FVG
-//       (3-candle gap, minimum size)
-//    5. Entry: limit order 25% inside the FVG from the entry side
-//    6. SL: just beyond the highest high (for sells) or lowest low
-//       (for buys) formed in the post-sweep consolidation
-//    7. TP: opposing liquidity (SSL if BSL swept, BSL if SSL swept)
-//    8. One trade per day; 2% compounding from £1,500
+//  Strategy (NY Kill Zone — ICT Method):
+//    1. Mark Asia session swing high/low  (04:00–08:00 UTC)
+//    2. Mark London session swing high/low (08:00–12:00 UTC)
+//       → BSL = most recent swing HIGH from either session
+//       → SSL = most recent swing LOW from either session
+//    3. NY Kill Zone 12:00–15:00 GMT: wait for sweep of BSL or SSL
+//       (wick beyond level, close back inside)
+//    4. Switch to 1m: find MSS (CHoCH/BOS) confirming reversal
+//    5. 1m: find FVG created by the displacement leg
+//    6. Entry: limit 25% inside FVG
+//    7. SL: just beyond the SWEEP CANDLE's wick extreme
+//       (sweep high for sells, sweep low for buys)
+//    8. TP1: nearest opposing liquidity (Asia/London session level)
+//    9. No new entries after 15:00 GMT (10:00 AM EST)
+//   10. 2% compounding from £1,500
 // ═══════════════════════════════════════════════════════════════════════════
 
 require('dotenv').config();
@@ -88,38 +89,35 @@ function minsUTC(timeStr) {
   return parseInt(timeStr.slice(11,13)) * 60 + parseInt(timeStr.slice(14,16));
 }
 
-// ─── Step 1: CLOSEST swing high and swing low on 5m before 14:00 UTC ──────────
-// "Closest" = the most recently formed swing pivot before the sweep window
-function getClosestSwingLevels(candles5m, dateStr, nyOpenMins) {
-  // Pre-session: 08:00 UTC up to (but not including) sweep window
-  const session = candles5m.filter(c => {
+// ─── Step 1: Asia + London session swing levels (5m, pre-market) ──────────────
+// Asia equivalent:  04:00–07:55 UTC (US pre-market opens 04:00 UTC)
+// London session:   08:00–11:55 UTC (London active, US still pre-market)
+// Kill zone starts: 12:00 UTC — so we look for levels before that
+function getSessionLevels(candles5m, dateStr) {
+  const KILL_ZONE_START = 12 * 60; // 12:00 UTC
+
+  const preKZ = candles5m.filter(c => {
     if (!c.time.startsWith(dateStr)) return false;
     const m = minsUTC(c.time);
-    return m >= 8 * 60 && m < nyOpenMins;
+    return m >= 4 * 60 && m < KILL_ZONE_START;
   });
-  if (session.length < 5) return null;
+  if (preKZ.length < 5) return null;
 
-  // Find ALL swing highs and swing lows (pivot: higher/lower than 2 bars each side)
-  let lastSwingHigh = null, lastSwingHighIdx = -1;
-  let lastSwingLow  = null, lastSwingLowIdx  = -1;
+  // Find most recent 5m swing HIGH and swing LOW before kill zone
+  // Swing = higher/lower than both neighbours (1-bar pivot for 5m pre-market)
+  let lastSwingHigh = null, lastSwingLow = null;
 
-  for (let i = 2; i < session.length - 2; i++) {
-    const c = session[i];
-    if (c.high > session[i-1].high && c.high > session[i-2].high &&
-        c.high > session[i+1].high && c.high > session[i+2].high) {
-      lastSwingHigh    = c.high;
-      lastSwingHighIdx = i;
-    }
-    if (c.low < session[i-1].low && c.low < session[i-2].low &&
-        c.low < session[i+1].low && c.low < session[i+2].low) {
-      lastSwingLow    = c.low;
-      lastSwingLowIdx = i;
-    }
+  for (let i = 1; i < preKZ.length - 1; i++) {
+    const c = preKZ[i];
+    if (c.high >= preKZ[i-1].high && c.high >= preKZ[i+1].high)
+      lastSwingHigh = c.high;
+    if (c.low <= preKZ[i-1].low && c.low <= preKZ[i+1].low)
+      lastSwingLow = c.low;
   }
 
-  // Fall back to session high/low if no swing pivot found
-  if (lastSwingHigh === null) lastSwingHigh = Math.max(...session.map(c => c.high));
-  if (lastSwingLow  === null) lastSwingLow  = Math.min(...session.map(c => c.low));
+  // Fall back to session extreme if no swing found
+  if (lastSwingHigh === null) lastSwingHigh = Math.max(...preKZ.map(c => c.high));
+  if (lastSwingLow  === null) lastSwingLow  = Math.min(...preKZ.map(c => c.low));
 
   if (lastSwingHigh <= lastSwingLow) return null;
   if ((lastSwingHigh - lastSwingLow) / lastSwingLow < MIN_RANGE_PCT) return null;
@@ -127,61 +125,64 @@ function getClosestSwingLevels(candles5m, dateStr, nyOpenMins) {
   return { bsl: lastSwingHigh, ssl: lastSwingLow };
 }
 
-// ─── Step 2: Sweep on 5m in 14:00–16:00 UTC window ────────────────────────────
-function detectSweep5m(candles5m, dateStr, nyOpenMins, levels) {
-  const windowEnd = nyOpenMins + 120; // 2hr window
-  const nyBars = candles5m.filter(c => {
+// ─── Step 2: Sweep in NY Kill Zone 12:00–15:00 UTC ────────────────────────────
+function detectSweep5m(candles5m, dateStr, levels) {
+  const KZ_START = 12 * 60; // 12:00 UTC (7:00 AM EST)
+  const KZ_END   = 15 * 60; // 15:00 UTC (10:00 AM EST) — no entries after
+
+  const kzBars = candles5m.filter(c => {
     if (!c.time.startsWith(dateStr)) return false;
     const m = minsUTC(c.time);
-    return m >= nyOpenMins && m < windowEnd;
+    return m >= KZ_START && m < KZ_END;
   });
 
-  for (const c of nyBars) {
+  for (const c of kzBars) {
     if (c.high > levels.bsl && c.close < levels.bsl)
       return { detected: true, dir: 'bear', sweptLevel: levels.bsl,
                targetLevel: levels.ssl, sweepTime: c.time,
+               sweepWickExtreme: c.high,  // SL anchor = sweep wick high
                label: 'BSL swept → target SSL' };
     if (c.low < levels.ssl && c.close > levels.ssl)
       return { detected: true, dir: 'bull', sweptLevel: levels.ssl,
                targetLevel: levels.bsl, sweepTime: c.time,
+               sweepWickExtreme: c.low,   // SL anchor = sweep wick low
                label: 'SSL swept → target BSL' };
   }
   return { detected: false };
 }
 
-// ─── Step 3: MSS on 2m bars after sweep ───────────────────────────────────────
-function detectMSS2m(bars2m, sweepDir) {
-  if (bars2m.length < 4) return { confirmed: false };
+// ─── Step 3: MSS on 1m bars after sweep ───────────────────────────────────────
+function detectMSS1m(bars1m, sweepDir) {
+  if (bars1m.length < 4) return { confirmed: false };
 
-  for (let i = 2; i < Math.min(bars2m.length, 60); i++) {
-    const last = bars2m[i], prev = bars2m[i-1];
+  for (let i = 2; i < Math.min(bars1m.length, 60); i++) {
+    const last = bars1m[i], prev = bars1m[i-1];
 
     if (sweepDir === 'bear') {
-      const slAnchor = Math.max(...bars2m.slice(0, i + 1).map(b => b.high));
-      // CHoCH: close below prior bar's low
+      // slAnchor = highest high in the consolidation up to and including MSS bar
+      // This is the "recent high that caused the MSS" = SL goes just above it
+      const slAnchor = Math.max(...bars1m.slice(0, i + 1).map(b => b.high));
       if (last.close < prev.low)
         return { confirmed: true, type: 'CHoCH', mssBar: i, slAnchor };
-      // BOS: close below a swing low formed after sweep
       let swingLow = Infinity;
       for (let j = 1; j < i - 1; j++)
-        if (bars2m[j].low < (bars2m[j-1]?.low ?? Infinity) &&
-            bars2m[j].low < (bars2m[j+1]?.low ?? Infinity))
-          swingLow = Math.min(swingLow, bars2m[j].low);
+        if (bars1m[j].low < (bars1m[j-1]?.low ?? Infinity) &&
+            bars1m[j].low < (bars1m[j+1]?.low ?? Infinity))
+          swingLow = Math.min(swingLow, bars1m[j].low);
       if (swingLow < Infinity && last.close < swingLow)
         return { confirmed: true, type: 'BOS_DOWN', mssBar: i, slAnchor };
     }
 
     if (sweepDir === 'bull') {
-      const slAnchor = Math.min(...bars2m.slice(0, i + 1).map(b => b.low));
-      // CHoCH: close above prior bar's high
+      // slAnchor = lowest low in the consolidation = SL goes just below it
+      const slAnchor = Math.min(...bars1m.slice(0, i + 1).map(b => b.low));
       if (last.close > prev.high)
         return { confirmed: true, type: 'CHoCH', mssBar: i, slAnchor };
-      // BOS: close above a swing high formed after sweep
       let swingHigh = -Infinity;
       for (let j = 1; j < i - 1; j++)
-        if (bars2m[j].high > (bars2m[j-1]?.high ?? -Infinity) &&
-            bars2m[j].high > (bars2m[j+1]?.high ?? -Infinity))
-          swingHigh = Math.max(swingHigh, bars2m[j].high);
+        if (bars1m[j].high > (bars1m[j-1]?.high ?? -Infinity) &&
+            bars1m[j].high > (bars1m[j+1]?.high ?? -Infinity))
+          swingHigh = Math.max(swingHigh, bars1m[j].high);
       if (swingHigh > -Infinity && last.close > swingHigh)
         return { confirmed: true, type: 'BOS_UP', mssBar: i, slAnchor };
     }
@@ -189,8 +190,9 @@ function detectMSS2m(bars2m, sweepDir) {
   return { confirmed: false };
 }
 
-// ─── Step 4: FVG on 2m within the displacement ────────────────────────────────
-function detectFVG2m(bars2m, sweepDir, mssBar) {
+// ─── Step 4: FVG on 1m within the displacement ────────────────────────────────
+function detectFVG1m(bars1m, sweepDir, mssBar) {
+  const bars2m = bars1m;
   // Search from bar 0 up through mssBar + a few bars
   const window = bars2m.slice(0, Math.min(mssBar + 6, bars2m.length));
   const gaps = [];
@@ -242,8 +244,8 @@ function simulate(dir, entry, sl, tp, futureBars) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 async function run() {
   console.clear();
-  console.log('\n' + chalk.bold.cyan('  ◆ NAS100 Judas Swing — ICT Checklist'));
-  console.log(chalk.gray('  Closest 5m swing H/L → 5m sweep 14:00–16:00 GMT → 1m MSS + FVG → limit entry\n'));
+  console.log('\n' + chalk.bold.cyan('  ◆ NAS100 — NY Kill Zone Judas Swing (ICT Method)'));
+  console.log(chalk.gray('  Asia/London 5m levels → 5m sweep 12:00–15:00 GMT → 1m MSS + FVG → SL at sweep wick\n'));
 
   // Fetch 5m with pre-market (for pre-NY levels + sweep)
   process.stdout.write(chalk.gray('  QQQ 5m (pre-market)...'));
@@ -269,34 +271,31 @@ async function run() {
   const stats = { noLevels: 0, noSweep: 0, noMSS: 0, noFVG: 0, riskFail: 0 };
 
   for (const dateStr of tradingDays) {
-    const nyMins = nyOpenUTC(dateStr);
-
-    // Step 1: closest 5m swing levels
-    const levels = getClosestSwingLevels(c5m, dateStr, nyMins);
+    // Step 1: Asia + London session swing levels (before 12:00 UTC)
+    const levels = getSessionLevels(c5m, dateStr);
     if (!levels) { stats.noLevels++; continue; }
 
-    // Step 2: sweep on 5m
-    const sweep = detectSweep5m(c5m, dateStr, nyMins, levels);
+    // Step 2: sweep in NY Kill Zone 12:00–15:00 UTC
+    const sweep = detectSweep5m(c5m, dateStr, levels);
     if (!sweep.detected) { stats.noSweep++; continue; }
 
-    // Find where the sweep candle sits in time, then get 2m bars after it
     const sweepMins = minsUTC(sweep.sweepTime);
 
-    // Post-sweep 1m bars: same date, after sweep candle, within 45 minutes of sweep
-    const post2m = c2m.filter(c => {
+    // Post-sweep 1m bars: after sweep candle, up to 15:00 UTC max
+    const post1m = c2m.filter(c => {
       if (!c.time.startsWith(dateStr)) return false;
       const m = minsUTC(c.time);
-      return m > sweepMins && m <= sweepMins + 45;
+      return m > sweepMins && m < 15 * 60;
     });
 
-    if (post2m.length < 4) { stats.noMSS++; continue; }
+    if (post1m.length < 4) { stats.noMSS++; continue; }
 
-    // Step 3: MSS on 2m
-    const mss = detectMSS2m(post2m, sweep.dir);
+    // Step 3: MSS on 1m
+    const mss = detectMSS1m(post1m, sweep.dir);
     if (!mss.confirmed) { stats.noMSS++; continue; }
 
-    // Step 4: FVG on 2m
-    const fvg = detectFVG2m(post2m, sweep.dir, mss.mssBar);
+    // Step 4: FVG on 1m
+    const fvg = detectFVG1m(post1m, sweep.dir, mss.mssBar);
     if (!fvg.found) { stats.noFVG++; continue; }
 
     // Build entry, SL, TP
@@ -305,26 +304,28 @@ async function run() {
       ? fvg.bottom + (fvg.top - fvg.bottom) * 0.25
       : fvg.top    - (fvg.top - fvg.bottom) * 0.25).toFixed(2));
 
+    // SL = just beyond the highest high (sell) or lowest low (buy)
+    // of the 1m consolidation bars leading into the MSS
+    // This is the "recent swing high/low that caused the MSS" per ICT
     const sl = parseFloat((isLong
       ? mss.slAnchor * (1 - SL_BUF_PCT)
-      : mss.slAnchor * (1 + SL_BUF_PCT)).toFixed(2));
+      : mss.slAnchor * (1 + SL_BUF_PCT)
+    ).toFixed(2));
 
     const tp = parseFloat(sweep.targetLevel.toFixed(2));
     const risk = Math.abs(entry - sl);
 
     // Validity checks
     if (risk < entry * MIN_STOP_PCT)              { stats.riskFail++; continue; }
-    if (risk > entry * 0.03)                      { stats.riskFail++; continue; }
+    if (risk > entry * 0.04)                      { stats.riskFail++; continue; }
     if (isLong  && (sl >= entry || tp <= entry))  { stats.riskFail++; continue; }
     if (!isLong && (sl <= entry || tp >= entry))  { stats.riskFail++; continue; }
     if (Math.abs(tp - entry) < MIN_TP_DIST)       { stats.riskFail++; continue; }
-    // Entry must be within 2% of swept level (no chasing far-away FVGs)
-    if (Math.abs(entry - sweep.sweptLevel) / sweep.sweptLevel > 0.02) { stats.riskFail++; continue; }
 
     const rrPot = parseFloat((Math.abs(tp - entry) / risk).toFixed(2));
 
     // Simulate on 2m bars from after the MSS bar
-    const simStart2m = c2m.indexOf(post2m[mss.mssBar]) + 1;
+    const simStart2m = c2m.indexOf(post1m[mss.mssBar]) + 1;
     const future2m   = c2m.slice(simStart2m, simStart2m + SIM_BARS);
     const outcome    = simulate(sweep.dir, entry, sl, tp, future2m);
 
@@ -361,7 +362,7 @@ async function run() {
   // ─── Print report ─────────────────────────────────────────────────────────
   const sep = '═'.repeat(72);
   console.log(sep);
-  console.log(chalk.bold.cyan('  SIGNAL REPORT — NAS100 Judas Swing (5m levels + 1m MSS/FVG)'));
+  console.log(chalk.bold.cyan('  SIGNAL REPORT — NAS100 NY Kill Zone (Asia/London levels · 1m MSS/FVG)'));
   console.log(sep);
 
   signals.forEach((s, idx) => {
@@ -396,7 +397,7 @@ async function run() {
   signals.forEach(s => { const mk=s.date.slice(0,7); byMonth[mk]=(byMonth[mk]||[]).concat(s); });
 
   console.log('\n\n' + sep);
-  console.log(chalk.bold.cyan('  SUMMARY — NAS100 Judas Swing (5m + 1m TwelveData)'));
+  console.log(chalk.bold.cyan('  SUMMARY — NAS100 NY Kill Zone (ICT · Asia/London + 1m)'));
   console.log(sep);
   console.log(chalk.gray('  Filter funnel:'));
   console.log(chalk.gray(`    Trading days:          ${tradingDays.length}`));
@@ -441,9 +442,9 @@ async function run() {
   fs.writeFileSync(reportPath, JSON.stringify({
     period: `${tradingDays[0]} → ${tradingDays[tradingDays.length-1]}`,
     generatedAt: new Date().toISOString(),
-    dataSource: 'Yahoo Finance QQQ 5m pre-market + 2m regular',
+    dataSource: 'Yahoo Finance QQQ 5m pre-market + TwelveData QQQ 1m',
     instrument: 'NAS100 proxy via QQQ ETF',
-    strategy: 'ICT Judas Swing — closest 5m swing H/L, 2m MSS+FVG',
+    strategy: 'ICT NY Kill Zone — Asia/London 5m levels, 12-15 GMT sweep, 1m MSS+FVG, SL at sweep wick',
     account: { start: ACCOUNT_START, end: parseFloat(balance.toFixed(2)),
       netGBP: parseFloat(totalGBP.toFixed(2)),
       returnPct: parseFloat(((balance-ACCOUNT_START)/ACCOUNT_START*100).toFixed(1)),
