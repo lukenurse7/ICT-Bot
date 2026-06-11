@@ -1,6 +1,6 @@
 {
-  "period": "2026-03-05 → 2026-06-05",
-  "generatedAt": "2026-06-11T11:47:06.823Z",
+  "period": "2026-03-17 → 2026-06-10",
+  "generatedAt": "2026-06-11T11:53:34.142Z",
   "settings": {
     "symbol": "XAUUSD",
     "entryMethod": "limit_fvg_midpoint",

@@ -50,15 +50,9 @@ function fmtGBP(n) { return '£' + n.toFixed(2); }
 function fmtPct(n) { return (n >= 0 ? '+' : '') + n.toFixed(1) + '%'; }
 
 function threeMonthRange() {
-  const now = new Date();
-  const day = now.getUTCDay();
-  const daysToLastFri = day === 0 ? 1 : (day >= 6 ? day - 5 : day + 2);
-  const end = new Date(now);
-  end.setUTCDate(now.getUTCDate() - daysToLastFri);
-  end.setUTCHours(23, 59, 59, 0);
-  const start = new Date(end);
-  start.setUTCMonth(start.getUTCMonth() - 3);
-  start.setUTCHours(0, 0, 0, 0);
+  // Fixed range matching NAS100 backtest — do not change to rolling window
+  const start = new Date('2026-03-17T00:00:00Z');
+  const end   = new Date('2026-06-10T23:59:59Z');
   return { start, end, label: `${fmt(start)} → ${fmt(end)}` };
 }
 
