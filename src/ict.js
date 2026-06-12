@@ -203,17 +203,20 @@ function detectFVG(candles5m, sweepDir) {
 }
 
 // ─── Liquidity-based TPs ──────────────────────────────────────────────────────
+// Minimums match the backtest exactly: TP2 ≥ 2.5R, TP3 ≥ 3.5R
+// Liquidity targets (5m equal H/L, 1H swings) used only if they clear the minimum
 function liquidityTPs(dir, entry, risk, candles5m, h1Candles) {
-  const isLong = dir === 'bull';
-  const minTP = isLong ? entry + risk * 1.5 : entry - risk * 1.5;
-  const maxR  = 4.0;
+  const isLong  = dir === 'bull';
+  const minTP2  = isLong ? entry + risk * 2.5 : entry - risk * 2.5;
+  const minTP3  = isLong ? entry + risk * 3.5 : entry - risk * 3.5;
+  const maxR    = 5.0;
 
   const candidates = [];
 
   // 5m equal lows/highs
   const c5 = candles5m.slice(-60);
   for (let i = 2; i < c5.length - 1; i++) {
-    const c = c5[i];
+    const c    = c5[i];
     const prev = c5.slice(Math.max(0, i-8), i);
     if (isLong) {
       const eq = prev.find(p => Math.abs(p.high - c.high) / c.high < 0.001);
@@ -237,14 +240,22 @@ function liquidityTPs(dir, entry, risk, candles5m, h1Candles) {
     }
   }
 
-  // Filter: must be in trade direction and within max R
-  const valid = candidates
-    .filter(t => isLong ? t.price > minTP && t.price < entry + risk * maxR
-                        : t.price < minTP && t.price > entry - risk * maxR)
+  // TP2: nearest liquidity at or beyond 2.5R, else fixed 2.5R
+  const tp2candidates = candidates
+    .filter(t => isLong
+      ? t.price >= minTP2 && t.price < entry + risk * maxR
+      : t.price <= minTP2 && t.price > entry - risk * maxR)
     .sort((a, b) => isLong ? a.price - b.price : b.price - a.price);
 
-  const tp2obj = valid[0] || { price: isLong ? entry + risk*2.5 : entry - risk*2.5, desc: 'Fixed 2.5R (no liquidity)' };
-  const tp3obj = valid[1] || { price: isLong ? entry + risk*3.5 : entry - risk*3.5, desc: 'Fixed 3.5R (no liquidity)' };
+  // TP3: nearest liquidity at or beyond 3.5R, else fixed 3.5R
+  const tp3candidates = candidates
+    .filter(t => isLong
+      ? t.price >= minTP3 && t.price < entry + risk * maxR
+      : t.price <= minTP3 && t.price > entry - risk * maxR)
+    .sort((a, b) => isLong ? a.price - b.price : b.price - a.price);
+
+  const tp2obj = tp2candidates[0] || { price: isLong ? entry + risk*2.5 : entry - risk*2.5, desc: 'Fixed 2.5R' };
+  const tp3obj = tp3candidates[0] || { price: isLong ? entry + risk*3.5 : entry - risk*3.5, desc: 'Fixed 3.5R' };
 
   return { tp2: tp2obj.price, tp2Desc: tp2obj.desc, tp3: tp3obj.price, tp3Desc: tp3obj.desc };
 }
