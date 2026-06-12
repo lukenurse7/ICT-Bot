@@ -336,15 +336,11 @@ function simulateOutcome(dir, entry, sl, tp1, tp2, tp1R, tp2R, futureCandles) {
   return { result: 'OPEN', pnlR: null };
 }
 
-function isKillZone(iso) {
-  const h = new Date(iso).getUTCHours();
-  return (h >= 7 && h < 9) || (h >= 12 && h < 15);
-}
 
 function sessionLabel(iso) {
   const h = new Date(iso).getUTCHours();
   if (h >= 7  && h < 9)  return '🟡 London KZ';
-  if (h >= 12 && h < 15) return '🟢 NY KZ';
+  if (h >= 14 && h < 16) return '🟢 NY KZ';
   return 'Off-hours';
 }
 
