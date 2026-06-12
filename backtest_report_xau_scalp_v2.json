@@ -1,0 +1,33 @@
+{
+  "period": "2025-06-11 → 2026-06-10",
+  "method": "ICT scalp v2 — weekly bias + frequency boost",
+  "generatedAt": "2026-06-12T11:28:27.473Z",
+  "noBias": {
+    "label": "NO BIAS FILTER — Asia H/L + PDH/PDL sweeps, both directions",
+    "signals": 296,
+    "filled": 125,
+    "missed": 171,
+    "wins": 30,
+    "losses": 64,
+    "wr": "32%",
+    "netR": -28,
+    "pf": 0.56,
+    "returnPct": -44.2,
+    "maxDD": 56.3,
+    "endBalance": 837.6
+  },
+  "withBias": {
+    "label": "WITH WEEKLY BIAS — trades only in H1 trend direction",
+    "signals": 168,
+    "filled": 62,
+    "missed": 106,
+    "wins": 12,
+    "losses": 27,
+    "wr": "31%",
+    "netR": -12,
+    "pf": 0.56,
+    "returnPct": -22.1,
+    "maxDD": 33.2,
+    "endBalance": 1168.68
+  }
+}
