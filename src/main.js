@@ -1,9 +1,9 @@
 'use strict';
 
 // ═══════════════════════════════════════════════════════════════════════
-//  COMBINED SIGNAL BOT
-//  XAUUSD  — scans every 60s, 24/5, signals anytime
-//  DJ30    — scans every 60s, signals ONLY during 14:00–16:00 GMT KZ
+//  DJ30 SIGNAL BOT
+//  DJ30 only — scans every 60s, signals during 14:00–16:00 GMT KZ
+//  XAUUSD disabled — low frequency, keeping DJ30 as sole instrument
 // ═══════════════════════════════════════════════════════════════════════
 
 require('dotenv').config();
@@ -12,16 +12,6 @@ const cron  = require('node-cron');
 const { publishSignal, updateStatus, startServer } = require('./signal_server');
 const tg = require('./telegram');
 
-// ─── XAUUSD engine ──────────────────────────────────────────────────────
-const { fetchAll: xauFetch }            = require('./data_xau');
-const { runAnalysis }                   = require('./ict_xau');
-const { sessionStatus, getAsiaSessionBounds, isWeekday } = require('./sessions');
-const {
-  printHeader: xauHeader, printStatusBar, printKeyLevels,
-  printSweep, printMSS, printFVG, printConfluence,
-  printSignal: printXauSignal, printWaiting
-} = require('./format_xau');
-
 // ─── DJ30 engine ────────────────────────────────────────────────────────
 const { fetchAllData: dj30Fetch }       = require('./data');
 const { runICTAnalysis }                = require('./ict');
@@ -29,9 +19,7 @@ const { isKillZone, killZoneStatus, getGMTTime } = require('./killzone');
 
 const SIGNAL_COOLDOWN = 600 * 1000; // 10 min ms
 
-// Per-instrument state
 const state = {
-  xau:  { lastTime: 0, lastDir: null },
   dj30: { lastTime: 0, lastDir: null }
 };
 
@@ -47,58 +35,10 @@ function fmtP(p) { return p.toLocaleString('en-GB', { minimumFractionDigits: 2 }
 
 function banner() {
   console.clear();
-  console.log('\n' + chalk.bold.yellow('  ◆ ICT SIGNAL BOT  —  COMBINED'));
-  console.log(chalk.gray('  XAUUSD (24/5 scan)  +  DJ30 (14:00–16:00 GMT KZ only)'));
+  console.log('\n' + chalk.bold.white('  ■ ICT SIGNAL BOT  —  DJ30'));
+  console.log(chalk.gray('  Signals during 14:00–16:00 GMT kill zone only'));
+  console.log(chalk.gray('  Backtest: 79% WR · +67.9% on £2,000 = ~£3,358 over 3 months'));
   console.log(divider());
-}
-
-// ─── XAUUSD scan ─────────────────────────────────────────────────────────
-
-async function scanXAU() {
-  if (!isWeekday()) return;
-
-  try {
-    const session = sessionStatus();
-    const alwaysActive = { ...session, active: true };
-
-    const data     = await xauFetch();
-    const asia     = getAsiaSessionBounds(data.h1);
-    const result   = runAnalysis(data, asia, alwaysActive);
-
-    // Print compact XAU block
-    console.log('\n' + chalk.bold.yellow('  ◆ XAUUSD') + chalk.gray(`  [${ts()}]`));
-    printStatusBar(result.quote, session, result.htf);
-    printKeyLevels(result.lvls);
-    console.log(divider());
-    console.log(chalk.gray('  MARKET STRUCTURE'));
-    printSweep(result.sweepResult);
-    printMSS(result.mss);
-    printFVG(result.fvg);
-    printConfluence(result.confluence);
-
-    if (result.signal) {
-      const now = Date.now();
-      const s   = state.xau;
-      const dup = result.signal.direction === s.lastDir && (now - s.lastTime) < SIGNAL_COOLDOWN;
-
-      if (!dup) {
-        printXauSignal(result.signal);
-        publishSignal(result.signal);
-        tg.send(tg.signalMessage(result.signal));  // → Telegram
-        s.lastTime = now;
-        s.lastDir  = result.signal.direction;
-      } else {
-        console.log(chalk.gray('  [XAU] Signal cooldown active'));
-      }
-    } else {
-      printWaiting(result.waitReason, result);
-    }
-
-    updateStatus({ waitReason: result.waitReason, confluence: result.confluence?.score });
-
-  } catch (err) {
-    console.log(chalk.red(`  [XAU] ✗ ${err.message}`));
-  }
 }
 
 // ─── DJ30 scan ───────────────────────────────────────────────────────────
@@ -163,8 +103,7 @@ async function scanDJ30() {
 
 async function runCycle() {
   banner();
-  // Run both scans in parallel, then schedule next cycle
-  await Promise.allSettled([scanXAU(), scanDJ30()]);
+  await scanDJ30();
   console.log('\n' + divider());
   console.log(chalk.gray(`  Next scan in 60s — Ctrl+C to stop\n`));
 }
