@@ -29,7 +29,6 @@ const ACCOUNT_START = 1000;
 const RISK_PCT      = 0.01;
 const SIM_BARS      = 288;   // 24h of 5m bars
 const MIN_SCORE     = 80;
-const COOLDOWN      = 36;    // 3h in 5m bars
 
 // ─── Date helpers ────────────────────────────────────────────────────────────
 function fmt(d) {
@@ -139,86 +138,43 @@ function rollup(src, factor) {
 
 // ─── ICT Engine (mirrors ict.js logic inline for backtest precision) ─────────
 
-function htfBiasFromCandles(daily, h4) {
-  function swings(arr) {
-    const highs = [], lows = [];
-    for (let i = 2; i < arr.length - 2; i++) {
-      const c = arr[i];
-      if (c.high > arr[i-1].high && c.high > arr[i-2].high && c.high > arr[i+1].high && c.high > arr[i+2].high) highs.push(c.high);
-      if (c.low  < arr[i-1].low  && c.low  < arr[i-2].low  && c.low  < arr[i+1].low  && c.low  < arr[i+2].low)  lows.push(c.low);
-    }
-    return { highs, lows };
-  }
-  function bias({ highs, lows }) {
-    if (highs.length < 2 || lows.length < 2) return 'ranging';
-    const hh = highs[highs.length-1] > highs[highs.length-2];
-    const hl = lows[lows.length-1]   > lows[lows.length-2];
-    const lh = highs[highs.length-1] < highs[highs.length-2];
-    const ll = lows[lows.length-1]   < lows[lows.length-2];
-    if (hh && hl) return 'bullish';
-    if (lh && ll) return 'bearish';
-    return 'ranging';
-  }
-  const db = bias(swings(daily)), h4b = bias(swings(h4));
-  if (db === 'bullish' && h4b === 'bullish') return 'bullish';
-  if (db === 'bearish' && h4b === 'bearish') return 'bearish';
-  if (db === 'bullish' && h4b === 'bearish') return 'pullback_in_bull';
-  if (db === 'bearish' && h4b === 'bullish') return 'pullback_in_bear';
-  return 'ranging';
-}
-
-function htfAligned(bias, dir) {
-  return (dir === 'bull' && (bias === 'bullish' || bias === 'pullback_in_bear'))
-      || (dir === 'bear' && (bias === 'bearish' || bias === 'pullback_in_bull'));
-}
-
-function detectSweep(candles15m, candles5m) {
-  const LOOKBACK = 50;
-  const recent15 = candles15m.slice(-LOOKBACK);
-  const last5    = candles5m[candles5m.length - 1];
-  const levels   = [];
-
-  for (let i = 2; i < recent15.length - 1; i++) {
-    const c = recent15[i];
-    const prev = recent15.slice(Math.max(0, i-10), i);
-    const eqH = prev.find(p => Math.abs(p.high - c.high) / c.high < 0.0005);
-    if (eqH) levels.push({ price: Math.max(c.high, eqH.high), type: 'BSL', name: 'Equal Highs (BSL)' });
-    const eqL = prev.find(p => Math.abs(p.low - c.low) / c.low < 0.0005);
-    if (eqL) levels.push({ price: Math.min(c.low, eqL.low), type: 'SSL', name: 'Equal Lows (SSL)' });
-  }
-
-  // Prev day H/L
-  const yesterday = candles15m.slice(-100).filter(c => {
-    const h = new Date(c.time).getUTCHours(); return h >= 21 || h < 2;
+// ─── Pre-NY range from 5m candles (07:00–13:55 UTC on the given date) ────────
+function getPreNYRange(candles5m, dateStr) {
+  const session = candles5m.filter(c => {
+    if (!c.time.startsWith(dateStr)) return false;
+    const h = new Date(c.time).getUTCHours();
+    const m = new Date(c.time).getUTCMinutes();
+    const mins = h * 60 + m;
+    return mins >= 7 * 60 && mins < 14 * 60;
   });
-  if (yesterday.length) {
-    levels.push({ price: Math.max(...yesterday.map(c => c.high)), type: 'BSL', name: 'Prev Day High' });
-    levels.push({ price: Math.min(...yesterday.map(c => c.low)),  type: 'SSL', name: 'Prev Day Low' });
-  }
+  if (session.length < 3) return null;
+  return {
+    high: Math.max(...session.map(c => c.high)),
+    low:  Math.min(...session.map(c => c.low)),
+    candles: session.length
+  };
+}
 
-  const results = [];
-  for (const lvl of levels) {
-    if (lvl.type === 'BSL' && last5.high > lvl.price && last5.close < lvl.price)
-      results.push({ dir: 'bear', level: lvl.price, levelName: lvl.name, barsAgo: 0 });
-    if (lvl.type === 'SSL' && last5.low < lvl.price && last5.close > lvl.price)
-      results.push({ dir: 'bull', level: lvl.price, levelName: lvl.name, barsAgo: 0 });
-  }
+// ─── Judas sweep: wick beyond pre-NY range H/L, close back inside ────────────
+// Scans the last few 5m bars in the NY window (14:00–16:00 UTC) for a sweep
+function detectSweep(candles5m, preNYRange) {
+  if (!preNYRange) return { detected: false };
 
-  for (let back = 1; back <= 12; back++) {
+  // Look back up to 12 bars (1 hour) within NY window for a fresh sweep
+  for (let back = 0; back <= 12; back++) {
     const idx = candles5m.length - 1 - back;
     if (idx < 0) break;
     const c = candles5m[idx];
-    for (const lvl of levels) {
-      if (lvl.type === 'BSL' && c.high > lvl.price && c.close < lvl.price)
-        results.push({ dir: 'bear', level: lvl.price, levelName: lvl.name, barsAgo: back });
-      if (lvl.type === 'SSL' && c.low < lvl.price && c.close > lvl.price)
-        results.push({ dir: 'bull', level: lvl.price, levelName: lvl.name, barsAgo: back });
-    }
+    const h = new Date(c.time).getUTCHours();
+    if (h < 14 || h >= 16) continue;
+
+    if (c.high > preNYRange.high && c.close < preNYRange.high)
+      return { detected: true, dir: 'bear', level: preNYRange.high, levelName: 'Pre-NY High (BSL)', sweepCandle: c, barsAgo: back };
+    if (c.low < preNYRange.low && c.close > preNYRange.low)
+      return { detected: true, dir: 'bull', level: preNYRange.low,  levelName: 'Pre-NY Low (SSL)',  sweepCandle: c, barsAgo: back };
   }
 
-  if (!results.length) return { detected: false };
-  results.sort((a, b) => a.barsAgo - b.barsAgo);
-  return { detected: true, ...results[0] };
+  return { detected: false };
 }
 
 function detectMSS(candles5m, sweepDir) {
@@ -408,17 +364,7 @@ async function run() {
   console.log(chalk.gray('  Fetching data in monthly chunks...\n'));
 
   const all5m  = await fetchChunked('5min',  4500, 4); await wait(15000);
-  const all15m = await fetchChunked('15min', 1500, 4); await wait(15000);
   const allH1  = await fetchChunked('1h',    750,  4); await wait(15000);
-
-  process.stdout.write(chalk.gray('  Fetching 4H candles...'));
-  const allH4 = await fetchWithRetry({ symbol: SYMBOL, interval: '4h', outputsize: 200 }, '4h_3m')
-    .catch(() => { process.stdout.write(chalk.yellow(' using rollup\n')); return rollup(allH1, 4); });
-  await wait(10000);
-
-  process.stdout.write(chalk.gray('  Fetching Daily candles...'));
-  const allDaily = await fetchWithRetry({ symbol: SYMBOL, interval: '1day', outputsize: 90 }, '1day_3m')
-    .catch(() => { process.stdout.write(chalk.yellow(' using rollup\n')); return rollup(allH1, 24); });
 
   console.log(chalk.green('\n  ✓ Data assembled'));
 
@@ -430,27 +376,38 @@ async function run() {
 
   // ─── Backtest loop ──────────────────────────────────────────────────────────
   const signals    = [];
-  let lastBar      = -999;
   let balance      = ACCOUNT_START;
   let peakBalance  = ACCOUNT_START;
   let maxDrawdown  = 0;
 
+  // One signal per KZ session per day
+  const firedSessions = new Set();
+
   for (let i = 50; i < period5m.length - 1; i++) {
-    const bar  = period5m[i];
-    const time = new Date(bar.time);
+    const bar    = period5m[i];
+    const time   = new Date(bar.time);
+    const dateStr = bar.time.slice(0, 10);
 
-    if (i - lastBar < COOLDOWN) continue;
-    if (!isKillZone(bar.time)) continue;
+    // Only scan during NY KZ (14:00–16:00 UTC)
+    const h = time.getUTCHours();
+    if (h < 14 || h >= 16) continue;
 
-    const slice5m  = all5m.filter(c  => new Date(c.time) <= time);
-    const slice15m = all15m.filter(c => new Date(c.time) <= time);
-    const sliceH1  = allH1.filter(c  => new Date(c.time) <= time);
+    // One signal per day
+    const sessionKey = `${dateStr}_NY`;
+    if (firedSessions.has(sessionKey)) continue;
 
-    if (slice5m.length < 40 || allH4.length < 6 || allDaily.length < 5) continue;
+    const slice5m = all5m.filter(c  => new Date(c.time) <= time);
+    const sliceH1 = allH1.filter(c  => new Date(c.time) <= time);
 
-    let bias, sweep, mss, fvg, conf;
+    if (slice5m.length < 40 || sliceH1.length < 4) continue;
+
+    // Build pre-NY range from 5m candles on this date
+    const preNY = getPreNYRange(slice5m, dateStr);
+    if (!preNY) continue;
+
+    let sweep, mss, fvg, conf;
     try {
-      sweep = detectSweep(slice15m, slice5m);
+      sweep = detectSweep(slice5m, preNY);
       mss   = sweep.detected ? detectMSS(slice5m, sweep.dir) : { confirmed: false };
       fvg   = (sweep.detected && mss.confirmed) ? detectFVG(slice5m, sweep.dir) : { found: false };
       conf  = sweep.dir ? scoreConf(sweep, mss, fvg) : { score: 0, grade: 'D' };
@@ -460,15 +417,14 @@ async function run() {
     if (!dir || !mss.confirmed || !fvg.inFVG || conf.score < MIN_SCORE) continue;
 
     const isLong  = dir === 'bull';
-    // Market execution: enter at the open of the next bar (not FVG midpoint)
-    const nextBar = period5m[i + 1];
-    if (!nextBar) continue;
-    const entry   = nextBar.open;
-    const sl      = isLong
-      ? sweep.level - sweep.level * 0.001
-      : sweep.level + sweep.level * 0.001;
+    // FVG midpoint as limit entry (like live bot)
+    const entry   = parseFloat(((fvg.top + fvg.bottom) / 2).toFixed(2));
+    // SL: beyond sweep candle extreme + 0.1% buffer
+    const sl = isLong
+      ? parseFloat((sweep.sweepCandle.low  - sweep.sweepCandle.low  * 0.001).toFixed(2))
+      : parseFloat((sweep.sweepCandle.high + sweep.sweepCandle.high * 0.001).toFixed(2));
     const risk    = Math.abs(entry - sl);
-    if (risk <= 0 || risk > entry * 0.015) continue;  // skip if SL > 1.5% away (sanity check)
+    if (risk <= 0 || risk > entry * 0.015) continue;
 
     const { tp1, tp1R, tp1Desc, tp2, tp2R, tp2Desc } = liquidityTPs(dir, entry, risk, slice5m, sliceH1);
 
@@ -494,15 +450,16 @@ async function run() {
       tp2: parseFloat(tp2.toFixed(2)), tp2R, tp2Desc,
       risk: parseFloat(risk.toFixed(2)),
       score: conf.score, grade: conf.grade,
-      session: sessionLabel(bar.time), htfBias: bias,
+      session: sessionLabel(bar.time),
       sweep: sweep.levelName, mssType: mss.type,
+      preNYHigh: preNY.high, preNYLow: preNY.low,
       riskGBP: parseFloat(riskGBP.toFixed(2)),
       pnlGBP:  pnlGBP !== null ? parseFloat(pnlGBP.toFixed(2)) : null,
       balanceAfter: pnlGBP !== null ? parseFloat(balance.toFixed(2)) : null,
       ...outcome
     });
 
-    lastBar = i;
+    firedSessions.add(sessionKey);
   }
 
   // ─── Print signals ──────────────────────────────────────────────────────────
