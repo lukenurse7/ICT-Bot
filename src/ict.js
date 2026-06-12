@@ -320,7 +320,7 @@ function runICTAnalysis(data) {
     mss,
     fvg,
     confluence: conf,
-    htfAligned: !!htfAligned,
+    htfAligned: bias === 'bullish' || bias === 'bearish',
     signal,
     // legacy compat
     signals: signal ? [signal] : [],
