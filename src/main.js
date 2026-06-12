@@ -137,15 +137,12 @@ async function scanDJ30() {
   const kz = killZoneStatus();
 
   try {
-    const { candles15m, candles5m, quote } = await dj30Fetch();
-    const analysis = runICTAnalysis(candles15m, candles5m);
+    const { candles5m, h1, quote } = await dj30Fetch();
+    const analysis = runICTAnalysis({ candles5m, h1 });
 
     console.log('\n' + chalk.bold.white('  ■ DJ30') + chalk.gray(`  [${ts()}]`));
     const chg = quote.changePct > 0 ? chalk.green(`+${quote.changePct.toFixed(2)}%`) : chalk.red(`${quote.changePct.toFixed(2)}%`);
     console.log(chalk.gray('  Price: ') + chalk.bold.white(fmtP(quote.price)) + '  ' + chg);
-
-    const biasColor = analysis.bias === 'bullish' ? chalk.green : analysis.bias === 'bearish' ? chalk.red : chalk.yellow;
-    console.log(chalk.gray('  HTF Bias: ') + biasColor(analysis.bias.toUpperCase()));
 
     if (!isKillZone()) {
       console.log(chalk.gray('  Status: ') + chalk.yellow(kz.message));
@@ -166,17 +163,17 @@ async function scanDJ30() {
       const dup = sig.direction === s.lastDir && (now - s.lastTime) < SIGNAL_COOLDOWN;
       if (dup) { console.log(chalk.gray('  [DJ30] Signal cooldown active')); continue; }
 
-      const isLong = sig.direction === 'long';
+      const isLong = sig.direction === 'BUY';
       const color  = isLong ? chalk.green : chalk.red;
       const arrow  = isLong ? '▲' : '▼';
 
       console.log('\n' + chalk.bold.white('═'.repeat(62)));
-      console.log(color(`  ${arrow} ${sig.direction.toUpperCase()} SIGNAL — DJ30  |  Confluence: ${sig.confluence}%`));
+      console.log(color(`  ${arrow} ${sig.direction} SIGNAL — DJ30  |  ${sig.sweep} → ${sig.mssType}`));
       console.log(chalk.gray('  Tags: ') + chalk.white(sig.tags.join(' · ')));
       console.log(chalk.gray(`\n  Entry  `) + chalk.bold.white(fmtP(sig.entry)));
       console.log(chalk.gray('  SL     ') + chalk.red(fmtP(sig.sl)) + chalk.gray(` (${sig.stopPoints} pts)`));
-      console.log(chalk.gray(`  TP1    `) + chalk.green(fmtP(sig.tp1)) + chalk.gray(` (1:${sig.rr} R:R)`));
-      console.log(chalk.gray(`  TP2    `) + chalk.green(fmtP(sig.tp2)));
+      console.log(chalk.gray(`  TP1    `) + chalk.green(fmtP(sig.tp1)) + chalk.gray(` (${sig.tp1R}R · ${sig.tp1Desc})`));
+      console.log(chalk.gray(`  TP2    `) + chalk.green(fmtP(sig.tp2)) + chalk.gray(` (${sig.tp2R}R · ${sig.tp2Desc})`));
       console.log(chalk.bold.white('═'.repeat(62)) + '\n');
 
       tg.send(tg.signalMessage({ ...sig, instrument: 'DJ30' }));  // → Telegram
