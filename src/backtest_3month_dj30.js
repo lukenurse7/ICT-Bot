@@ -27,7 +27,6 @@ const SYMBOL = 'DIA';   // Dow Jones ETF — free-tier proxy for DJ30
 // ─── Account settings ────────────────────────────────────────────────────────
 const ACCOUNT_START = 1000;
 const RISK_PCT      = 0.01;
-const TP1_R         = 1.5;
 const SIM_BARS      = 288;   // 24h of 5m bars
 const MIN_SCORE     = 80;
 const COOLDOWN      = 36;    // 3h in 5m bars
@@ -292,39 +291,68 @@ function detectFVG(candles5m, sweepDir) {
 
 function liquidityTPs(dir, entry, risk, candles5m, h1Candles) {
   const isLong = dir === 'bull';
-  const minTP  = isLong ? entry + risk * 1.5 : entry - risk * 1.5;
-  const maxR   = 4.0;
+  const MIN_R  = 1.0;
+  const MAX_R  = 8.0;
   const candidates = [];
+
+  function rOf(p) { return Math.abs(p - entry) / risk; }
+  function validSide(p) { return isLong ? p > entry : p < entry; }
+  function inRange(p) { return rOf(p) >= MIN_R && rOf(p) <= MAX_R; }
 
   const c5 = candles5m.slice(-60);
   for (let i = 2; i < c5.length - 1; i++) {
     const c = c5[i], prev = c5.slice(Math.max(0, i-8), i);
     if (isLong) {
       const eq = prev.find(p => Math.abs(p.high - c.high) / c.high < 0.001);
-      if (eq) candidates.push({ price: Math.max(c.high, eq.high), desc: '5m equal highs' });
+      if (eq) {
+        const price = Math.max(c.high, eq.high);
+        if (validSide(price) && inRange(price))
+          candidates.push({ price, r: rOf(price), desc: '5m equal highs', priority: 1 });
+      }
     } else {
       const eq = prev.find(p => Math.abs(p.low - c.low) / c.low < 0.001);
-      if (eq) candidates.push({ price: Math.min(c.low, eq.low), desc: '5m equal lows' });
+      if (eq) {
+        const price = Math.min(c.low, eq.low);
+        if (validSide(price) && inRange(price))
+          candidates.push({ price, r: rOf(price), desc: '5m equal lows', priority: 1 });
+      }
     }
   }
 
   const c1h = h1Candles.slice(-24);
   for (let i = 2; i < c1h.length - 2; i++) {
     const c = c1h[i];
-    if (isLong && c.high > c1h[i-1].high && c.high > c1h[i-2].high && c.high > c1h[i+1].high)
-      candidates.push({ price: c.high, desc: '1H swing high' });
-    if (!isLong && c.low < c1h[i-1].low && c.low < c1h[i-2].low && c.low < c1h[i+1].low)
-      candidates.push({ price: c.low, desc: '1H swing low' });
+    if (isLong && c.high > c1h[i-1].high && c.high > c1h[i-2].high && c.high > c1h[i+1].high) {
+      if (validSide(c.high) && inRange(c.high))
+        candidates.push({ price: c.high, r: rOf(c.high), desc: '1H swing high', priority: 2 });
+    }
+    if (!isLong && c.low < c1h[i-1].low && c.low < c1h[i-2].low && c.low < c1h[i+1].low) {
+      if (validSide(c.low) && inRange(c.low))
+        candidates.push({ price: c.low, r: rOf(c.low), desc: '1H swing low', priority: 2 });
+    }
   }
 
-  const valid = candidates
-    .filter(t => isLong ? t.price > minTP && t.price < entry + risk * maxR
-                        : t.price < minTP && t.price > entry - risk * maxR)
-    .sort((a, b) => isLong ? a.price - b.price : b.price - a.price);
+  candidates.sort((a, b) => a.r !== b.r ? a.r - b.r : a.priority - b.priority);
 
-  const tp2obj = valid[0] || { price: isLong ? entry + risk*2.5 : entry - risk*2.5, desc: 'Fixed 2.5R' };
-  const tp3obj = valid[1] || { price: isLong ? entry + risk*3.5 : entry - risk*3.5, desc: 'Fixed 3.5R' };
-  return { tp2: tp2obj.price, tp2Desc: tp2obj.desc, tp3: tp3obj.price, tp3Desc: tp3obj.desc };
+  // Deduplicate nearby levels (within 0.05% of price)
+  const deduped = [];
+  for (const c of candidates) {
+    const tol = entry * 0.0005;
+    if (!deduped.find(d => Math.abs(d.price - c.price) <= tol)) deduped.push(c);
+  }
+
+  const tp1Obj  = deduped[0] || null;
+  const tp1     = tp1Obj ? tp1Obj.price : parseFloat((isLong ? entry + risk * 2 : entry - risk * 2).toFixed(2));
+  const tp1R    = parseFloat(rOf(tp1).toFixed(2));
+  const tp1Desc = tp1Obj ? tp1Obj.desc : 'Fixed 2R (no structure)';
+
+  const tp2Candidates = deduped.filter(c => c.r >= tp1R + 1.0);
+  const tp2Obj  = tp2Candidates[0] || null;
+  const tp2     = tp2Obj ? tp2Obj.price : parseFloat((isLong ? entry + risk * (tp1R + 2) : entry - risk * (tp1R + 2)).toFixed(2));
+  const tp2R    = parseFloat(rOf(tp2).toFixed(2));
+  const tp2Desc = tp2Obj ? tp2Obj.desc : 'Fixed extension (no structure beyond TP1)';
+
+  return { tp1, tp1R, tp1Desc, tp2, tp2R, tp2Desc };
 }
 
 function scoreConf(sweep, mss, fvg) {
@@ -338,27 +366,23 @@ function scoreConf(sweep, mss, fvg) {
 }
 
 // ─── Trade simulation ────────────────────────────────────────────────────────
-function simulateOutcome(dir, entry, sl, tp1, tp2, tp3, futureCandles) {
+function simulateOutcome(dir, entry, sl, tp1, tp2, tp1R, tp2R, futureCandles) {
   let tp1Hit = false, currentSL = sl;
   for (const c of futureCandles) {
-    const slHit  = dir === 'bull' ? c.low <= currentSL : c.high >= currentSL;
-    const tp1Hit_ = dir === 'bull' ? c.high >= tp1 : c.low <= tp1;
-    const tp2Hit  = dir === 'bull' ? c.high >= tp2 : c.low <= tp2;
-    const tp3Hit  = dir === 'bull' ? c.high >= tp3 : c.low <= tp3;
-
+    const slHit   = dir === 'bull' ? c.low  <= currentSL : c.high >= currentSL;
+    const tp1Hit_ = dir === 'bull' ? c.high >= tp1       : c.low  <= tp1;
+    const tp2Hit  = dir === 'bull' ? c.high >= tp2       : c.low  <= tp2;
     if (!tp1Hit) {
-      if (slHit)   return { result: 'LOSS',       pnlR: -1,                                   exits: ['Full loss at SL'] };
-      if (tp3Hit)  return { result: 'WIN_TP3',    pnlR: 0.5*TP1_R+0.25*2.5+0.25*3.5,         exits: ['50%@TP1','25%@TP2','25%@TP3'] };
-      if (tp2Hit)  return { result: 'WIN_TP2',    pnlR: 0.5*TP1_R+0.5*2.5,                   exits: ['50%@TP1','50%@TP2'] };
+      if (slHit)   return { result: 'LOSS',       pnlR: -1 };
+      if (tp2Hit)  return { result: 'WIN_TP2',    pnlR: +(0.5 * tp1R + 0.5 * tp2R).toFixed(2) };
       if (tp1Hit_) { tp1Hit = true; currentSL = entry; }
     } else {
-      if (slHit)   return { result: 'WIN_TP1_BE', pnlR: 0.5*TP1_R,                            exits: ['50%@TP1','50% BE'] };
-      if (tp3Hit)  return { result: 'WIN_TP3',    pnlR: 0.5*TP1_R+0.25*2.5+0.25*3.5,         exits: ['50%@TP1','25%@TP2','25%@TP3'] };
-      if (tp2Hit)  return { result: 'WIN_TP2',    pnlR: 0.5*TP1_R+0.5*2.5,                   exits: ['50%@TP1','50%@TP2'] };
+      if (slHit)   return { result: 'WIN_TP1_BE', pnlR: +(0.5 * tp1R).toFixed(2) };
+      if (tp2Hit)  return { result: 'WIN_TP2',    pnlR: +(0.5 * tp1R + 0.5 * tp2R).toFixed(2) };
     }
   }
-  if (tp1Hit) return { result: 'WIN_TP1_OPEN', pnlR: 0.5*TP1_R, exits: ['50%@TP1','50% open'] };
-  return { result: 'OPEN', pnlR: null, exits: [] };
+  if (tp1Hit) return { result: 'WIN_TP1_OPEN', pnlR: +(0.5 * tp1R).toFixed(2) };
+  return { result: 'OPEN', pnlR: null };
 }
 
 function isKillZone(iso) {
@@ -446,12 +470,11 @@ async function run() {
     const risk    = Math.abs(entry - sl);
     if (risk <= 0 || risk > entry * 0.015) continue;  // skip if SL > 1.5% away (sanity check)
 
-    const tp1 = isLong ? entry + risk * TP1_R : entry - risk * TP1_R;
-    const { tp2, tp2Desc, tp3, tp3Desc } = liquidityTPs(dir, entry, risk, slice5m, sliceH1);
+    const { tp1, tp1R, tp1Desc, tp2, tp2R, tp2Desc } = liquidityTPs(dir, entry, risk, slice5m, sliceH1);
 
     // Simulate from bar AFTER entry bar (i+1 is entry bar, simulation starts at i+2)
     const future  = period5m.slice(i + 2, i + SIM_BARS);
-    const outcome = simulateOutcome(dir, entry, sl, tp1, tp2, tp3, future);
+    const outcome = simulateOutcome(dir, entry, sl, tp1, tp2, tp1R, tp2R, future);
 
     const riskGBP = balance * RISK_PCT;
     const pnlGBP  = outcome.pnlR != null ? outcome.pnlR * riskGBP : null;
@@ -466,13 +489,13 @@ async function run() {
     signals.push({
       time: bar.time, dir: isLong ? 'BUY' : 'SELL',
       entry: parseFloat(entry.toFixed(2)),
-      sl: parseFloat(sl.toFixed(2)), tp1: parseFloat(tp1.toFixed(2)),
-      tp2: parseFloat(tp2.toFixed(2)), tp3: parseFloat(tp3.toFixed(2)),
+      sl: parseFloat(sl.toFixed(2)),
+      tp1: parseFloat(tp1.toFixed(2)), tp1R, tp1Desc,
+      tp2: parseFloat(tp2.toFixed(2)), tp2R, tp2Desc,
       risk: parseFloat(risk.toFixed(2)),
       score: conf.score, grade: conf.grade,
       session: sessionLabel(bar.time), htfBias: bias,
       sweep: sweep.levelName, mssType: mss.type,
-      tp2Desc, tp3Desc,
       riskGBP: parseFloat(riskGBP.toFixed(2)),
       pnlGBP:  pnlGBP !== null ? parseFloat(pnlGBP.toFixed(2)) : null,
       balanceAfter: pnlGBP !== null ? parseFloat(balance.toFixed(2)) : null,
@@ -505,8 +528,8 @@ async function run() {
     console.log(
       chalk.gray('  Entry ') + chalk.white(`$${s.entry}`) +
       chalk.gray('  SL ') + chalk.red(`$${s.sl}`) +
-      chalk.gray(`  TP1 `) + chalk.green(`$${s.tp1}`) +
-      chalk.gray(`  TP2 `) + chalk.green(`$${s.tp2}`) + chalk.gray(` (${s.tp2Desc})`)
+      chalk.gray(`  TP1 `) + chalk.green(`$${s.tp1}`) + chalk.gray(` (${s.tp1R}R · ${s.tp1Desc})`) +
+      chalk.gray(`  TP2 `) + chalk.green(`$${s.tp2}`) + chalk.gray(` (${s.tp2R}R · ${s.tp2Desc})`)
     );
     console.log(
       chalk.gray('  → ') + oc(s.result || 'OPEN') + '  ' + pnlStr +
