@@ -1,0 +1,49 @@
+{
+  "period": "2025-06-11 → 2026-06-10",
+  "method": "ICT scalp clean slate — Asia sweep + displacement FVG",
+  "generatedAt": "2026-06-12T11:22:18.871Z",
+  "summaries": [
+    {
+      "label": "AGGRESSIVE — FVG near-edge (SELL: FVG top, BUY: FVG bottom)",
+      "signals": 169,
+      "filled": 23,
+      "missed": 146,
+      "wins": 8,
+      "losses": 10,
+      "wr": "44%",
+      "netR": -1,
+      "pf": 0.9,
+      "returnPct": -2.4,
+      "maxDD": 14.1,
+      "endBalance": 1463.87
+    },
+    {
+      "label": "MIDPOINT   — FVG midpoint",
+      "signals": 121,
+      "filled": 24,
+      "missed": 97,
+      "wins": 8,
+      "losses": 11,
+      "wr": "42%",
+      "netR": -2,
+      "pf": 0.82,
+      "returnPct": -4.4,
+      "maxDD": 14.2,
+      "endBalance": 1434.59
+    },
+    {
+      "label": "CONSERVATIVE — FVG far-edge (SELL: FVG bottom, BUY: FVG top)",
+      "signals": 94,
+      "filled": 26,
+      "missed": 68,
+      "wins": 11,
+      "losses": 10,
+      "wr": "52%",
+      "netR": 2.5,
+      "pf": 1.25,
+      "returnPct": 4.6,
+      "maxDD": 11.5,
+      "endBalance": 1568.55
+    }
+  ]
+}
