@@ -104,73 +104,60 @@ function detectLiquiditySweep(candles5m, levels, htfBiasResult) {
   const current = candles5m[candles5m.length - 1];
   const sweeps = [];
 
+  const MIN_WICK = 2; // minimum $2 wick extension to filter marginal sweeps
+
   function checkSweep(level, levelName, dir) {
     if (!level) return;
     for (let i = 5; i < last20.length - 1; i++) {
       const c = last20[i];
       const prevClose = last20[i - 1].close;
-      const nextClose = last20[i + 1]?.close;
+      const barsAgo = last20.length - 1 - i;
 
       if (dir === 'bull') {
-        // Sweep low: wick below level, close back above
-        if (c.low < level && c.close > level && prevClose > level) {
+        const wickBelow = level - c.low;
+        if (c.low < level && c.close > level && prevClose > level && wickBelow >= MIN_WICK) {
           sweeps.push({
-            dir: 'bull',
-            level,
-            levelName,
-            sweepLow: c.low,
-            wickBelow: level - c.low,
+            dir: 'bull', level, levelName,
+            sweepLow: c.low, wickBelow,
             candleTime: c.time,
             candleIndex: candles5m.length - 20 + i,
-            barsAgo: last20.length - 1 - i,
-            strength: Math.min(100, Math.round(((level - c.low) / level) * 10000))
+            barsAgo,
+            strength: Math.min(100, Math.round((wickBelow / level) * 10000))
           });
         }
       } else {
-        // Sweep high: wick above level, close back below
-        if (c.high > level && c.close < level && prevClose < level) {
+        const wickAbove = c.high - level;
+        if (c.high > level && c.close < level && prevClose < level && wickAbove >= MIN_WICK) {
           sweeps.push({
-            dir: 'bear',
-            level,
-            levelName,
-            sweepHigh: c.high,
-            wickAbove: c.high - level,
+            dir: 'bear', level, levelName,
+            sweepHigh: c.high, wickAbove,
             candleTime: c.time,
             candleIndex: candles5m.length - 20 + i,
-            barsAgo: last20.length - 1 - i,
-            strength: Math.min(100, Math.round(((c.high - level) / level) * 10000))
+            barsAgo,
+            strength: Math.min(100, Math.round((wickAbove / level) * 10000))
           });
         }
       }
     }
   }
 
-  // Bull sweeps (SSL hunts — looking for LONG after sweep)
-  const bullAllowed = ['bullish','pullback_in_bull','ranging'].includes(htfBiasResult.bias);
-  const bearAllowed = ['bearish','pullback_in_bear','ranging'].includes(htfBiasResult.bias);
-
-  if (bullAllowed) {
-    checkSweep(levels.pdl,      'PDL (Prev Day Low)',    'bull');
-    checkSweep(levels.asiaLow,  'Asia Session Low',      'bull');
-    checkSweep(levels.pwl,      'Prev Week Low',         'bull');
-  }
-  if (bearAllowed) {
-    checkSweep(levels.pdh,      'PDH (Prev Day High)',   'bear');
-    checkSweep(levels.asiaHigh, 'Asia Session High',     'bear');
-    checkSweep(levels.pwh,      'Prev Week High',        'bear');
-  }
+  // Detect all sweep directions — the caller (runAnalysis / backtest) applies HTF directional filter
+  checkSweep(levels.pdl,      'PDL (Prev Day Low)',    'bull');
+  checkSweep(levels.asiaLow,  'Asia Session Low',      'bull');
+  checkSweep(levels.pwl,      'Prev Week Low',         'bull');
+  checkSweep(levels.pdh,      'PDH (Prev Day High)',   'bear');
+  checkSweep(levels.asiaHigh, 'Asia Session High',     'bear');
+  checkSweep(levels.pwh,      'Prev Week High',        'bear');
 
   // Also detect equal highs/lows on recent 5m swings as liquidity pools
   const m5Swings = findSwings(candles5m.slice(-60), 2);
 
-  // Equal lows (SSL) — two swing lows within 0.15% of each other (tightened from 0.3%)
   const eqLows = [];
   for (let i = 0; i < m5Swings.lows.length - 1; i++) {
     const l1 = m5Swings.lows[i], l2 = m5Swings.lows[i + 1];
     const diff = Math.abs(l1.price - l2.price) / l1.price;
     if (diff < 0.0015) eqLows.push({ price: (l1.price + l2.price) / 2, time: l2.time, label: 'Equal Lows (SSL)' });
   }
-  // Equal highs (BSL) — tightened to 0.15%
   const eqHighs = [];
   for (let i = 0; i < m5Swings.highs.length - 1; i++) {
     const h1 = m5Swings.highs[i], h2 = m5Swings.highs[i + 1];
@@ -178,12 +165,8 @@ function detectLiquiditySweep(candles5m, levels, htfBiasResult) {
     if (diff < 0.0015) eqHighs.push({ price: (h1.price + h2.price) / 2, time: h2.time, label: 'Equal Highs (BSL)' });
   }
 
-  if (bullAllowed) {
-    eqLows.forEach(el => checkSweep(el.price, el.label, 'bull'));
-  }
-  if (bearAllowed) {
-    eqHighs.forEach(eh => checkSweep(eh.price, eh.label, 'bear'));
-  }
+  eqLows.forEach(el => checkSweep(el.price, el.label, 'bull'));
+  eqHighs.forEach(eh => checkSweep(eh.price, eh.label, 'bear'));
 
   // Return most recent sweep, sorted by recency
   sweeps.sort((a, b) => a.barsAgo - b.barsAgo);
@@ -697,7 +680,7 @@ function runAnalysis(data, asiaRange, sessionStatus) {
   // AND price must be inside the FVG zone (no premature entries)
   const fvgReady = fvg && fvg.inFVG;
 
-  // HTF bias hard gate for XAUUSD — only trade in direction Daily+4H structure points
+  // HTF gate — trade with trend or during pullback (counter-trend pullbacks can reverse)
   const htfAligned = (dir === 'bull' && (htf.bias === 'bullish' || htf.bias === 'pullback_in_bear'))
                   || (dir === 'bear' && (htf.bias === 'bearish' || htf.bias === 'pullback_in_bull'));
 
@@ -774,8 +757,120 @@ function runAnalysis(data, asiaRange, sessionStatus) {
   };
 }
 
+// ─── 10. LONDON JUDAS SWING ANALYSIS ─────────────────────────────────────────
+// Proven approach: Asia range (00:00-06:00 UTC) swept in London KZ (07:00-09:00)
+// SELL only (London sets daily high by sweeping BSL from Asia session)
+// 20-day SMA filter prevents selling into strong uptrends
+
+function runLondonJudas(data) {
+  const { h1, m5, quote } = data;
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10);
+  const utcHour = now.getUTCHours();
+
+  // Only active 07:00-09:00 UTC
+  if (utcHour < 7 || utcHour >= 9) return { active: false, reason: 'Outside London KZ (07:00–09:00 UTC)' };
+
+  // Asia range: 00:00–06:00 UTC today
+  const asiaCandles = m5.filter(c => {
+    if (!c.time.startsWith(dateStr)) return false;
+    const h = new Date(c.time).getUTCHours();
+    return h >= 0 && h < 6;
+  });
+  if (asiaCandles.length < 3) return { active: true, reason: 'Insufficient Asia session data' };
+  const asiaHigh = Math.max(...asiaCandles.map(c => c.high));
+  const asiaLow  = Math.min(...asiaCandles.map(c => c.low));
+
+  // Sweep detection: look back up to 24 bars in London KZ for Asia High sweep (SELL only)
+  const londonCandles = m5.filter(c => {
+    if (!c.time.startsWith(dateStr)) return false;
+    const h = new Date(c.time).getUTCHours();
+    return h >= 7 && h < 9;
+  });
+  let sweep = null;
+  for (let i = londonCandles.length - 1; i >= 0; i--) {
+    const c = londonCandles[i];
+    if (c.high > asiaHigh && c.close < asiaHigh) {
+      sweep = { dir: 'bear', level: asiaHigh, levelName: 'Asia High (BSL)',
+        sweepHigh: c.high, sweepCandle: c, barsAgo: londonCandles.length - 1 - i };
+      break;
+    }
+  }
+  if (!sweep) return { active: true, reason: 'No Asia High sweep detected in London KZ' };
+
+  // 20-day SMA filter — don't sell into strong uptrends
+  const byDate = {};
+  for (const c of h1) { const d = c.time.slice(0, 10); if (!byDate[d]) byDate[d] = []; byDate[d].push(c); }
+  const dates = Object.keys(byDate).sort();
+  let sma20 = null;
+  if (dates.length >= 20) {
+    const lastDates = dates.slice(-20);
+    sma20 = lastDates.reduce((s, d) => s + byDate[d][byDate[d].length - 1].close, 0) / 20;
+  }
+  if (sma20 && quote.price > sma20 * 1.02)
+    return { active: true, reason: `Price ${quote.price.toFixed(0)} is >2% above 20-day SMA (${sma20.toFixed(0)}) — skip sell` };
+
+  // MSS: break of structure down on 5m
+  const recent5m = m5.slice(-20);
+  let mss = { confirmed: false };
+  let swingLow = Infinity;
+  for (let i = 1; i < recent5m.length - 1; i++) {
+    if (recent5m[i].low < recent5m[i-1].low && recent5m[i].low < recent5m[i+1].low)
+      swingLow = Math.min(swingLow, recent5m[i].low);
+  }
+  const lastBar = recent5m[recent5m.length - 1], prevBar = recent5m[recent5m.length - 2];
+  if (swingLow < Infinity && lastBar.close < swingLow) mss = { confirmed: true, type: 'BOS_DOWN', level: swingLow };
+  else if (lastBar.close < prevBar.low) mss = { confirmed: true, type: 'CHoCH', level: prevBar.low };
+
+  if (!mss.confirmed) return { active: true, reason: `Sweep detected — waiting for MSS (BOS/CHoCH below ${swingLow < Infinity ? swingLow.toFixed(0) : 'swing low'})` };
+
+  // FVG: bearish fair value gap on 5m
+  const window5m = m5.slice(-30);
+  let fvg = null;
+  for (let i = 0; i < window5m.length - 2; i++) {
+    const c0 = window5m[i], c2 = window5m[i + 2];
+    if (c2.high < c0.low) {
+      const size = c0.low - c2.high;
+      if (size > 0 && (!fvg || size > fvg.size))
+        fvg = { top: c0.low, bottom: c2.high, size, midpoint: (c0.low + c2.high) / 2 };
+    }
+  }
+  if (!fvg) return { active: true, reason: 'MSS confirmed — waiting for bearish FVG to form' };
+
+  const entry = fvg.midpoint;
+  const SL_BUF = entry * 0.003;
+  const sl = sweep.sweepHigh + SL_BUF;
+  const risk = Math.abs(sl - entry);
+
+  // TP targets from liquidity
+  const liq = liquidityTargets('bear', entry, risk, {
+    pdl: null, pdh: null, pwh: null, pwl: null, asiaHigh, asiaLow, todayOpen: m5[0]?.open || entry
+  }, m5, h1);
+
+  if (liq.tp1R < 1.5) return { active: true, reason: `TP1 only ${liq.tp1R.toFixed(1)}R — need ≥1.5R to trade (nearest liquidity too close)` };
+
+  return {
+    active: true,
+    signal: {
+      instrument: 'XAU/USD',
+      direction: 'SELL',
+      entry: parseFloat(entry.toFixed(2)),
+      sl:    parseFloat(sl.toFixed(2)),
+      tp1:   parseFloat(liq.tp1.toFixed(2)),
+      tp2:   parseFloat(liq.tp2.toFixed(2)),
+      tp1R:  liq.tp1R, tp1Desc: liq.tp1Desc,
+      tp2R:  liq.tp2R, tp2Desc: liq.tp2Desc,
+      risk:  parseFloat(risk.toFixed(2)),
+      sweep: sweep.levelName,
+      mssType: mss.type,
+      asiaHigh: parseFloat(asiaHigh.toFixed(2)),
+      sma20: sma20 ? parseFloat(sma20.toFixed(2)) : null
+    }
+  };
+}
+
 module.exports = {
-  runAnalysis, htfBias, keyLevels, detectLiquiditySweep,
+  runAnalysis, runLondonJudas, htfBias, keyLevels, detectLiquiditySweep,
   detectMSS, findFVGs, entryFVG, findOrderBlock, scoreConfluence,
   liquidityTargets
 };

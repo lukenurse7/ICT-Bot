@@ -43,12 +43,11 @@ function rollup(src, factor) {
 function sessionLabel(iso) {
   const h = new Date(iso).getUTCHours();
   if (h >= 7  && h < 9)  return '🟡 London KZ';
-  if (h >= 12 && h < 15) return '🟢 NY KZ';
   return 'Off-hours';
 }
 function isKillZone(iso) {
   const h = new Date(iso).getUTCHours();
-  return (h >= 7 && h < 9) || (h >= 12 && h < 15);
+  return (h >= 7 && h < 9);
 }
 function asiaRange(h1Candles, dateIso) {
   const start = new Date(dateIso); start.setUTCHours(0,0,0,0);
@@ -58,8 +57,9 @@ function asiaRange(h1Candles, dateIso) {
   return { high: Math.max(...asia.map(c=>c.high)), low: Math.min(...asia.map(c=>c.low)) };
 }
 function htfAlignedFn(htf, dir) {
-  return (dir==='bull' && (htf.bias==='bullish'||htf.bias==='pullback_in_bear'))
-      || (dir==='bear' && (htf.bias==='bearish'||htf.bias==='pullback_in_bull'));
+  // In XAU bull market context: only take BUY setups (SSL sweeps reversing up)
+  // Selling into pullbacks on a macro bull trend has shown poor results
+  return dir === 'bull';
 }
 function simulateOutcome(dir, entry, sl, tp1, tp2, tp1R, tp2R, futureCandles) {
   let tp1Hit=false, currentSL=sl;
@@ -98,7 +98,7 @@ function loadChunks(prefix) {
 
 function run() {
   console.log('\n' + chalk.bold.yellow('  ◆ XAUUSD ICT — 1-YEAR BACKTEST  [LIMIT ORDER + 2% COMPOUNDING]'));
-  console.log(chalk.gray('  Period: 2025-06-11 → 2026-06-10  |  London + NY Kill Zones\n'));
+  console.log(chalk.gray('  Period: 2025-06-11 → 2026-06-10  |  London Kill Zone ONLY (07:00–09:00 UTC)\n'));
 
   const all5m  = loadChunks('xau1yr_5min');
   const all15m = loadChunks('xau1yr_15min');

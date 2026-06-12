@@ -14,7 +14,7 @@ const tg = require('./telegram');
 
 // ─── XAUUSD engine ──────────────────────────────────────────────────────
 const { fetchAll: xauFetch }            = require('./data_xau');
-const { runAnalysis }                   = require('./ict_xau');
+const { runAnalysis, runLondonJudas }   = require('./ict_xau');
 const { sessionStatus, getAsiaSessionBounds, isWeekday } = require('./sessions');
 const {
   printHeader: xauHeader, printStatusBar, printKeyLevels,
@@ -53,19 +53,17 @@ function banner() {
 }
 
 // ─── XAUUSD kill zone check ───────────────────────────────────────────────
-// Only fire signals during London (07:00-09:00 UTC) or NY (12:00-15:00 UTC)
+// Only fire signals during London KZ (07:00-09:00 UTC)
+// NY KZ removed for XAU — backtesting shows NY has poor win rate for this strategy
 function isXauKillZone() {
   const h = new Date().getUTCHours();
-  return (h >= 7 && h < 9) || (h >= 12 && h < 15);
+  return (h >= 7 && h < 9);
 }
 
-// Track the last kill zone window a signal fired in — prevents stale re-fires
-// when price revisits the FVG hours later
 function currentKZWindow() {
   const h = new Date().getUTCHours();
   const d = new Date().toISOString().slice(0, 10);
-  if (h >= 7 && h < 9)  return `${d}_LON`;
-  if (h >= 12 && h < 15) return `${d}_NY`;
+  if (h >= 7 && h < 9) return `${d}_LON`;
   return null;
 }
 
@@ -74,57 +72,69 @@ function currentKZWindow() {
 async function scanXAU() {
   if (!isWeekday()) return;
 
-  // Only generate signals inside kill zones — outside KZ, just show status
   const inKZ = isXauKillZone();
 
   try {
-    const session = sessionStatus();
-    // Signal gate: active only during kill zones
-    const kzSession = { ...session, active: inKZ };
+    const data = await xauFetch();
 
-    const data     = await xauFetch();
-    const asia     = getAsiaSessionBounds(data.h1);
-    const result   = runAnalysis(data, asia, kzSession);
-
-    // Print compact XAU block
+    // Print XAU header
     console.log('\n' + chalk.bold.yellow('  ◆ XAUUSD') + chalk.gray(`  [${ts()}]`));
-    printStatusBar(result.quote, session, result.htf);
-    printKeyLevels(result.lvls);
-    console.log(divider());
-    console.log(chalk.gray('  MARKET STRUCTURE'));
-    printSweep(result.sweepResult);
-    printMSS(result.mss);
-    printFVG(result.fvg);
-    printConfluence(result.confluence);
+    const chg = data.quote.changePct > 0
+      ? chalk.green(`+${data.quote.changePct.toFixed(2)}%`)
+      : chalk.red(`${data.quote.changePct.toFixed(2)}%`);
+    console.log(chalk.gray('  Price: ') + chalk.bold.yellow(fmtP(data.quote.price)) + '  ' + chg);
 
-    if (result.signal) {
-      const now  = Date.now();
-      const s    = state.xau;
-      const kzWin = currentKZWindow();
-
-      // Block if: same direction AND same kill zone window (signal already fired this session)
-      const sameWindow = kzWin && kzWin === s.lastKZWindow && result.signal.direction === s.lastDir;
-      // Also block if: outside kill zone (stale setup being evaluated between sessions)
-      const outsideKZ  = !inKZ;
-
-      if (outsideKZ) {
-        console.log(chalk.gray('  [XAU] Setup valid but outside KZ — no signal sent'));
-      } else if (sameWindow) {
-        const elapsed = Math.round((now - s.lastTime) / 60000);
-        console.log(chalk.gray(`  [XAU] Signal already fired this ${kzWin?.split('_')[1]} session (${elapsed}m ago)`));
-      } else {
-        printXauSignal(result.signal);
-        publishSignal(result.signal);
-        tg.send(tg.signalMessage(result.signal));
-        s.lastTime     = now;
-        s.lastDir      = result.signal.direction;
-        s.lastKZWindow = kzWin;
-      }
-    } else {
-      printWaiting(result.waitReason, result);
+    if (!inKZ) {
+      console.log(chalk.gray('  Status: ') + chalk.yellow('Outside London KZ (07:00–09:00 UTC)'));
+      console.log(chalk.gray('  Strategy: London Judas Swing — signals only 07:00–09:00 UTC'));
+      return;
     }
 
-    updateStatus({ waitReason: result.waitReason, confluence: result.confluence?.score });
+    console.log(chalk.gray('  Status: ') + chalk.bgYellow.black(' LONDON KZ ACTIVE '));
+    console.log(chalk.gray('  Strategy: Asia High sweep → MSS → FVG SELL (20-day SMA filter)'));
+
+    // Run London Judas Swing analysis
+    const judas = runLondonJudas(data);
+
+    if (!judas.active) {
+      console.log(chalk.gray(`  [XAU] ${judas.reason}`));
+      return;
+    }
+
+    if (!judas.signal) {
+      console.log(chalk.gray(`  [XAU] Waiting: ${judas.reason}`));
+      updateStatus({ waitReason: judas.reason });
+      return;
+    }
+
+    // Signal found — apply cooldown
+    const now = Date.now();
+    const s   = state.xau;
+    const kzWin = currentKZWindow();
+    const sameWindow = kzWin && kzWin === s.lastKZWindow && judas.signal.direction === s.lastDir;
+
+    if (sameWindow) {
+      const elapsed = Math.round((now - s.lastTime) / 60000);
+      console.log(chalk.gray(`  [XAU] Signal already fired this London session (${elapsed}m ago)`));
+    } else {
+      const sig = judas.signal;
+      console.log('\n' + chalk.bold.yellow('═'.repeat(62)));
+      console.log(chalk.red(`  ▼ SELL SIGNAL — XAU/USD  |  ${sig.sweep} → ${sig.mssType}`));
+      console.log(chalk.gray(`\n  Entry  `) + chalk.bold.white(fmtP(sig.entry)));
+      console.log(chalk.gray('  SL     ') + chalk.red(fmtP(sig.sl)));
+      console.log(chalk.gray(`  TP1    `) + chalk.green(fmtP(sig.tp1)) + chalk.gray(` (${sig.tp1R}R · ${sig.tp1Desc})`));
+      console.log(chalk.gray(`  TP2    `) + chalk.green(fmtP(sig.tp2)) + chalk.gray(` (${sig.tp2R}R · ${sig.tp2Desc})`));
+      if (sig.sma20) console.log(chalk.gray(`  SMA20  `) + chalk.gray(fmtP(sig.sma20)));
+      console.log(chalk.bold.yellow('═'.repeat(62)) + '\n');
+
+      publishSignal(sig);
+      tg.send(tg.signalMessage(sig));
+      s.lastTime     = now;
+      s.lastDir      = sig.direction;
+      s.lastKZWindow = kzWin;
+    }
+
+    updateStatus({ waitReason: null });
 
   } catch (err) {
     console.log(chalk.red(`  [XAU] ✗ ${err.message}`));
