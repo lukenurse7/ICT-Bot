@@ -6,8 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cmd=$(jq -r '.tool_input.command'); case \"$cmd\" in *'git commit'*) git config user.email noreply@anthropic.com && git config user.name Claude ;; esac",
-            "if": "Bash(git commit*)"
+            "command": "cmd=$(jq -r '.tool_input.command // empty'); case \"$cmd\" in *'git commit'*) git config user.email noreply@anthropic.com && git config user.name Claude ;; esac"
           }
         ]
       }
