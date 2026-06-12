@@ -19,60 +19,44 @@ async function send(text) {
   }
 }
 
+// ─── DJ30 signal message ──────────────────────────────────────────────────────
 function signalMessage(sig) {
   const isLong = sig.direction === 'BUY' || sig.direction === 'long';
   const arrow  = isLong ? '🟢' : '🔴';
-  const dir    = isLong ? 'BUY' : 'SELL';
-  const instr  = sig.instrument || sig.symbol || 'XAUUSD';
-  const grade  = sig.grade || '—';
-  const score  = sig.confluence || sig.confluence || '—';
+  const dir    = isLong ? '▲ BUY' : '▼ SELL';
 
   const entry = parseFloat(sig.entry).toFixed(2);
   const sl    = parseFloat(sig.sl).toFixed(2);
   const tp1   = parseFloat(sig.tp1).toFixed(2);
   const tp2   = parseFloat(sig.tp2).toFixed(2);
   const tp3   = parseFloat(sig.tp3).toFixed(2);
-  const rr    = sig.rr1 || sig.rr || '—';
+  const pts   = sig.stopPoints || Math.round(Math.abs(sig.entry - sig.sl));
 
-  const setup = sig.setup || {};
-  const sweep = setup.sweep?.levelName || sig.sweep || '';
-  const mss   = setup.mss?.type || sig.mssType || '';
+  const sweep = sig.sweep   || '—';
+  const mss   = sig.mssType || '—';
+  const score = sig.confluence || '—';
+  const grade = sig.grade      || '—';
+  const bias  = (sig.htfBias || '—').toUpperCase().replace(/_/g, ' ');
 
-  const time  = new Date().toUTCString().slice(0, 25);
+  const time = new Date().toUTCString().slice(0, 25);
 
-  return (
-`${arrow} <b>${dir} — ${instr}</b>
-📊 Confluence: <b>${score}%</b>  Grade: <b>${grade}</b>
-🕐 ${time}
-
-💰 <b>ENTRY</b>    <code>$${entry}</code>
-🛑 <b>STOP LOSS</b> <code>$${sl}</code>
-🎯 <b>TP1</b>      <code>$${tp1}</code>  <i>(1:1.5R — partial close)</i>
-🎯 <b>TP2</b>      <code>$${tp2}</code>  <i>(1:${rr}R — full target)</i>
-🎯 <b>TP3</b>      <code>$${tp3}</code>  <i>(extension)</i>
-
-📋 <b>Setup</b>
-• Sweep: ${sweep}
-• MSS: ${mss}
-• FVG: ${sig.hasFVG !== undefined ? (sig.hasFVG ? 'Yes ✅' : 'No') : (setup.fvg ? 'Yes ✅' : '—')}`
-  );
+  return [
+    `${arrow} <b>DJ30  ${dir}</b>`,
+    ``,
+    `📊 Score: <b>${score}%</b>  Grade: <b>${grade}</b>  Bias: <b>${bias}</b>`,
+    `🕐 <code>${time} UTC</code>`,
+    ``,
+    `💰 <b>ENTRY</b>     <code>$${entry}</code>`,
+    `🛑 <b>STOP LOSS</b>  <code>$${sl}</code>  <i>(${pts} pts)</i>`,
+    ``,
+    `🎯 <b>TP1</b>  <code>$${tp1}</code>  <i>— close 50% here, move SL to BE</i>`,
+    `🎯 <b>TP2</b>  <code>$${tp2}</code>  <i>(${sig.tp2Desc || '—'})</i>`,
+    `🎯 <b>TP3</b>  <code>$${tp3}</code>  <i>(${sig.tp3Desc || 'extension'})</i>`,
+    ``,
+    `📋 Sweep: <b>${sweep}</b>  →  MSS: <b>${mss}</b>  →  FVG: ✅`,
+    ``,
+    `⚠️ <i>Kill zone signal — NY open 14:00–16:00 GMT only</i>`,
+  ].join('\n');
 }
 
-function waitMessage(instr, step, detail) {
-  const steps = { sweep: '1/3', mss: '2/3', fvg: '3/3' };
-  return `⏳ <b>${instr}</b> — Step ${steps[step] || step}\n${detail}`;
-}
-
-function statusMessage(xau) {
-  if (!xau) return;
-  const bias = xau.bias?.toUpperCase().replace(/_/g,' ') || '—';
-  const price = xau.price ? '$' + parseFloat(xau.price).toFixed(2) : '—';
-  return (
-`📡 <b>XAUUSD Scan</b>  ${new Date().toUTCString().slice(17,22)} UTC
-Price: <code>${price}</code>  Bias: <b>${bias}</b>
-Confluence: ${xau.confluence?.score || 0}% (Grade ${xau.confluence?.grade || '—'})
-Status: ${xau.waitReason || 'Monitoring...'}`
-  );
-}
-
-module.exports = { send, signalMessage, waitMessage, statusMessage };
+module.exports = { send, signalMessage };
