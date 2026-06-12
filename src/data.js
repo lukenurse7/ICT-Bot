@@ -7,7 +7,9 @@ const API_KEY = process.env.TWELVEDATA_API_KEY;
 const BASE_URL = 'https://api.twelvedata.com';
 
 // DIA = Dow Jones ETF (free tier proxy for DJ30 on TwelveData)
+// DIA trades at 1/100th of the actual DJ30 index price — multiply all prices by 100
 const SYMBOL = 'DIA';
+const PRICE_SCALE = 100;
 
 async function fetchCandles(interval, outputSize = 100) {
   if (!API_KEY || API_KEY === 'your_api_key_here') {
@@ -27,8 +29,12 @@ async function fetchCandles(interval, outputSize = 100) {
   if (!raw || raw.length === 0) throw new Error('No candle data returned');
 
   return raw.reverse().map(c => ({
-    time: c.datetime, open: parseFloat(c.open), high: parseFloat(c.high),
-    low: parseFloat(c.low), close: parseFloat(c.close), volume: parseFloat(c.volume || 0)
+    time:   c.datetime,
+    open:   parseFloat(c.open)   * PRICE_SCALE,
+    high:   parseFloat(c.high)   * PRICE_SCALE,
+    low:    parseFloat(c.low)    * PRICE_SCALE,
+    close:  parseFloat(c.close)  * PRICE_SCALE,
+    volume: parseFloat(c.volume || 0)
   }));
 }
 
@@ -39,9 +45,13 @@ async function fetchQuote() {
   });
   if (res.data.status === 'error') throw new Error(res.data.message);
   return {
-    price: parseFloat(res.data.close), change: parseFloat(res.data.change),
-    changePct: parseFloat(res.data.percent_change), open: parseFloat(res.data.open),
-    high: parseFloat(res.data.high), low: parseFloat(res.data.low), timestamp: res.data.datetime
+    price:     parseFloat(res.data.close)           * PRICE_SCALE,
+    change:    parseFloat(res.data.change)           * PRICE_SCALE,
+    changePct: parseFloat(res.data.percent_change),
+    open:      parseFloat(res.data.open)             * PRICE_SCALE,
+    high:      parseFloat(res.data.high)             * PRICE_SCALE,
+    low:       parseFloat(res.data.low)              * PRICE_SCALE,
+    timestamp: res.data.datetime
   };
 }
 
