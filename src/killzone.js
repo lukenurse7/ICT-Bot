@@ -23,8 +23,8 @@ function isKillZone() {
   if (!isMarketOpen()) return false;
   const { hours, minutes } = getGMTTime();
   const totalMins = hours * 60 + minutes;
-  const kzStart = 14 * 60; // 14:00
-  const kzEnd   = 16 * 60; // 16:00
+  const kzStart = 13 * 60 + 30; // 13:30
+  const kzEnd   = 16 * 60;      // 16:00
   return totalMins >= kzStart && totalMins < kzEnd;
 }
 
@@ -38,6 +38,7 @@ function minutesUntilKillZone() {
   const totalMins = hours * 60 + minutes;
   const kzStart = 14 * 60;
   if (totalMins < kzStart) return kzStart - totalMins;
+
   return 0; // already in KZ or past it
 }
 
@@ -50,8 +51,8 @@ function killZoneStatus() {
   }
 
   const totalMins = hours * 60 + minutes;
-  const kzStart = 14 * 60;
-  const kzEnd   = 4 * 60;
+  const kzStart = 13 * 60 + 30;
+  const kzEnd   = 16 * 60;
 
   if (totalMins >= kzStart && totalMins < kzEnd) {
     const remaining = kzEnd - totalMins;
@@ -68,7 +69,7 @@ function killZoneStatus() {
     const m = wait % 60;
     return {
       active: false,
-      message: `DJ30 Kill Zone opens in ${h > 0 ? h + 'h ' : ''}${m}m (14:00 GMT)`
+      message: `DJ30 Kill Zone opens in ${h > 0 ? h + 'h ' : ''}${m}m (13:30 GMT)`
     };
   }
 
