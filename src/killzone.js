@@ -5,14 +5,12 @@
 
 function getGMTTime() {
   const now = new Date();
-  // Convert to GMT
-  const gmt = new Date(now.toLocaleString('en-GB', { timeZone: 'UTC' }));
   return {
-    hours: gmt.getHours(),
-    minutes: gmt.getMinutes(),
-    day: gmt.getDay(), // 0=Sun, 1=Mon ... 6=Sat
-    full: gmt,
-    iso: gmt.toISOString()
+    hours: now.getUTCHours(),
+    minutes: now.getUTCMinutes(),
+    day: now.getUTCDay(), // 0=Sun, 1=Mon ... 6=Sat
+    full: now,
+    iso: now.toISOString()
   };
 }
 
