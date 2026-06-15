@@ -276,7 +276,7 @@ function scoreConfluence(sweep, mss, fvg) {
 
 // ─── Main Analysis ────────────────────────────────────────────────────────────
 function runICTAnalysis(data) {
-  const { daily, h4, h1, candles15m, candles5m } = data;
+  const { daily, h4, h1, candles15m, candles5m, livePrice } = data;
 
   const bias    = htfBias(daily, h4);
   const sweep   = detectSweep(candles15m, candles5m);
@@ -290,7 +290,7 @@ function runICTAnalysis(data) {
   if (dir && mss.confirmed && fvg.inFVG && conf.score >= 80) {
     const lastCandle = candles5m[candles5m.length - 1];
     const isLong = dir === 'bull';
-    const entry  = lastCandle.close;
+    const entry  = livePrice || lastCandle.close;
 
     // SL: beyond the sweep wick (recent swing high/low of last 5 candles)
     const recent5 = candles5m.slice(-5);
