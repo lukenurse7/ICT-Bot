@@ -290,12 +290,19 @@ function runICTAnalysis(data) {
   if (dir && mss.confirmed && fvg.inFVG && conf.score >= 80) {
     const lastCandle = candles5m[candles5m.length - 1];
     const isLong = dir === 'bull';
-    const entry  = isLong ? fvg.bottom + fvg.size * 0.5 : fvg.top - fvg.size * 0.5;
+    const entry  = lastCandle.close;
 
-    // SL: just beyond the sweep level
+    // SL: beyond the sweep wick (recent swing high/low of last 5 candles)
+    const recent5 = candles5m.slice(-5);
+    const swingHigh = Math.max(...recent5.map(c => c.high));
+    const swingLow  = Math.min(...recent5.map(c => c.low));
     const sl = isLong
-      ? sweep.level - (sweep.level * 0.001)
-      : sweep.level + (sweep.level * 0.001);
+      ? swingLow  - (swingLow  * 0.0005)
+      : swingHigh + (swingHigh * 0.0005);
+
+    // Sanity check: SL must be on the correct side of entry
+    if (isLong  && sl >= entry) return { bias, sweep, mss, fvg, confluence: conf, htfAligned: false, signal: null, signals: [], liquidity: { nearestBSL: null, nearestSSL: null }, structure: { bias, mss: null } };
+    if (!isLong && sl <= entry) return { bias, sweep, mss, fvg, confluence: conf, htfAligned: false, signal: null, signals: [], liquidity: { nearestBSL: null, nearestSSL: null }, structure: { bias, mss: null } };
 
     const risk = Math.abs(entry - sl);
     const tp1  = isLong ? entry + risk * 1.5 : entry - risk * 1.5;
