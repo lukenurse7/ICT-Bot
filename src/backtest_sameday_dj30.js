@@ -350,7 +350,7 @@ function run() {
   const all15m = rollup(all5m, 3);
 
   let START = new Date('2025-06-01T00:00:00Z');
-  let END   = new Date('2026-06-05T23:59:59Z');
+  let END   = new Date('2026-06-16T23:59:59Z');
   if (ENTRY_MODE === '1m') {
     // Real 1m data only covers the cached ~3-week window — restrict the backtest to it.
     START = new Date(all1m[0].time);
