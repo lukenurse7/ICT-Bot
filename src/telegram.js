@@ -38,13 +38,18 @@ function signalMessage(sig) {
   const grade = sig.grade      || '—';
   const bias  = (sig.htfBias || '—').toUpperCase().replace(/_/g, ' ');
 
-  const time = new Date().toUTCString().slice(0, 25);
+  // Europe/London auto-handles the BST/GMT switch (UTC+1 in summer, UTC+0 in winter) —
+  // a fixed +1 offset would be wrong from late October to late March.
+  const time = new Date().toLocaleString('en-GB', {
+    timeZone: 'Europe/London', day: '2-digit', month: 'short',
+    hour: '2-digit', minute: '2-digit', hour12: false
+  });
 
   return [
     `${arrow} <b>DJ30  ${dir}</b>`,
     ``,
     `📊 Score: <b>${score}%</b>  Grade: <b>${grade}</b>  Bias: <b>${bias}</b>`,
-    `🕐 <code>${time} UTC</code>`,
+    `🕐 <code>${time} UK time</code>`,
     ``,
     `💰 <b>ENTRY</b>     <code>$${entry}</code>`,
     `🛑 <b>STOP LOSS</b>  <code>$${sl}</code>  <i>(${pts} pts)</i>`,
