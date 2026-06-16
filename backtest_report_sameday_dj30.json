@@ -1,6 +1,6 @@
 {
   "period": "Jun 2025 → Jun 2026 (same-day exit, force-close 21:00 UTC)",
-  "generatedAt": "2026-06-16T11:19:07.471Z",
+  "generatedAt": "2026-06-16T11:33:28.716Z",
   "settings": {
     "symbol": "DJ30/DIA",
     "start": 2000,
@@ -45,7 +45,8 @@
       "pnlGBP": -40,
       "balanceAfter": 1960,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2025-06-03 14:05:00"
     },
     {
       "time": "2025-06-04 13:35:00",
@@ -66,7 +67,8 @@
       "pnlGBP": -39.2,
       "balanceAfter": 1920.8,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2025-06-04 16:20:00"
     },
     {
       "time": "2025-06-05 13:35:00",
@@ -87,7 +89,8 @@
       "pnlGBP": 28.81,
       "balanceAfter": 1949.61,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2025-06-05 14:35:00"
     },
     {
       "time": "2025-06-11 13:40:00",
@@ -108,7 +111,8 @@
       "pnlGBP": 73.31,
       "balanceAfter": 2022.92,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-06-11 13:50:00"
     },
     {
       "time": "2025-06-12 15:35:00",
@@ -129,7 +133,8 @@
       "pnlGBP": -40.46,
       "balanceAfter": 1982.46,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2025-06-12 16:10:00"
     },
     {
       "time": "2025-06-16 14:55:00",
@@ -150,7 +155,8 @@
       "pnlGBP": 74.54,
       "balanceAfter": 2057,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-06-16 18:50:00"
     },
     {
       "time": "2025-06-18 13:55:00",
@@ -171,7 +177,8 @@
       "pnlGBP": 71.99,
       "balanceAfter": 2128.99,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-06-18 14:25:00"
     },
     {
       "time": "2025-06-20 13:35:00",
@@ -192,7 +199,8 @@
       "pnlGBP": 31.93,
       "balanceAfter": 2160.93,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2025-06-20 13:50:00"
     },
     {
       "time": "2025-06-23 13:35:00",
@@ -213,7 +221,8 @@
       "pnlGBP": 81.25,
       "balanceAfter": 2242.18,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-06-23 13:40:00"
     },
     {
       "time": "2025-06-26 13:35:00",
@@ -234,7 +243,8 @@
       "pnlGBP": 67.27,
       "balanceAfter": 2309.45,
       "result": "EOD_PARTIAL",
-      "pnlR": 1.5
+      "pnlR": 1.5,
+      "closeTime": "2025-06-26 19:55:00"
     },
     {
       "time": "2025-06-30 13:30:00",
@@ -255,7 +265,8 @@
       "pnlGBP": 86.84,
       "balanceAfter": 2396.28,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-06-30 13:35:00"
     },
     {
       "time": "2025-07-02 13:35:00",
@@ -276,7 +287,8 @@
       "pnlGBP": -24.44,
       "balanceAfter": 2371.84,
       "result": "EOD_LOSS",
-      "pnlR": -0.51
+      "pnlR": -0.51,
+      "closeTime": "2025-07-02 19:55:00"
     },
     {
       "time": "2025-07-03 14:05:00",
@@ -297,7 +309,8 @@
       "pnlGBP": 4.27,
       "balanceAfter": 2376.11,
       "result": "EOD_WIN",
-      "pnlR": 0.09
+      "pnlR": 0.09,
+      "closeTime": "2025-07-03 16:55:00"
     },
     {
       "time": "2025-07-07 15:20:00",
@@ -318,7 +331,8 @@
       "pnlGBP": 35.64,
       "balanceAfter": 2411.75,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2025-07-07 16:00:00"
     },
     {
       "time": "2025-07-08 14:00:00",
@@ -339,7 +353,8 @@
       "pnlGBP": 84.41,
       "balanceAfter": 2496.16,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-07-08 14:05:00"
     },
     {
       "time": "2025-07-09 14:00:00",
@@ -360,7 +375,8 @@
       "pnlGBP": 93.86,
       "balanceAfter": 2590.02,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-07-09 14:30:00"
     },
     {
       "time": "2025-07-10 13:45:00",
@@ -381,7 +397,8 @@
       "pnlGBP": 90.65,
       "balanceAfter": 2680.67,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-07-10 14:10:00"
     },
     {
       "time": "2025-07-11 15:35:00",
@@ -402,7 +419,8 @@
       "pnlGBP": -53.61,
       "balanceAfter": 2627.05,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2025-07-11 15:45:00"
     },
     {
       "time": "2025-07-14 14:25:00",
@@ -423,7 +441,8 @@
       "pnlGBP": 98.78,
       "balanceAfter": 2725.83,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-07-14 14:30:00"
     },
     {
       "time": "2025-07-15 13:35:00",
@@ -444,7 +463,8 @@
       "pnlGBP": 102.49,
       "balanceAfter": 2828.32,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-07-15 13:40:00"
     },
     {
       "time": "2025-07-16 13:45:00",
@@ -465,7 +485,8 @@
       "pnlGBP": 98.99,
       "balanceAfter": 2927.31,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-07-16 13:50:00"
     },
     {
       "time": "2025-07-17 14:20:00",
@@ -486,7 +507,8 @@
       "pnlGBP": -58.55,
       "balanceAfter": 2868.77,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2025-07-17 18:20:00"
     },
     {
       "time": "2025-07-18 13:30:00",
@@ -507,7 +529,8 @@
       "pnlGBP": 100.41,
       "balanceAfter": 2969.17,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-07-18 14:15:00"
     },
     {
       "time": "2025-07-21 14:25:00",
@@ -528,7 +551,8 @@
       "pnlGBP": 103.92,
       "balanceAfter": 3073.1,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-07-21 15:45:00"
     },
     {
       "time": "2025-07-22 13:40:00",
@@ -549,7 +573,8 @@
       "pnlGBP": 46.1,
       "balanceAfter": 3119.19,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2025-07-22 13:50:00"
     },
     {
       "time": "2025-07-23 14:45:00",
@@ -570,7 +595,8 @@
       "pnlGBP": -62.38,
       "balanceAfter": 3056.81,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2025-07-23 15:50:00"
     },
     {
       "time": "2025-07-24 14:00:00",
@@ -591,7 +617,8 @@
       "pnlGBP": -45.85,
       "balanceAfter": 3010.96,
       "result": "EOD_LOSS",
-      "pnlR": -0.75
+      "pnlR": -0.75,
+      "closeTime": "2025-07-24 19:55:00"
     },
     {
       "time": "2025-07-25 13:35:00",
@@ -612,7 +639,8 @@
       "pnlGBP": -60.22,
       "balanceAfter": 2950.74,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2025-07-25 13:45:00"
     },
     {
       "time": "2025-07-28 13:30:00",
@@ -633,7 +661,8 @@
       "pnlGBP": 103.28,
       "balanceAfter": 3054.01,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-07-28 13:50:00"
     },
     {
       "time": "2025-07-29 14:15:00",
@@ -654,7 +683,8 @@
       "pnlGBP": -61.08,
       "balanceAfter": 2992.93,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2025-07-29 14:30:00"
     },
     {
       "time": "2025-07-30 13:55:00",
@@ -675,7 +705,8 @@
       "pnlGBP": 112.53,
       "balanceAfter": 3105.47,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-07-30 14:15:00"
     },
     {
       "time": "2025-07-31 13:45:00",
@@ -696,7 +727,8 @@
       "pnlGBP": 108.69,
       "balanceAfter": 3214.16,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-07-31 13:55:00"
     },
     {
       "time": "2025-08-01 15:25:00",
@@ -717,7 +749,8 @@
       "pnlGBP": -64.28,
       "balanceAfter": 3149.87,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2025-08-01 15:40:00"
     },
     {
       "time": "2025-08-04 15:40:00",
@@ -738,7 +771,8 @@
       "pnlGBP": -63,
       "balanceAfter": 3086.88,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2025-08-04 15:55:00"
     },
     {
       "time": "2025-08-05 13:55:00",
@@ -759,7 +793,8 @@
       "pnlGBP": 116.07,
       "balanceAfter": 3202.94,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-08-05 14:00:00"
     },
     {
       "time": "2025-08-06 14:15:00",
@@ -780,7 +815,8 @@
       "pnlGBP": 112.1,
       "balanceAfter": 3315.05,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-08-06 14:20:00"
     },
     {
       "time": "2025-08-07 14:05:00",
@@ -801,7 +837,8 @@
       "pnlGBP": 124.65,
       "balanceAfter": 3439.69,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-08-07 14:10:00"
     },
     {
       "time": "2025-08-08 14:20:00",
@@ -822,7 +859,8 @@
       "pnlGBP": 120.39,
       "balanceAfter": 3560.08,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-08-08 15:35:00"
     },
     {
       "time": "2025-08-11 13:45:00",
@@ -843,7 +881,8 @@
       "pnlGBP": 133.86,
       "balanceAfter": 3693.94,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-08-11 13:50:00"
     },
     {
       "time": "2025-08-14 15:00:00",
@@ -864,7 +903,8 @@
       "pnlGBP": 129.29,
       "balanceAfter": 3823.23,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-08-14 15:15:00"
     },
     {
       "time": "2025-08-15 14:20:00",
@@ -885,7 +925,8 @@
       "pnlGBP": -76.46,
       "balanceAfter": 3746.76,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2025-08-15 14:30:00"
     },
     {
       "time": "2025-08-18 13:50:00",
@@ -906,7 +947,8 @@
       "pnlGBP": 131.14,
       "balanceAfter": 3877.9,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-08-18 13:55:00"
     },
     {
       "time": "2025-08-19 15:45:00",
@@ -927,7 +969,8 @@
       "pnlGBP": 135.73,
       "balanceAfter": 4013.63,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-08-19 15:55:00"
     },
     {
       "time": "2025-08-20 15:45:00",
@@ -948,7 +991,8 @@
       "pnlGBP": 140.48,
       "balanceAfter": 4154.1,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-08-20 15:50:00"
     },
     {
       "time": "2025-08-21 13:30:00",
@@ -969,7 +1013,8 @@
       "pnlGBP": 156.19,
       "balanceAfter": 4310.3,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-08-21 13:35:00"
     },
     {
       "time": "2025-08-25 15:15:00",
@@ -990,7 +1035,8 @@
       "pnlGBP": -86.21,
       "balanceAfter": 4224.09,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2025-08-25 15:45:00"
     },
     {
       "time": "2025-08-28 13:30:00",
@@ -1011,7 +1057,8 @@
       "pnlGBP": 63.36,
       "balanceAfter": 4287.45,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2025-08-28 15:55:00"
     },
     {
       "time": "2025-08-29 14:05:00",
@@ -1032,7 +1079,8 @@
       "pnlGBP": -85.75,
       "balanceAfter": 4201.71,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2025-08-29 19:45:00"
     },
     {
       "time": "2025-09-03 13:50:00",
@@ -1053,7 +1101,8 @@
       "pnlGBP": 63.03,
       "balanceAfter": 4264.73,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2025-09-03 14:20:00"
     },
     {
       "time": "2025-09-05 14:15:00",
@@ -1074,7 +1123,8 @@
       "pnlGBP": 160.35,
       "balanceAfter": 4425.08,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-09-05 14:20:00"
     },
     {
       "time": "2025-09-08 14:50:00",
@@ -1095,7 +1145,8 @@
       "pnlGBP": 154.88,
       "balanceAfter": 4579.96,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-09-08 15:00:00"
     },
     {
       "time": "2025-09-09 14:35:00",
@@ -1116,7 +1167,8 @@
       "pnlGBP": 172.21,
       "balanceAfter": 4752.17,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-09-09 14:40:00"
     },
     {
       "time": "2025-09-10 13:35:00",
@@ -1137,7 +1189,8 @@
       "pnlGBP": -95.04,
       "balanceAfter": 4657.13,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2025-09-10 13:45:00"
     },
     {
       "time": "2025-09-11 13:55:00",
@@ -1158,7 +1211,8 @@
       "pnlGBP": 109.91,
       "balanceAfter": 4767.03,
       "result": "EOD_WIN",
-      "pnlR": 1.18
+      "pnlR": 1.18,
+      "closeTime": "2025-09-11 19:55:00"
     },
     {
       "time": "2025-09-15 13:40:00",
@@ -1179,7 +1233,8 @@
       "pnlGBP": -95.34,
       "balanceAfter": 4671.69,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2025-09-15 14:45:00"
     },
     {
       "time": "2025-09-16 15:50:00",
@@ -1200,7 +1255,8 @@
       "pnlGBP": 140.15,
       "balanceAfter": 4811.84,
       "result": "EOD_PARTIAL",
-      "pnlR": 1.5
+      "pnlR": 1.5,
+      "closeTime": "2025-09-16 19:55:00"
     },
     {
       "time": "2025-09-17 13:35:00",
@@ -1221,7 +1277,8 @@
       "pnlGBP": 168.41,
       "balanceAfter": 4980.26,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-09-17 18:00:00"
     },
     {
       "time": "2025-09-18 14:45:00",
@@ -1242,7 +1299,8 @@
       "pnlGBP": 187.26,
       "balanceAfter": 5167.52,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-09-18 14:50:00"
     },
     {
       "time": "2025-09-19 13:55:00",
@@ -1263,7 +1321,8 @@
       "pnlGBP": 77.51,
       "balanceAfter": 5245.03,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2025-09-19 14:15:00"
     },
     {
       "time": "2025-09-22 13:30:00",
@@ -1284,7 +1343,8 @@
       "pnlGBP": 78.68,
       "balanceAfter": 5323.7,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2025-09-22 14:45:00"
     },
     {
       "time": "2025-09-23 14:35:00",
@@ -1305,7 +1365,8 @@
       "pnlGBP": 186.33,
       "balanceAfter": 5510.03,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-09-23 17:40:00"
     },
     {
       "time": "2025-09-24 13:50:00",
@@ -1326,7 +1387,8 @@
       "pnlGBP": 207.18,
       "balanceAfter": 5717.21,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-09-24 15:10:00"
     },
     {
       "time": "2025-09-25 15:05:00",
@@ -1347,7 +1409,8 @@
       "pnlGBP": 200.1,
       "balanceAfter": 5917.31,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-09-25 17:55:00"
     },
     {
       "time": "2025-09-26 14:05:00",
@@ -1368,7 +1431,8 @@
       "pnlGBP": 222.49,
       "balanceAfter": 6139.8,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-09-26 14:10:00"
     },
     {
       "time": "2025-09-29 13:35:00",
@@ -1389,7 +1453,8 @@
       "pnlGBP": 230.86,
       "balanceAfter": 6370.66,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-09-29 13:40:00"
     },
     {
       "time": "2025-09-30 13:55:00",
@@ -1410,7 +1475,8 @@
       "pnlGBP": 95.56,
       "balanceAfter": 6466.22,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2025-09-30 14:05:00"
     },
     {
       "time": "2025-10-01 13:35:00",
@@ -1431,7 +1497,8 @@
       "pnlGBP": -129.32,
       "balanceAfter": 6336.9,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2025-10-01 14:00:00"
     },
     {
       "time": "2025-10-02 14:05:00",
@@ -1452,7 +1519,8 @@
       "pnlGBP": 238.27,
       "balanceAfter": 6575.16,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-10-02 14:10:00"
     },
     {
       "time": "2025-10-03 14:20:00",
@@ -1473,7 +1541,8 @@
       "pnlGBP": -63.12,
       "balanceAfter": 6512.04,
       "result": "EOD_LOSS",
-      "pnlR": -0.48
+      "pnlR": -0.48,
+      "closeTime": "2025-10-03 19:55:00"
     },
     {
       "time": "2025-10-06 13:40:00",
@@ -1494,7 +1563,8 @@
       "pnlGBP": 97.68,
       "balanceAfter": 6609.72,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2025-10-06 17:50:00"
     },
     {
       "time": "2025-10-08 14:05:00",
@@ -1515,7 +1585,8 @@
       "pnlGBP": 99.15,
       "balanceAfter": 6708.87,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2025-10-08 14:20:00"
     },
     {
       "time": "2025-10-09 13:50:00",
@@ -1536,7 +1607,8 @@
       "pnlGBP": 252.25,
       "balanceAfter": 6961.12,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-10-09 13:55:00"
     },
     {
       "time": "2025-10-10 14:55:00",
@@ -1557,7 +1629,8 @@
       "pnlGBP": 261.74,
       "balanceAfter": 7222.86,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-10-10 15:00:00"
     },
     {
       "time": "2025-10-14 14:00:00",
@@ -1578,7 +1651,8 @@
       "pnlGBP": 252.8,
       "balanceAfter": 7475.66,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-10-14 14:10:00"
     },
     {
       "time": "2025-10-16 13:35:00",
@@ -1599,7 +1673,8 @@
       "pnlGBP": -149.51,
       "balanceAfter": 7326.15,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2025-10-16 13:45:00"
     },
     {
       "time": "2025-10-17 13:30:00",
@@ -1620,7 +1695,8 @@
       "pnlGBP": 256.42,
       "balanceAfter": 7582.56,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-10-17 13:35:00"
     },
     {
       "time": "2025-10-21 13:40:00",
@@ -1641,7 +1717,8 @@
       "pnlGBP": 285.1,
       "balanceAfter": 7867.67,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-10-21 14:20:00"
     },
     {
       "time": "2025-10-22 13:30:00",
@@ -1662,7 +1739,8 @@
       "pnlGBP": 275.37,
       "balanceAfter": 8143.04,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-10-22 16:10:00"
     },
     {
       "time": "2025-10-23 14:10:00",
@@ -1683,7 +1761,8 @@
       "pnlGBP": 306.18,
       "balanceAfter": 8449.21,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-10-23 14:15:00"
     },
     {
       "time": "2025-10-27 15:45:00",
@@ -1704,7 +1783,8 @@
       "pnlGBP": 295.72,
       "balanceAfter": 8744.94,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-10-27 17:15:00"
     },
     {
       "time": "2025-10-28 15:05:00",
@@ -1725,7 +1805,8 @@
       "pnlGBP": -174.9,
       "balanceAfter": 8570.04,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2025-10-28 15:25:00"
     },
     {
       "time": "2025-10-29 13:35:00",
@@ -1746,7 +1827,8 @@
       "pnlGBP": 322.23,
       "balanceAfter": 8892.27,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-10-29 13:40:00"
     },
     {
       "time": "2025-10-30 13:40:00",
@@ -1767,7 +1849,8 @@
       "pnlGBP": 334.35,
       "balanceAfter": 9226.62,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-10-30 13:50:00"
     },
     {
       "time": "2025-10-31 14:40:00",
@@ -1788,7 +1871,8 @@
       "pnlGBP": -184.53,
       "balanceAfter": 9042.09,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2025-10-31 15:40:00"
     },
     {
       "time": "2025-11-04 15:45:00",
@@ -1809,7 +1893,8 @@
       "pnlGBP": 316.47,
       "balanceAfter": 9358.56,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-11-04 17:20:00"
     },
     {
       "time": "2025-11-05 14:30:00",
@@ -1830,7 +1915,8 @@
       "pnlGBP": 351.88,
       "balanceAfter": 9710.44,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-11-05 14:50:00"
     },
     {
       "time": "2025-11-06 15:40:00",
@@ -1851,7 +1937,8 @@
       "pnlGBP": 145.66,
       "balanceAfter": 9856.1,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2025-11-06 18:40:00"
     },
     {
       "time": "2025-11-07 15:20:00",
@@ -1872,7 +1959,8 @@
       "pnlGBP": 344.96,
       "balanceAfter": 10201.06,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-11-07 15:45:00"
     },
     {
       "time": "2025-11-10 14:30:00",
@@ -1893,7 +1981,8 @@
       "pnlGBP": 383.56,
       "balanceAfter": 10584.62,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-11-10 14:35:00"
     },
     {
       "time": "2025-11-13 15:50:00",
@@ -1914,7 +2003,8 @@
       "pnlGBP": 370.46,
       "balanceAfter": 10955.09,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-11-13 16:05:00"
     },
     {
       "time": "2025-11-19 15:25:00",
@@ -1935,7 +2025,8 @@
       "pnlGBP": 383.43,
       "balanceAfter": 11338.51,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-11-19 15:35:00"
     },
     {
       "time": "2025-11-20 15:50:00",
@@ -1956,7 +2047,8 @@
       "pnlGBP": 426.33,
       "balanceAfter": 11764.84,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-11-20 16:20:00"
     },
     {
       "time": "2025-11-21 15:15:00",
@@ -1977,7 +2069,8 @@
       "pnlGBP": -235.3,
       "balanceAfter": 11529.54,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2025-11-21 15:20:00"
     },
     {
       "time": "2025-11-24 14:40:00",
@@ -1998,7 +2091,8 @@
       "pnlGBP": -230.59,
       "balanceAfter": 11298.95,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2025-11-24 15:15:00"
     },
     {
       "time": "2025-11-25 15:05:00",
@@ -2019,7 +2113,8 @@
       "pnlGBP": 424.84,
       "balanceAfter": 11723.79,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-11-25 15:10:00"
     },
     {
       "time": "2025-12-01 14:55:00",
@@ -2040,7 +2135,8 @@
       "pnlGBP": -234.48,
       "balanceAfter": 11489.32,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2025-12-01 15:00:00"
     },
     {
       "time": "2025-12-02 15:00:00",
@@ -2061,7 +2157,8 @@
       "pnlGBP": 172.34,
       "balanceAfter": 11661.66,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2025-12-02 15:25:00"
     },
     {
       "time": "2025-12-03 14:40:00",
@@ -2082,7 +2179,8 @@
       "pnlGBP": 408.16,
       "balanceAfter": 12069.82,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-12-03 16:35:00"
     },
     {
       "time": "2025-12-04 14:45:00",
@@ -2103,7 +2201,8 @@
       "pnlGBP": 453.83,
       "balanceAfter": 12523.64,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-12-04 14:50:00"
     },
     {
       "time": "2025-12-08 14:50:00",
@@ -2124,7 +2223,8 @@
       "pnlGBP": 187.85,
       "balanceAfter": 12711.5,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2025-12-08 15:00:00"
     },
     {
       "time": "2025-12-09 14:30:00",
@@ -2145,7 +2245,8 @@
       "pnlGBP": 477.95,
       "balanceAfter": 13189.45,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-12-09 14:35:00"
     },
     {
       "time": "2025-12-10 15:00:00",
@@ -2166,7 +2267,8 @@
       "pnlGBP": -263.79,
       "balanceAfter": 12925.66,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2025-12-10 15:35:00"
     },
     {
       "time": "2025-12-11 14:35:00",
@@ -2187,7 +2289,8 @@
       "pnlGBP": 452.4,
       "balanceAfter": 13378.06,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-12-11 16:40:00"
     },
     {
       "time": "2025-12-12 15:25:00",
@@ -2208,7 +2311,8 @@
       "pnlGBP": 200.67,
       "balanceAfter": 13578.73,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2025-12-12 15:35:00"
     },
     {
       "time": "2025-12-17 14:35:00",
@@ -2229,7 +2333,8 @@
       "pnlGBP": 203.68,
       "balanceAfter": 13782.41,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2025-12-17 15:20:00"
     },
     {
       "time": "2025-12-18 14:45:00",
@@ -2250,7 +2355,8 @@
       "pnlGBP": -275.65,
       "balanceAfter": 13506.76,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2025-12-18 14:50:00"
     },
     {
       "time": "2025-12-19 14:30:00",
@@ -2271,7 +2377,8 @@
       "pnlGBP": 507.85,
       "balanceAfter": 14014.61,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-12-19 14:35:00"
     },
     {
       "time": "2025-12-23 14:35:00",
@@ -2292,7 +2399,8 @@
       "pnlGBP": -280.29,
       "balanceAfter": 13734.32,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2025-12-23 14:50:00"
     },
     {
       "time": "2025-12-24 14:45:00",
@@ -2313,7 +2421,8 @@
       "pnlGBP": 480.7,
       "balanceAfter": 14215.02,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-12-24 15:55:00"
     },
     {
       "time": "2025-12-26 14:30:00",
@@ -2334,7 +2443,8 @@
       "pnlGBP": -284.3,
       "balanceAfter": 13930.72,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2025-12-26 14:40:00"
     },
     {
       "time": "2025-12-29 14:40:00",
@@ -2355,7 +2465,8 @@
       "pnlGBP": 523.8,
       "balanceAfter": 14454.52,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2025-12-29 14:45:00"
     },
     {
       "time": "2025-12-30 15:00:00",
@@ -2376,7 +2487,8 @@
       "pnlGBP": 190.8,
       "balanceAfter": 14645.32,
       "result": "EOD_WIN",
-      "pnlR": 0.66
+      "pnlR": 0.66,
+      "closeTime": "2025-12-30 20:55:00"
     },
     {
       "time": "2025-12-31 14:30:00",
@@ -2397,7 +2509,8 @@
       "pnlGBP": 512.59,
       "balanceAfter": 15157.9,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2025-12-31 14:35:00"
     },
     {
       "time": "2026-01-02 14:30:00",
@@ -2418,7 +2531,8 @@
       "pnlGBP": -303.16,
       "balanceAfter": 14854.75,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2026-01-02 16:15:00"
     },
     {
       "time": "2026-01-05 14:30:00",
@@ -2439,7 +2553,8 @@
       "pnlGBP": 558.54,
       "balanceAfter": 15413.28,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2026-01-05 14:35:00"
     },
     {
       "time": "2026-01-06 15:00:00",
@@ -2460,7 +2575,8 @@
       "pnlGBP": 539.46,
       "balanceAfter": 15952.75,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2026-01-06 15:10:00"
     },
     {
       "time": "2026-01-07 14:45:00",
@@ -2481,7 +2597,8 @@
       "pnlGBP": 599.82,
       "balanceAfter": 16552.57,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2026-01-07 15:00:00"
     },
     {
       "time": "2026-01-09 14:50:00",
@@ -2502,7 +2619,8 @@
       "pnlGBP": -331.05,
       "balanceAfter": 16221.52,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2026-01-09 15:05:00"
     },
     {
       "time": "2026-01-12 15:05:00",
@@ -2523,7 +2641,8 @@
       "pnlGBP": 609.93,
       "balanceAfter": 16831.45,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2026-01-12 15:10:00"
     },
     {
       "time": "2026-01-13 14:35:00",
@@ -2544,7 +2663,8 @@
       "pnlGBP": 632.86,
       "balanceAfter": 17464.31,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2026-01-13 14:40:00"
     },
     {
       "time": "2026-01-15 14:45:00",
@@ -2565,7 +2685,8 @@
       "pnlGBP": 611.25,
       "balanceAfter": 18075.56,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2026-01-15 15:05:00"
     },
     {
       "time": "2026-01-16 14:40:00",
@@ -2586,7 +2707,8 @@
       "pnlGBP": 271.13,
       "balanceAfter": 18346.7,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2026-01-16 16:30:00"
     },
     {
       "time": "2026-01-21 14:35:00",
@@ -2607,7 +2729,8 @@
       "pnlGBP": 642.13,
       "balanceAfter": 18988.83,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2026-01-21 14:45:00"
     },
     {
       "time": "2026-01-26 14:35:00",
@@ -2628,7 +2751,8 @@
       "pnlGBP": 345.6,
       "balanceAfter": 19334.43,
       "result": "EOD_WIN",
-      "pnlR": 0.91
+      "pnlR": 0.91,
+      "closeTime": "2026-01-26 20:55:00"
     },
     {
       "time": "2026-01-28 15:10:00",
@@ -2649,7 +2773,8 @@
       "pnlGBP": -386.69,
       "balanceAfter": 18947.74,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2026-01-28 15:30:00"
     },
     {
       "time": "2026-01-29 14:35:00",
@@ -2670,7 +2795,8 @@
       "pnlGBP": -378.95,
       "balanceAfter": 18568.79,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2026-01-29 14:45:00"
     },
     {
       "time": "2026-01-30 15:25:00",
@@ -2691,7 +2817,8 @@
       "pnlGBP": 698.19,
       "balanceAfter": 19266.97,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2026-01-30 15:30:00"
     },
     {
       "time": "2026-02-02 14:35:00",
@@ -2712,7 +2839,8 @@
       "pnlGBP": 477.82,
       "balanceAfter": 19744.79,
       "result": "EOD_WIN",
-      "pnlR": 1.24
+      "pnlR": 1.24,
+      "closeTime": "2026-02-02 20:55:00"
     },
     {
       "time": "2026-02-03 14:35:00",
@@ -2733,7 +2861,8 @@
       "pnlGBP": -394.9,
       "balanceAfter": 19349.9,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2026-02-03 16:40:00"
     },
     {
       "time": "2026-02-04 14:55:00",
@@ -2754,7 +2883,8 @@
       "pnlGBP": 727.56,
       "balanceAfter": 20077.45,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2026-02-04 15:00:00"
     },
     {
       "time": "2026-02-12 15:35:00",
@@ -2775,7 +2905,8 @@
       "pnlGBP": 754.91,
       "balanceAfter": 20832.37,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2026-02-12 15:55:00"
     },
     {
       "time": "2026-02-13 15:15:00",
@@ -2796,7 +2927,8 @@
       "pnlGBP": -416.65,
       "balanceAfter": 20415.72,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2026-02-13 15:25:00"
     },
     {
       "time": "2026-02-17 14:55:00",
@@ -2817,7 +2949,8 @@
       "pnlGBP": -408.31,
       "balanceAfter": 20007.4,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2026-02-17 16:20:00"
     },
     {
       "time": "2026-02-18 14:35:00",
@@ -2838,7 +2971,8 @@
       "pnlGBP": 752.28,
       "balanceAfter": 20759.68,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2026-02-18 14:40:00"
     },
     {
       "time": "2026-02-19 15:20:00",
@@ -2859,7 +2993,8 @@
       "pnlGBP": 311.4,
       "balanceAfter": 21071.08,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2026-02-19 15:30:00"
     },
     {
       "time": "2026-02-23 14:45:00",
@@ -2880,7 +3015,8 @@
       "pnlGBP": 792.27,
       "balanceAfter": 21863.35,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2026-02-23 14:50:00"
     },
     {
       "time": "2026-02-24 14:30:00",
@@ -2901,7 +3037,8 @@
       "pnlGBP": 822.06,
       "balanceAfter": 22685.41,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2026-02-24 14:35:00"
     },
     {
       "time": "2026-02-25 15:00:00",
@@ -2922,7 +3059,8 @@
       "pnlGBP": 340.28,
       "balanceAfter": 23025.69,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2026-02-25 15:40:00"
     },
     {
       "time": "2026-02-26 15:20:00",
@@ -2943,7 +3081,8 @@
       "pnlGBP": 345.39,
       "balanceAfter": 23371.08,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2026-02-26 15:35:00"
     },
     {
       "time": "2026-02-27 15:35:00",
@@ -2964,7 +3103,8 @@
       "pnlGBP": -467.42,
       "balanceAfter": 22903.66,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2026-02-27 17:30:00"
     },
     {
       "time": "2026-03-02 15:25:00",
@@ -2985,7 +3125,8 @@
       "pnlGBP": 801.63,
       "balanceAfter": 23705.28,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2026-03-02 15:30:00"
     },
     {
       "time": "2026-03-04 15:05:00",
@@ -3006,7 +3147,8 @@
       "pnlGBP": 891.32,
       "balanceAfter": 24596.6,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2026-03-04 15:10:00"
     },
     {
       "time": "2026-03-05 15:25:00",
@@ -3027,7 +3169,8 @@
       "pnlGBP": 860.88,
       "balanceAfter": 25457.48,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2026-03-05 19:25:00"
     },
     {
       "time": "2026-03-11 13:45:00",
@@ -3048,7 +3191,8 @@
       "pnlGBP": -509.15,
       "balanceAfter": 24948.33,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2026-03-11 14:00:00"
     },
     {
       "time": "2026-03-13 14:30:00",
@@ -3069,7 +3213,8 @@
       "pnlGBP": -498.97,
       "balanceAfter": 24449.37,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2026-03-13 14:45:00"
     },
     {
       "time": "2026-03-16 14:35:00",
@@ -3090,7 +3235,8 @@
       "pnlGBP": 366.74,
       "balanceAfter": 24816.11,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2026-03-16 14:55:00"
     },
     {
       "time": "2026-03-17 15:00:00",
@@ -3111,7 +3257,8 @@
       "pnlGBP": 868.56,
       "balanceAfter": 25684.67,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2026-03-17 15:10:00"
     },
     {
       "time": "2026-03-19 15:05:00",
@@ -3132,7 +3279,8 @@
       "pnlGBP": 385.27,
       "balanceAfter": 26069.94,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2026-03-19 15:15:00"
     },
     {
       "time": "2026-03-23 15:35:00",
@@ -3153,7 +3301,8 @@
       "pnlGBP": 912.45,
       "balanceAfter": 26982.39,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2026-03-23 15:45:00"
     },
     {
       "time": "2026-03-24 13:30:00",
@@ -3174,7 +3323,8 @@
       "pnlGBP": 1014.54,
       "balanceAfter": 27996.93,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2026-03-24 13:35:00"
     },
     {
       "time": "2026-03-25 13:45:00",
@@ -3195,7 +3345,8 @@
       "pnlGBP": 979.89,
       "balanceAfter": 28976.82,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2026-03-25 15:15:00"
     },
     {
       "time": "2026-03-26 13:45:00",
@@ -3216,7 +3367,8 @@
       "pnlGBP": 1089.53,
       "balanceAfter": 30066.35,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2026-03-26 13:50:00"
     },
     {
       "time": "2026-03-31 14:45:00",
@@ -3237,7 +3389,8 @@
       "pnlGBP": 1130.49,
       "balanceAfter": 31196.84,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2026-03-31 14:50:00"
     },
     {
       "time": "2026-04-02 13:55:00",
@@ -3258,7 +3411,8 @@
       "pnlGBP": 1091.89,
       "balanceAfter": 32288.73,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2026-04-02 14:00:00"
     },
     {
       "time": "2026-04-06 15:45:00",
@@ -3279,7 +3433,8 @@
       "pnlGBP": 484.33,
       "balanceAfter": 32773.06,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2026-04-06 17:00:00"
     },
     {
       "time": "2026-04-08 13:30:00",
@@ -3300,7 +3455,8 @@
       "pnlGBP": 1232.27,
       "balanceAfter": 34005.33,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2026-04-08 13:35:00"
     },
     {
       "time": "2026-04-09 14:05:00",
@@ -3321,7 +3477,8 @@
       "pnlGBP": 1190.19,
       "balanceAfter": 35195.52,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2026-04-09 14:10:00"
     },
     {
       "time": "2026-04-10 13:35:00",
@@ -3342,7 +3499,8 @@
       "pnlGBP": 478.66,
       "balanceAfter": 35674.18,
       "result": "EOD_WIN",
-      "pnlR": 0.68
+      "pnlR": 0.68,
+      "closeTime": "2026-04-10 19:55:00"
     },
     {
       "time": "2026-04-13 15:00:00",
@@ -3363,7 +3521,8 @@
       "pnlGBP": 535.11,
       "balanceAfter": 36209.29,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2026-04-13 16:05:00"
     },
     {
       "time": "2026-04-17 15:50:00",
@@ -3384,7 +3543,8 @@
       "pnlGBP": 543.14,
       "balanceAfter": 36752.43,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2026-04-17 17:05:00"
     },
     {
       "time": "2026-04-21 14:30:00",
@@ -3405,7 +3565,8 @@
       "pnlGBP": 1286.34,
       "balanceAfter": 38038.76,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2026-04-21 14:40:00"
     },
     {
       "time": "2026-04-22 15:40:00",
@@ -3426,7 +3587,8 @@
       "pnlGBP": -760.78,
       "balanceAfter": 37277.99,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2026-04-22 16:05:00"
     },
     {
       "time": "2026-04-23 14:30:00",
@@ -3447,7 +3609,8 @@
       "pnlGBP": -745.56,
       "balanceAfter": 36532.43,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2026-04-23 14:55:00"
     },
     {
       "time": "2026-04-24 13:35:00",
@@ -3468,7 +3631,8 @@
       "pnlGBP": -730.65,
       "balanceAfter": 35801.78,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2026-04-24 15:40:00"
     },
     {
       "time": "2026-04-27 13:35:00",
@@ -3489,7 +3653,8 @@
       "pnlGBP": -716.04,
       "balanceAfter": 35085.75,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2026-04-27 13:40:00"
     },
     {
       "time": "2026-04-28 14:10:00",
@@ -3510,7 +3675,8 @@
       "pnlGBP": 1319.22,
       "balanceAfter": 36404.97,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2026-04-28 14:15:00"
     },
     {
       "time": "2026-04-29 13:35:00",
@@ -3531,7 +3697,8 @@
       "pnlGBP": 1092.15,
       "balanceAfter": 37497.12,
       "result": "EOD_PARTIAL",
-      "pnlR": 1.5
+      "pnlR": 1.5,
+      "closeTime": "2026-04-29 19:55:00"
     },
     {
       "time": "2026-05-01 15:55:00",
@@ -3552,7 +3719,8 @@
       "pnlGBP": 562.46,
       "balanceAfter": 38059.58,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2026-05-01 17:50:00"
     },
     {
       "time": "2026-05-04 13:30:00",
@@ -3573,7 +3741,8 @@
       "pnlGBP": 1431.04,
       "balanceAfter": 39490.62,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2026-05-04 13:35:00"
     },
     {
       "time": "2026-05-05 13:40:00",
@@ -3594,7 +3763,8 @@
       "pnlGBP": -789.81,
       "balanceAfter": 38700.8,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2026-05-05 13:50:00"
     },
     {
       "time": "2026-05-07 14:10:00",
@@ -3615,7 +3785,8 @@
       "pnlGBP": 1354.53,
       "balanceAfter": 40055.33,
       "result": "WIN_TP2",
-      "pnlR": 1.75
+      "pnlR": 1.75,
+      "closeTime": "2026-05-07 14:20:00"
     },
     {
       "time": "2026-05-08 15:10:00",
@@ -3636,7 +3807,8 @@
       "pnlGBP": -801.11,
       "balanceAfter": 39254.22,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2026-05-08 15:35:00"
     },
     {
       "time": "2026-05-11 13:35:00",
@@ -3657,7 +3829,8 @@
       "pnlGBP": -785.08,
       "balanceAfter": 38469.14,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2026-05-11 13:45:00"
     },
     {
       "time": "2026-05-12 13:35:00",
@@ -3678,7 +3851,8 @@
       "pnlGBP": -769.38,
       "balanceAfter": 37699.76,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2026-05-12 17:25:00"
     },
     {
       "time": "2026-05-15 14:45:00",
@@ -3699,7 +3873,8 @@
       "pnlGBP": 1417.51,
       "balanceAfter": 39117.27,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2026-05-15 15:00:00"
     },
     {
       "time": "2026-05-18 13:35:00",
@@ -3720,7 +3895,8 @@
       "pnlGBP": -782.35,
       "balanceAfter": 38334.92,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2026-05-18 13:45:00"
     },
     {
       "time": "2026-05-19 15:00:00",
@@ -3741,7 +3917,8 @@
       "pnlGBP": 575.02,
       "balanceAfter": 38909.95,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2026-05-19 15:15:00"
     },
     {
       "time": "2026-05-20 13:35:00",
@@ -3762,7 +3939,8 @@
       "pnlGBP": -778.2,
       "balanceAfter": 38131.75,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2026-05-20 14:15:00"
     },
     {
       "time": "2026-05-21 15:05:00",
@@ -3783,7 +3961,8 @@
       "pnlGBP": -762.63,
       "balanceAfter": 37369.11,
       "result": "LOSS",
-      "pnlR": -1
+      "pnlR": -1,
+      "closeTime": "2026-05-21 15:10:00"
     },
     {
       "time": "2026-05-26 14:10:00",
@@ -3804,7 +3983,8 @@
       "pnlGBP": 1405.08,
       "balanceAfter": 38774.19,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2026-05-26 14:25:00"
     },
     {
       "time": "2026-05-27 14:45:00",
@@ -3825,7 +4005,8 @@
       "pnlGBP": 581.61,
       "balanceAfter": 39355.8,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2026-05-27 14:55:00"
     },
     {
       "time": "2026-05-28 13:45:00",
@@ -3846,7 +4027,8 @@
       "pnlGBP": 590.34,
       "balanceAfter": 39946.14,
       "result": "WIN_BE",
-      "pnlR": 0.75
+      "pnlR": 0.75,
+      "closeTime": "2026-05-28 13:55:00"
     },
     {
       "time": "2026-05-29 13:35:00",
@@ -3867,7 +4049,8 @@
       "pnlGBP": 1198.38,
       "balanceAfter": 41144.53,
       "result": "EOD_PARTIAL",
-      "pnlR": 1.5
+      "pnlR": 1.5,
+      "closeTime": "2026-05-29 19:55:00"
     },
     {
       "time": "2026-06-01 14:15:00",
@@ -3888,7 +4071,8 @@
       "pnlGBP": 1547.03,
       "balanceAfter": 42691.56,
       "result": "WIN_TP3",
-      "pnlR": 1.88
+      "pnlR": 1.88,
+      "closeTime": "2026-06-01 14:45:00"
     }
   ]
 }

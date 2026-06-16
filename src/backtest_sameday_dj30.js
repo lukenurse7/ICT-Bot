@@ -242,24 +242,25 @@ function scoreConf(sweep, mss, fvg) {
 // Trade is force-closed at 21:00 UTC same calendar day if neither TP nor SL hit.
 function simulateOutcomeSameDay(dir, entry, sl, tp1, tp2, tp3, risk, futureCandles) {
   const isLong = dir === 'bull';
-  let tp1Hit = false, currentSL = sl, lastClose = entry;
+  let tp1Hit = false, currentSL = sl, lastClose = entry, lastTime = null;
 
   for (const c of futureCandles) {
     lastClose = c.close;
+    lastTime  = c.time;
     const slHit   = isLong ? c.low <= currentSL : c.high >= currentSL;
     const tp1Hit_ = isLong ? c.high >= tp1 : c.low <= tp1;
     const tp2Hit  = isLong ? c.high >= tp2 : c.low <= tp2;
     const tp3Hit  = isLong ? c.high >= tp3 : c.low <= tp3;
 
     if (!tp1Hit) {
-      if (slHit)   return { result: 'LOSS',    pnlR: -1 };
-      if (tp3Hit)  return { result: 'WIN_TP3', pnlR: +(0.5*TP1_R + 0.25*TP2_R + 0.25*TP3_R).toFixed(2) };
-      if (tp2Hit)  return { result: 'WIN_TP2', pnlR: +(0.5*TP1_R + 0.5*TP2_R).toFixed(2) };
+      if (slHit)   return { result: 'LOSS',    pnlR: -1, closeTime: c.time };
+      if (tp3Hit)  return { result: 'WIN_TP3', pnlR: +(0.5*TP1_R + 0.25*TP2_R + 0.25*TP3_R).toFixed(2), closeTime: c.time };
+      if (tp2Hit)  return { result: 'WIN_TP2', pnlR: +(0.5*TP1_R + 0.5*TP2_R).toFixed(2), closeTime: c.time };
       if (tp1Hit_) { tp1Hit = true; currentSL = entry; }
     } else {
-      if (slHit)   return { result: 'WIN_BE',  pnlR: +(0.5*TP1_R).toFixed(2) };
-      if (tp3Hit)  return { result: 'WIN_TP3', pnlR: +(0.5*TP1_R + 0.25*TP2_R + 0.25*TP3_R).toFixed(2) };
-      if (tp2Hit)  return { result: 'WIN_TP2', pnlR: +(0.5*TP1_R + 0.5*TP2_R).toFixed(2) };
+      if (slHit)   return { result: 'WIN_BE',  pnlR: +(0.5*TP1_R).toFixed(2), closeTime: c.time };
+      if (tp3Hit)  return { result: 'WIN_TP3', pnlR: +(0.5*TP1_R + 0.25*TP2_R + 0.25*TP3_R).toFixed(2), closeTime: c.time };
+      if (tp2Hit)  return { result: 'WIN_TP2', pnlR: +(0.5*TP1_R + 0.5*TP2_R).toFixed(2), closeTime: c.time };
     }
   }
 
@@ -268,11 +269,11 @@ function simulateOutcomeSameDay(dir, entry, sl, tp1, tp2, tp3, risk, futureCandl
   if (tp1Hit) {
     // 50% locked at TP1 already; remaining 50% closes at whatever R it's at (floor TP1_R since SL is at BE)
     const runnerR = Math.max(rAtClose, TP1_R);
-    return { result: 'EOD_PARTIAL', pnlR: +(0.5*TP1_R + 0.5*runnerR).toFixed(2) };
+    return { result: 'EOD_PARTIAL', pnlR: +(0.5*TP1_R + 0.5*runnerR).toFixed(2), closeTime: lastTime };
   }
   // Full position still open, force close at day-end price
   const clamped = Math.max(rAtClose, -1);
-  return { result: clamped >= 0 ? 'EOD_WIN' : 'EOD_LOSS', pnlR: +clamped.toFixed(2) };
+  return { result: clamped >= 0 ? 'EOD_WIN' : 'EOD_LOSS', pnlR: +clamped.toFixed(2), closeTime: lastTime };
 }
 
 function isKillZone(iso) {
