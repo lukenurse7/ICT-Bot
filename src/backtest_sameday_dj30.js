@@ -18,6 +18,8 @@ const path  = require('path');
 const ACCOUNT_START = 2000;
 const RISK_PCT      = 0.02;
 const TP1_R         = 1.5;
+const TP2_R         = parseFloat(process.env.TP2_R || '2.5');
+const TP3_R         = parseFloat(process.env.TP3_R || '3.5');
 const MIN_SCORE     = 80;
 const COOLDOWN      = 36;        // 3h in 5m bars
 const DAY_END_HOUR  = 21;        // force-close at 21:00 UTC (NYSE close window)
@@ -186,8 +188,8 @@ function detectFVG(candles5m, sweepDir) {
 // TP logic — identical to live src/ict.js: TP2 >= 2.5R, TP3 >= 3.5R
 function liquidityTPs(dir, entry, risk, candles5m, h1Candles) {
   const isLong  = dir === 'bull';
-  const minTP2  = isLong ? entry + risk * 2.5 : entry - risk * 2.5;
-  const minTP3  = isLong ? entry + risk * 3.5 : entry - risk * 3.5;
+  const minTP2  = isLong ? entry + risk * TP2_R : entry - risk * TP2_R;
+  const minTP3  = isLong ? entry + risk * TP3_R : entry - risk * TP3_R;
   const maxR    = 5.0;
   const candidates = [];
 
@@ -221,8 +223,8 @@ function liquidityTPs(dir, entry, risk, candles5m, h1Candles) {
                         : t.price <= minTP3 && t.price > entry - risk * maxR)
     .sort((a, b) => isLong ? a.price - b.price : b.price - a.price);
 
-  const tp2obj = tp2candidates[0] || { price: isLong ? entry + risk*2.5 : entry - risk*2.5, desc: 'Fixed 2.5R' };
-  const tp3obj = tp3candidates[0] || { price: isLong ? entry + risk*3.5 : entry - risk*3.5, desc: 'Fixed 3.5R' };
+  const tp2obj = tp2candidates[0] || { price: isLong ? entry + risk*TP2_R : entry - risk*TP2_R, desc: `Fixed ${TP2_R}R` };
+  const tp3obj = tp3candidates[0] || { price: isLong ? entry + risk*TP3_R : entry - risk*TP3_R, desc: `Fixed ${TP3_R}R` };
   return { tp2: tp2obj.price, tp2Desc: tp2obj.desc, tp3: tp3obj.price, tp3Desc: tp3obj.desc };
 }
 
@@ -251,13 +253,13 @@ function simulateOutcomeSameDay(dir, entry, sl, tp1, tp2, tp3, risk, futureCandl
 
     if (!tp1Hit) {
       if (slHit)   return { result: 'LOSS',    pnlR: -1 };
-      if (tp3Hit)  return { result: 'WIN_TP3', pnlR: +(0.5*TP1_R + 0.25*2.5 + 0.25*3.5).toFixed(2) };
-      if (tp2Hit)  return { result: 'WIN_TP2', pnlR: +(0.5*TP1_R + 0.5*2.5).toFixed(2) };
+      if (tp3Hit)  return { result: 'WIN_TP3', pnlR: +(0.5*TP1_R + 0.25*TP2_R + 0.25*TP3_R).toFixed(2) };
+      if (tp2Hit)  return { result: 'WIN_TP2', pnlR: +(0.5*TP1_R + 0.5*TP2_R).toFixed(2) };
       if (tp1Hit_) { tp1Hit = true; currentSL = entry; }
     } else {
       if (slHit)   return { result: 'WIN_BE',  pnlR: +(0.5*TP1_R).toFixed(2) };
-      if (tp3Hit)  return { result: 'WIN_TP3', pnlR: +(0.5*TP1_R + 0.25*2.5 + 0.25*3.5).toFixed(2) };
-      if (tp2Hit)  return { result: 'WIN_TP2', pnlR: +(0.5*TP1_R + 0.5*2.5).toFixed(2) };
+      if (tp3Hit)  return { result: 'WIN_TP3', pnlR: +(0.5*TP1_R + 0.25*TP2_R + 0.25*TP3_R).toFixed(2) };
+      if (tp2Hit)  return { result: 'WIN_TP2', pnlR: +(0.5*TP1_R + 0.5*TP2_R).toFixed(2) };
     }
   }
 
@@ -335,8 +337,9 @@ function run() {
     const isLong = dir === 'bull';
     const entry  = bar.close; // matches live: entry = current candle close
 
-    // SL: swing high/low of last 5 candles (matches live src/ict.js)
-    const recent5   = slice5m.slice(-5);
+    // SL: swing high/low of last N candles (N tunable via SL_LOOKBACK env, default matches live src/ict.js)
+    const SL_LOOKBACK = parseInt(process.env.SL_LOOKBACK || '5', 10);
+    const recent5   = slice5m.slice(-SL_LOOKBACK);
     const swingHigh = Math.max(...recent5.map(c => c.high));
     const swingLow  = Math.min(...recent5.map(c => c.low));
     const sl = isLong ? swingLow - swingLow*0.0005 : swingHigh + swingHigh*0.0005;
