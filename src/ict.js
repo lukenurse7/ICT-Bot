@@ -52,18 +52,28 @@ function detectSweep(candles15m, candles5m) {
   // Collect significant swing levels from 5m
   const levels = [];
 
+  // DJ30/DIA only trades during market hours — there's a multi-hour gap between
+  // sessions. Equal-high/low levels must come from the CURRENT session only;
+  // otherwise stale overnight chop gets treated as live intraday liquidity.
+  let sessionStart = 0;
+  for (let i = recent5.length - 1; i > 0; i--) {
+    const gapMins = (new Date(recent5[i].time) - new Date(recent5[i-1].time)) / 60000;
+    if (gapMins > 30) { sessionStart = i; break; }
+  }
+  const session = recent5.slice(sessionStart);
+
   // Equal highs (BSL)
-  for (let i = 2; i < recent5.length - 1; i++) {
-    const c = recent5[i];
-    const prev = recent5.slice(Math.max(0, i-10), i);
+  for (let i = 2; i < session.length - 1; i++) {
+    const c = session[i];
+    const prev = session.slice(Math.max(0, i-10), i);
     const eqHigh = prev.find(p => Math.abs(p.high - c.high) / c.high < 0.0005);
     if (eqHigh) levels.push({ price: Math.max(c.high, eqHigh.high), type: 'BSL', name: 'Equal Highs (BSL)' });
   }
 
   // Equal lows (SSL)
-  for (let i = 2; i < recent5.length - 1; i++) {
-    const c = recent5[i];
-    const prev = recent5.slice(Math.max(0, i-10), i);
+  for (let i = 2; i < session.length - 1; i++) {
+    const c = session[i];
+    const prev = session.slice(Math.max(0, i-10), i);
     const eqLow = prev.find(p => Math.abs(p.low - c.low) / c.low < 0.0005);
     if (eqLow) levels.push({ price: Math.min(c.low, eqLow.low), type: 'SSL', name: 'Equal Lows (SSL)' });
   }
