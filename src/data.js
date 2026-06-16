@@ -6,10 +6,11 @@ require('dotenv').config();
 const API_KEY = process.env.TWELVEDATA_API_KEY;
 const BASE_URL = 'https://api.twelvedata.com';
 
-// DIA = Dow Jones ETF (free tier proxy for DJ30 on TwelveData)
-// DIA trades at 1/100th of the actual DJ30 index price — multiply all prices by 100
+// DIA = Dow Jones ETF (proxy for DJ30 — TwelveData has no real DJIA index even on paid plans)
+// DIA doesn't track DJ30 at an exact 1/100 ratio (dividend drag, NAV decay) —
+// PRICE_SCALE is calibrated against the real DJ30 price and can be overridden via env var.
 const SYMBOL = 'DIA';
-const PRICE_SCALE = 100;
+const PRICE_SCALE = parseFloat(process.env.DJ30_PRICE_SCALE) || 99.7724;
 
 async function fetchCandles(interval, outputSize = 100) {
   if (!API_KEY || API_KEY === 'your_api_key_here') {
