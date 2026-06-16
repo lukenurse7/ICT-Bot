@@ -47,8 +47,8 @@ async function scanDJ30() {
   const kz = killZoneStatus();
 
   try {
-    const { candles15m, candles5m, quote, daily, h4, h1 } = await dj30Fetch();
-    const analysis = runICTAnalysis({ daily, h4, h1, candles15m, candles5m, livePrice: quote.price });
+    const { candles15m, candles5m, candles1m, quote, daily, h4, h1 } = await dj30Fetch();
+    const analysis = runICTAnalysis({ daily, h4, h1, candles15m, candles5m, candles1m, livePrice: quote.price });
 
     console.log('\n' + chalk.bold.white('  ■ DJ30') + chalk.gray(`  [${ts()}]`));
     const chg = quote.changePct > 0 ? chalk.green(`+${quote.changePct.toFixed(2)}%`) : chalk.red(`${quote.changePct.toFixed(2)}%`);

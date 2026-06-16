@@ -57,15 +57,16 @@ async function fetchQuote() {
 }
 
 async function fetchAllData() {
-  const [daily, h4, h1, candles15m, candles5m, quote] = await Promise.all([
+  const [daily, h4, h1, candles15m, candles5m, candles1m, quote] = await Promise.all([
     fetchCandles('1day',  30),   // HTF bias — daily structure
     fetchCandles('4h',    48),   // HTF bias — 4H structure
     fetchCandles('1h',    48),   // 1H swing lows/highs for TP targets
     fetchCandles('15min', 96),   // liquidity sweep detection
-    fetchCandles('5min',  120),  // MSS + FVG entry
+    fetchCandles('5min',  120),  // MSS + FVG zone detection
+    fetchCandles('1min',  180),  // pinpoint the actual realistic entry trigger inside the FVG zone
     fetchQuote()
   ]);
-  return { daily, h4, h1, candles15m, candles5m, quote };
+  return { daily, h4, h1, candles15m, candles5m, candles1m, quote };
 }
 
 module.exports = { fetchCandles, fetchQuote, fetchAllData, SYMBOL };

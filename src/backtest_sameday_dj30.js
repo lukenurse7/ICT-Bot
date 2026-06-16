@@ -53,6 +53,28 @@ function loadCached(interval, startYear, startMonth, endYear, endMonth) {
     }));
 }
 
+// Loads the single-file 1m cache (TwelveData caps 1min outputsize at 5000 bars
+// per request, so this only covers a ~3-week window, not the full backtest period).
+function load1mCache() {
+  const files = fs.existsSync(CACHE)
+    ? fs.readdirSync(CACHE).filter(f => f.startsWith('dj30_1min_'))
+    : [];
+  const all = [];
+  for (const f of files) all.push(...JSON.parse(fs.readFileSync(path.join(CACHE, f))));
+  const seen = new Set();
+  return all
+    .filter(c => { if (seen.has(c.time)) return false; seen.add(c.time); return true; })
+    .sort((a, b) => new Date(a.time) - new Date(b.time))
+    .map(c => ({
+      time: c.time,
+      open:  c.open  * PRICE_SCALE,
+      high:  c.high  * PRICE_SCALE,
+      low:   c.low   * PRICE_SCALE,
+      close: c.close * PRICE_SCALE,
+      volume: c.volume || 0
+    }));
+}
+
 function rollup(src, factor) {
   const out = [];
   for (let i = 0; i < src.length; i += factor) {
@@ -70,21 +92,21 @@ function rollup(src, factor) {
 // ─── ICT engine (identical logic to live src/ict.js) ──────────────────────────
 
 function detectSweep(candles15m, candles5m) {
-  const LOOKBACK = 50;
-  const recent15 = candles15m.slice(-LOOKBACK);
+  const LOOKBACK = 100;
+  const recent5  = candles5m.slice(-LOOKBACK);
   const last5    = candles5m[candles5m.length - 1];
   const levels   = [];
 
-  for (let i = 2; i < recent15.length - 1; i++) {
-    const c = recent15[i];
-    const prev = recent15.slice(Math.max(0, i-10), i);
+  for (let i = 2; i < recent5.length - 1; i++) {
+    const c = recent5[i];
+    const prev = recent5.slice(Math.max(0, i-10), i);
     const eqH = prev.find(p => Math.abs(p.high - c.high) / c.high < 0.0005);
     if (eqH) levels.push({ price: Math.max(c.high, eqH.high), type: 'BSL', name: 'Equal Highs (BSL)' });
     const eqL = prev.find(p => Math.abs(p.low - c.low) / c.low < 0.0005);
     if (eqL) levels.push({ price: Math.min(c.low, eqL.low), type: 'SSL', name: 'Equal Lows (SSL)' });
   }
 
-  const yesterday = candles15m.slice(-100).filter(c => {
+  const yesterday = candles5m.slice(-300).filter(c => {
     const h = new Date(c.time).getUTCHours(); return h >= 21 || h < 2;
   });
   if (yesterday.length) {
@@ -182,7 +204,27 @@ function detectFVG(candles5m, sweepDir) {
     confirmed = wickedIn && closedBack && (best.top - prev.low) >= best.size * 0.5;
   }
 
-  return { found: true, top: best.top, bottom: best.bottom, size: best.size, inFVG: confirmed };
+  return { found: true, top: best.top, bottom: best.bottom, size: best.size, inFVG: confirmed, zoneFormedAt: prev.time };
+}
+
+// 1m entry trigger: first 1m candle (after the zone exists) that wicks into the
+// FVG zone and closes back out — the true, immediately-actionable fill, instead of
+// waiting for the whole 5m candle to close (which is often already stale by then).
+function findEntryTrigger1m(candles1m, fvg, sweepDir, notAfter) {
+  if (!fvg.found || !fvg.zoneFormedAt || !candles1m || !candles1m.length) return null;
+  const zoneStart = new Date(fvg.zoneFormedAt).getTime();
+  const cutoff    = notAfter ? new Date(notAfter).getTime() : Infinity;
+  for (const c of candles1m) {
+    const t = new Date(c.time).getTime();
+    if (t <= zoneStart) continue;
+    if (t > cutoff) break;
+    if (sweepDir === 'bear') {
+      if (c.high >= fvg.bottom && c.close <= fvg.top) return { price: c.close, time: c.time };
+    } else {
+      if (c.low <= fvg.top && c.close >= fvg.bottom) return { price: c.close, time: c.time };
+    }
+  }
+  return null;
 }
 
 // TP logic — identical to live src/ict.js: TP2 >= 2.5R, TP3 >= 3.5R
@@ -293,16 +335,27 @@ function run() {
 
   const all5m = loadCached('5min', 2025, 5, 2026, 6);
   const allH1 = loadCached('1h',  2025, 5, 2026, 6);
+  const ENTRY_MODE = process.env.ENTRY_MODE || 'close'; // 'close' = legacy chase, 'wick' = FVG candle close, '1m' = real 1m entry trigger
+  const all1m = ENTRY_MODE === '1m' ? load1mCache() : [];
 
   if (!all5m.length) {
     console.log(chalk.red('  ✗ No 5m data found.'));
     process.exit(1);
   }
+  if (ENTRY_MODE === '1m' && !all1m.length) {
+    console.log(chalk.red('  ✗ No 1m data found (run the 1m cache fetch first).'));
+    process.exit(1);
+  }
 
   const all15m = rollup(all5m, 3);
 
-  const START = new Date('2025-06-01T00:00:00Z');
-  const END   = new Date('2026-06-05T23:59:59Z');
+  let START = new Date('2025-06-01T00:00:00Z');
+  let END   = new Date('2026-06-05T23:59:59Z');
+  if (ENTRY_MODE === '1m') {
+    // Real 1m data only covers the cached ~3-week window — restrict the backtest to it.
+    START = new Date(all1m[0].time);
+    END   = new Date(all1m[all1m.length - 1].time);
+  }
   const period5m = all5m.filter(c => { const t = new Date(c.time); return t >= START && t <= END; });
 
   console.log(chalk.gray(`  5m bars loaded:  ${all5m.length.toLocaleString()}`));
@@ -336,10 +389,20 @@ function run() {
     if (!dir || !mss.confirmed || !fvg.inFVG || conf.score < MIN_SCORE) continue;
 
     const isLong = dir === 'bull';
-    const ENTRY_MODE = process.env.ENTRY_MODE || 'close'; // 'close' = legacy chase, 'wick' = ICT-style entry at the FVG retracement candle
-    const entry  = ENTRY_MODE === 'wick'
-      ? slice5m[slice5m.length - 2].close   // the candle that wicked into the FVG and closed back — true ICT entry, no extra lag candle
-      : bar.close;                          // legacy: wait one more candle (matches old live src/ict.js)
+
+    let entry, entryTriggerTime = bar.time;
+    if (ENTRY_MODE === '1m') {
+      // Day-end cutoff so we never "find" a trigger from the next trading day
+      const dayEndCutoff = new Date(Date.UTC(time.getUTCFullYear(), time.getUTCMonth(), time.getUTCDate(), DAY_END_HOUR, 0, 0));
+      const trigger = findEntryTrigger1m(all1m, fvg, dir, dayEndCutoff);
+      if (!trigger) continue; // zone never actually got retraced into on the 1m chart — no real fill
+      entry = trigger.price;
+      entryTriggerTime = trigger.time;
+    } else if (ENTRY_MODE === 'wick') {
+      entry = slice5m[slice5m.length - 2].close; // the candle that wicked into the FVG and closed back — true ICT entry, no extra lag candle
+    } else {
+      entry = bar.close; // legacy: wait one more candle (matches old live src/ict.js)
+    }
 
     // SL: anchored to the actual liquidity-sweep wick (ICT invalidation point) when SL_MODE=wick,
     // else legacy swing high/low of last N candles (N tunable via SL_LOOKBACK)
@@ -367,7 +430,8 @@ function run() {
 
     // Force-close window: same UTC calendar day, up to 21:00 UTC
     const dayEnd = new Date(Date.UTC(time.getUTCFullYear(), time.getUTCMonth(), time.getUTCDate(), DAY_END_HOUR, 0, 0));
-    const future = period5m.filter((c, idx) => idx > i && new Date(c.time) <= dayEnd);
+    const entryTime = new Date(entryTriggerTime);
+    const future = period5m.filter(c => { const t = new Date(c.time); return t > entryTime && t <= dayEnd; });
 
     const outcome = simulateOutcomeSameDay(dir, entry, sl, tp1, tp2, tp3, risk, future);
 
@@ -382,7 +446,7 @@ function run() {
     }
 
     signals.push({
-      time: bar.time, dir: isLong ? 'BUY' : 'SELL',
+      time: bar.time, entryTriggerTime, dir: isLong ? 'BUY' : 'SELL',
       entry: +entry.toFixed(2), sl: +sl.toFixed(2),
       tp1: +tp1.toFixed(2), tp2: +tp2.toFixed(2), tp3: +tp3.toFixed(2),
       riskPts: +risk.toFixed(2),

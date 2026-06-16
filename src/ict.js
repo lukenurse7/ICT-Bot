@@ -41,32 +41,35 @@ function htfBias(dailyCandles, h4Candles) {
 }
 
 // ─── Liquidity Sweep Detection ────────────────────────────────────────────────
+// Everything — levels, wick, sweep — runs on the 5m timeframe only.
+// Mixing in 15m levels caused the 15m's different candle boundaries to disagree
+// with what the 5m chart was actually showing at the moment of the sweep.
 function detectSweep(candles15m, candles5m) {
-  const LOOKBACK = 50;
-  const recent15 = candles15m.slice(-LOOKBACK);
+  const LOOKBACK = 100;
+  const recent5  = candles5m.slice(-LOOKBACK);
   const last5    = candles5m[candles5m.length - 1];
 
-  // Collect significant swing levels from 15m
+  // Collect significant swing levels from 5m
   const levels = [];
 
   // Equal highs (BSL)
-  for (let i = 2; i < recent15.length - 1; i++) {
-    const c = recent15[i];
-    const prev = recent15.slice(Math.max(0, i-10), i);
+  for (let i = 2; i < recent5.length - 1; i++) {
+    const c = recent5[i];
+    const prev = recent5.slice(Math.max(0, i-10), i);
     const eqHigh = prev.find(p => Math.abs(p.high - c.high) / c.high < 0.0005);
     if (eqHigh) levels.push({ price: Math.max(c.high, eqHigh.high), type: 'BSL', name: 'Equal Highs (BSL)' });
   }
 
   // Equal lows (SSL)
-  for (let i = 2; i < recent15.length - 1; i++) {
-    const c = recent15[i];
-    const prev = recent15.slice(Math.max(0, i-10), i);
+  for (let i = 2; i < recent5.length - 1; i++) {
+    const c = recent5[i];
+    const prev = recent5.slice(Math.max(0, i-10), i);
     const eqLow = prev.find(p => Math.abs(p.low - c.low) / c.low < 0.0005);
     if (eqLow) levels.push({ price: Math.min(c.low, eqLow.low), type: 'SSL', name: 'Equal Lows (SSL)' });
   }
 
   // Prev day high/low
-  const yesterday = candles15m.slice(-100).filter(c => {
+  const yesterday = candles5m.slice(-300).filter(c => {
     const d = new Date(c.time); return d.getUTCHours() >= 21 || d.getUTCHours() < 2;
   });
   if (yesterday.length) {
@@ -178,6 +181,7 @@ function detectFVG(candles5m, sweepDir) {
 
   // Confirmation candle: prev candle wicked into FVG and closed back out
   const prevCandle = window[window.length - 2];
+  const zoneFormedAt = window[best.idx + 1].time; // the 3rd candle of the FVG pattern — zone exists from here on
   let confirmedEntry = false;
 
   if (sweepDir === 'bear') {
@@ -199,8 +203,34 @@ function detectFVG(candles5m, sweepDir) {
     size: best.size,
     entryZone: `${best.bottom.toFixed(2)}–${best.top.toFixed(2)}`,
     inFVG: confirmedEntry,
-    confirmPrice: prevCandle.close // the FVG retracement candle's own close — the true ICT entry, no extra lag candle
+    zoneFormedAt,
+    confirmPrice: prevCandle.close // 5m fallback only — superseded by the 1m trigger when available
   };
+}
+
+// ─── 1-minute entry trigger ───────────────────────────────────────────────────
+// The 5m FVG candle only confirms the retracement once the whole 5m bar closes —
+// by then price has often already moved well past that close (stale fill).
+// Once the zone exists, scan forward on 1m candles for the first bar that actually
+// wicks into the zone and closes back out — that is the true, immediately-actionable entry.
+function findEntryTrigger1m(candles1m, fvg, sweepDir) {
+  if (!fvg.found || !fvg.zoneFormedAt || !candles1m || !candles1m.length) return null;
+
+  const zoneStart = new Date(fvg.zoneFormedAt).getTime();
+  const after = candles1m.filter(c => new Date(c.time).getTime() > zoneStart);
+
+  for (const c of after) {
+    if (sweepDir === 'bear') {
+      const wickedIn   = c.high >= fvg.bottom;
+      const closedBack = c.close <= fvg.top;
+      if (wickedIn && closedBack) return { price: c.close, time: c.time };
+    } else {
+      const wickedIn   = c.low <= fvg.top;
+      const closedBack = c.close >= fvg.bottom;
+      if (wickedIn && closedBack) return { price: c.close, time: c.time };
+    }
+  }
+  return null;
 }
 
 // ─── Liquidity-based TPs ──────────────────────────────────────────────────────
@@ -277,7 +307,7 @@ function scoreConfluence(sweep, mss, fvg) {
 
 // ─── Main Analysis ────────────────────────────────────────────────────────────
 function runICTAnalysis(data) {
-  const { daily, h4, h1, candles15m, candles5m, livePrice } = data;
+  const { daily, h4, h1, candles15m, candles5m, candles1m, livePrice } = data;
 
   const bias    = htfBias(daily, h4);
   const sweep   = detectSweep(candles15m, candles5m);
@@ -293,9 +323,12 @@ function runICTAnalysis(data) {
     const isLong = dir === 'bull';
     const noSignal = { bias, sweep, mss, fvg, confluence: conf, htfAligned: false, signal: null, signals: [], liquidity: { nearestBSL: null, nearestSSL: null }, structure: { bias, mss: null } };
 
-    // Entry: the FVG retracement candle's own close — the true ICT entry trigger,
-    // not the live tick or a later candle (which adds a full extra candle of chase/lag)
-    const entry = fvg.confirmPrice;
+    // Entry: find the actual moment price trades back into the FVG zone on the 1m
+    // chart — far more realistic than waiting for the whole 5m candle to close,
+    // by which point price has often already run well past that close (stale fill).
+    const trigger1m = findEntryTrigger1m(candles1m, fvg, dir);
+    if (!trigger1m) return noSignal; // zone not yet actually retraced into — no real fill available
+    const entry = trigger1m.price;
 
     // SL: beyond the actual liquidity-sweep wick (the real invalidation point),
     // not a generic recent-candle swing
@@ -337,6 +370,7 @@ function runICTAnalysis(data) {
       htfBias:  bias,
       hasFVG:   true,
       timestamp: new Date().toISOString(),
+      entryTriggerTime: trigger1m.time,
       price:    lastCandle.close
     };
   }
