@@ -20,7 +20,7 @@ const RISK_PCT      = 0.02;
 const TP1_R         = 1.5;
 const TP2_R         = parseFloat(process.env.TP2_R || '2.5');
 const TP3_R         = parseFloat(process.env.TP3_R || '3.5');
-const MIN_SCORE     = 80;
+const MIN_SCORE     = parseFloat(process.env.MIN_SCORE || '80');
 const COOLDOWN      = 36;        // 3h in 5m bars
 const DAY_END_HOUR  = 21;        // force-close at 21:00 UTC (NYSE close window)
 
