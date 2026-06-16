@@ -95,9 +95,9 @@ function detectSweep(candles15m, candles5m) {
   const results = [];
   for (const lvl of levels) {
     if (lvl.type === 'BSL' && last5.high > lvl.price && last5.close < lvl.price)
-      results.push({ dir: 'bear', level: lvl.price, levelName: lvl.name, barsAgo: 0 });
+      results.push({ dir: 'bear', level: lvl.price, levelName: lvl.name, barsAgo: 0, wick: last5.high });
     if (lvl.type === 'SSL' && last5.low < lvl.price && last5.close > lvl.price)
-      results.push({ dir: 'bull', level: lvl.price, levelName: lvl.name, barsAgo: 0 });
+      results.push({ dir: 'bull', level: lvl.price, levelName: lvl.name, barsAgo: 0, wick: last5.low });
   }
 
   for (let back = 1; back <= 12; back++) {
@@ -106,9 +106,9 @@ function detectSweep(candles15m, candles5m) {
     const c = candles5m[idx];
     for (const lvl of levels) {
       if (lvl.type === 'BSL' && c.high > lvl.price && c.close < lvl.price)
-        results.push({ dir: 'bear', level: lvl.price, levelName: lvl.name, barsAgo: back });
+        results.push({ dir: 'bear', level: lvl.price, levelName: lvl.name, barsAgo: back, wick: c.high });
       if (lvl.type === 'SSL' && c.low < lvl.price && c.close > lvl.price)
-        results.push({ dir: 'bull', level: lvl.price, levelName: lvl.name, barsAgo: back });
+        results.push({ dir: 'bull', level: lvl.price, levelName: lvl.name, barsAgo: back, wick: c.low });
     }
   }
 
@@ -335,20 +335,31 @@ function run() {
     if (!dir || !mss.confirmed || !fvg.inFVG || conf.score < MIN_SCORE) continue;
 
     const isLong = dir === 'bull';
-    const entry  = bar.close; // matches live: entry = current candle close
+    const ENTRY_MODE = process.env.ENTRY_MODE || 'close'; // 'close' = legacy chase, 'wick' = ICT-style entry at the FVG retracement candle
+    const entry  = ENTRY_MODE === 'wick'
+      ? slice5m[slice5m.length - 2].close   // the candle that wicked into the FVG and closed back — true ICT entry, no extra lag candle
+      : bar.close;                          // legacy: wait one more candle (matches old live src/ict.js)
 
-    // SL: swing high/low of last N candles (N tunable via SL_LOOKBACK env, default matches live src/ict.js)
-    const SL_LOOKBACK = parseInt(process.env.SL_LOOKBACK || '5', 10);
-    const recent5   = slice5m.slice(-SL_LOOKBACK);
-    const swingHigh = Math.max(...recent5.map(c => c.high));
-    const swingLow  = Math.min(...recent5.map(c => c.low));
-    const sl = isLong ? swingLow - swingLow*0.0005 : swingHigh + swingHigh*0.0005;
+    // SL: anchored to the actual liquidity-sweep wick (ICT invalidation point) when SL_MODE=wick,
+    // else legacy swing high/low of last N candles (N tunable via SL_LOOKBACK)
+    const SL_MODE = process.env.SL_MODE || 'swing';
+    let sl;
+    if (SL_MODE === 'wick' && sweep.wick != null) {
+      sl = isLong ? sweep.wick - sweep.wick*0.0005 : sweep.wick + sweep.wick*0.0005;
+    } else {
+      const SL_LOOKBACK = parseInt(process.env.SL_LOOKBACK || '5', 10);
+      const recent5   = slice5m.slice(-SL_LOOKBACK);
+      const swingHigh = Math.max(...recent5.map(c => c.high));
+      const swingLow  = Math.min(...recent5.map(c => c.low));
+      sl = isLong ? swingLow - swingLow*0.0005 : swingHigh + swingHigh*0.0005;
+    }
 
     if (isLong  && sl >= entry) continue;
     if (!isLong && sl <= entry) continue;
 
     const risk = Math.abs(entry - sl);
-    if (risk <= 0 || risk > entry * 0.02) continue;
+    const MIN_RISK_PTS = parseFloat(process.env.MIN_RISK_PTS || '0');
+    if (risk <= 0 || risk > entry * 0.02 || risk < MIN_RISK_PTS) continue;
 
     const tp1 = isLong ? entry + risk * TP1_R : entry - risk * TP1_R;
     const { tp2, tp2Desc, tp3, tp3Desc } = liquidityTPs(dir, entry, risk, slice5m, sliceH1);
