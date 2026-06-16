@@ -15,7 +15,7 @@ const chalk = require('chalk');
 const fs    = require('fs');
 const path  = require('path');
 
-const ACCOUNT_START = 2000;
+const ACCOUNT_START = parseFloat(process.env.ACCOUNT_START || '2000');
 const RISK_PCT      = 0.02;
 const TP1_R         = 1.5;
 const TP2_R         = parseFloat(process.env.TP2_R || '2.5');
