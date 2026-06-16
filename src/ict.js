@@ -80,10 +80,10 @@ function detectSweep(candles15m, candles5m) {
   const results = [];
   for (const lvl of levels) {
     if (lvl.type === 'BSL' && last5.high > lvl.price && last5.close < lvl.price) {
-      results.push({ dir: 'bear', level: lvl.price, levelName: lvl.name, barsAgo: 0 });
+      results.push({ dir: 'bear', level: lvl.price, levelName: lvl.name, barsAgo: 0, wick: last5.high });
     }
     if (lvl.type === 'SSL' && last5.low < lvl.price && last5.close > lvl.price) {
-      results.push({ dir: 'bull', level: lvl.price, levelName: lvl.name, barsAgo: 0 });
+      results.push({ dir: 'bull', level: lvl.price, levelName: lvl.name, barsAgo: 0, wick: last5.low });
     }
   }
 
@@ -94,10 +94,10 @@ function detectSweep(candles15m, candles5m) {
     const c = candles5m[idx];
     for (const lvl of levels) {
       if (lvl.type === 'BSL' && c.high > lvl.price && c.close < lvl.price) {
-        results.push({ dir: 'bear', level: lvl.price, levelName: lvl.name, barsAgo: back });
+        results.push({ dir: 'bear', level: lvl.price, levelName: lvl.name, barsAgo: back, wick: c.high });
       }
       if (lvl.type === 'SSL' && c.low < lvl.price && c.close > lvl.price) {
-        results.push({ dir: 'bull', level: lvl.price, levelName: lvl.name, barsAgo: back });
+        results.push({ dir: 'bull', level: lvl.price, levelName: lvl.name, barsAgo: back, wick: c.low });
       }
     }
   }
@@ -198,17 +198,18 @@ function detectFVG(candles5m, sweepDir) {
     bottom: best.bottom,
     size: best.size,
     entryZone: `${best.bottom.toFixed(2)}–${best.top.toFixed(2)}`,
-    inFVG: confirmedEntry
+    inFVG: confirmedEntry,
+    confirmPrice: prevCandle.close // the FVG retracement candle's own close — the true ICT entry, no extra lag candle
   };
 }
 
 // ─── Liquidity-based TPs ──────────────────────────────────────────────────────
-// Minimums match the backtest exactly: TP2 ≥ 2.5R, TP3 ≥ 3.5R
+// Minimums match the validated same-day backtest: TP2 ≥ 2.0R, TP3 ≥ 2.5R
 // Liquidity targets (5m equal H/L, 1H swings) used only if they clear the minimum
 function liquidityTPs(dir, entry, risk, candles5m, h1Candles) {
   const isLong  = dir === 'bull';
-  const minTP2  = isLong ? entry + risk * 2.5 : entry - risk * 2.5;
-  const minTP3  = isLong ? entry + risk * 3.5 : entry - risk * 3.5;
+  const minTP2  = isLong ? entry + risk * 2.0 : entry - risk * 2.0;
+  const minTP3  = isLong ? entry + risk * 2.5 : entry - risk * 2.5;
   const maxR    = 5.0;
 
   const candidates = [];
@@ -254,8 +255,8 @@ function liquidityTPs(dir, entry, risk, candles5m, h1Candles) {
       : t.price <= minTP3 && t.price > entry - risk * maxR)
     .sort((a, b) => isLong ? a.price - b.price : b.price - a.price);
 
-  const tp2obj = tp2candidates[0] || { price: isLong ? entry + risk*2.5 : entry - risk*2.5, desc: 'Fixed 2.5R' };
-  const tp3obj = tp3candidates[0] || { price: isLong ? entry + risk*3.5 : entry - risk*3.5, desc: 'Fixed 3.5R' };
+  const tp2obj = tp2candidates[0] || { price: isLong ? entry + risk*2.0 : entry - risk*2.0, desc: 'Fixed 2.0R' };
+  const tp3obj = tp3candidates[0] || { price: isLong ? entry + risk*2.5 : entry - risk*2.5, desc: 'Fixed 2.5R' };
 
   return { tp2: tp2obj.price, tp2Desc: tp2obj.desc, tp3: tp3obj.price, tp3Desc: tp3obj.desc };
 }
@@ -290,21 +291,29 @@ function runICTAnalysis(data) {
   if (dir && mss.confirmed && fvg.inFVG && conf.score >= 80) {
     const lastCandle = candles5m[candles5m.length - 1];
     const isLong = dir === 'bull';
-    const entry  = livePrice || lastCandle.close;
+    const noSignal = { bias, sweep, mss, fvg, confluence: conf, htfAligned: false, signal: null, signals: [], liquidity: { nearestBSL: null, nearestSSL: null }, structure: { bias, mss: null } };
 
-    // SL: beyond the sweep wick (recent swing high/low of last 5 candles)
-    const recent5 = candles5m.slice(-5);
-    const swingHigh = Math.max(...recent5.map(c => c.high));
-    const swingLow  = Math.min(...recent5.map(c => c.low));
+    // Entry: the FVG retracement candle's own close — the true ICT entry trigger,
+    // not the live tick or a later candle (which adds a full extra candle of chase/lag)
+    const entry = fvg.confirmPrice;
+
+    // SL: beyond the actual liquidity-sweep wick (the real invalidation point),
+    // not a generic recent-candle swing
+    if (sweep.wick == null) return noSignal;
     const sl = isLong
-      ? swingLow  - (swingLow  * 0.0005)
-      : swingHigh + (swingHigh * 0.0005);
+      ? sweep.wick - (sweep.wick * 0.0005)
+      : sweep.wick + (sweep.wick * 0.0005);
 
     // Sanity check: SL must be on the correct side of entry
-    if (isLong  && sl >= entry) return { bias, sweep, mss, fvg, confluence: conf, htfAligned: false, signal: null, signals: [], liquidity: { nearestBSL: null, nearestSSL: null }, structure: { bias, mss: null } };
-    if (!isLong && sl <= entry) return { bias, sweep, mss, fvg, confluence: conf, htfAligned: false, signal: null, signals: [], liquidity: { nearestBSL: null, nearestSSL: null }, structure: { bias, mss: null } };
+    if (isLong  && sl >= entry) return noSignal;
+    if (!isLong && sl <= entry) return noSignal;
 
     const risk = Math.abs(entry - sl);
+
+    // Minimum stop floor — rejects unrealistically tight stops (spread/slippage risk)
+    const MIN_RISK_PTS = 25;
+    if (risk < MIN_RISK_PTS) return noSignal;
+
     const tp1  = isLong ? entry + risk * 1.5 : entry - risk * 1.5;
 
     const { tp2, tp2Desc, tp3, tp3Desc } = liquidityTPs(dir, entry, risk, candles5m, h1);
