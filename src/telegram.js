@@ -55,7 +55,7 @@ function signalMessage(sig) {
     ``,
     `📋 Sweep: <b>${sweep}</b>  →  MSS: <b>${mss}</b>  →  FVG: ✅`,
     ``,
-    `⚠️ <i>Kill zone signal — NY open 14:00–16:00 GMT only</i>`,
+    `⚠️ <i>Kill zone signal — NY open 13:30–16:00 GMT only</i>`,
   ].join('\n');
 }
 
