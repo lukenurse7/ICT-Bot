@@ -1,35 +1,32 @@
 'use strict';
 
 // ─── 1m Execution Engine ──────────────────────────────────────────────────────
-// Activated by 5m permission. Watches 1m candles for a refined ICT entry.
+// Activated by 5m permission with targetHigh and targetLow.
 //
-// Correct ICT execution flow (SHORT example):
-//   1. SWEEP    — 1m wick above a confirmed 1m swing high, close back below
-//   2. MSS      — 1m close below a recent swing low (structure shift to bearish)
-//   3. FVG      — displacement candle creates a 1m imbalance ABOVE current price
-//   4. RETEST   — price RALLIES back up into the FVG zone (this is the entry)
-//   5. ENTRY    — alert fires: enter SHORT at FVG midpoint, SL above sweep wick
-//
-// Why the retest step matters:
-//   After displacement the FVG is above price. We do NOT enter at the bottom of
-//   the move. We place a LIMIT at the FVG midpoint and wait for the pullback.
-//   This gives a tighter SL (sweep high → FVG entry) and better R:R.
-//
-// Expires after MAX_1M_BARS bars from activation with no signal.
+// Correct flow:
+//   1. SWEEP  — 1m candle wicks through the specific 5m targetHigh (SHORT) or
+//               targetLow (LONG) and closes back on the other side
+//   2. MSS    — displacement candle shifts 1m structure in signal direction
+//   3. FVG    — imbalance left behind by the displacement candle
+//   4. ENTRY  — price reaches the START of the FVG (limit order level)
+//               SHORT: c2.high (bottom of bear FVG)
+//               LONG:  c2.low  (top of bull FVG)
+//   SL  = sweep extreme + buffer
+//   TP1 = 3R, TP2 = opposite 5m level
 
-const MIN_RISK_PTS = parseFloat(process.env.MIN_RISK_PTS || '0.5');   // skip signals with < 0.5pt risk
-const MAX_1M_BARS  = parseInt(process.env.MAX_1M_BARS   || '60');     // expire after 60 mins
+const MIN_RISK_PTS = parseFloat(process.env.MIN_RISK_PTS || '0.5');
+const MAX_1M_BARS  = parseInt(process.env.MAX_1M_BARS   || '60');
 
-const DISPLACEMENT_RATIO = 0.35;   // body/range threshold
-const FVG_MIN_SIZE_1M    = 0.02;   // minimum FVG width in points
+const DISPLACEMENT_RATIO = 0.35;
+const FVG_MIN_SIZE_1M    = 0.02;
 
 const STATES = {
-  IDLE:     'IDLE',
-  WATCHING: 'WATCHING',
-  SWEPT:    'SWEPT',
-  MSS:      'MSS',
-  RETEST:   'RETEST',   // FVG found, waiting for price to return into it
-  ENTRY:    'ENTRY',
+  IDLE:        'IDLE',
+  WATCHING:    'WATCHING',
+  SWEPT:       'SWEPT',
+  MSS:         'MSS',
+  ENTRY_WATCH: 'ENTRY_WATCH',
+  ENTRY:       'ENTRY',
 };
 
 class Engine1m {
@@ -40,12 +37,12 @@ class Engine1m {
 
   activate(permission) {
     this._reset();
-    this.active    = true;
-    this.direction = permission.direction;   // 'SHORT' or 'LONG'
-    this.fvg5m     = permission.fvg;
-    this.sweep5m   = permission.sweep;
-    this.startBar  = null;
-    this.state     = STATES.WATCHING;
+    this.active      = true;
+    this.targetHigh  = permission.targetHigh;
+    this.targetLow   = permission.targetLow;
+    this.sweep5m     = { targetHigh: permission.targetHigh, targetLow: permission.targetLow };
+    this.startBar    = null;
+    this.state       = STATES.WATCHING;
   }
 
   tick(candles1m) {
@@ -59,66 +56,66 @@ class Engine1m {
       return this._result(`Expired — no entry in ${MAX_1M_BARS} bars`);
     }
 
-    const isShort = this.direction === 'SHORT';
-
-    // ── STEP 1: Look for 1m sweep of a confirmed swing high/low ─────────────
+    // ── STEP 1: Sweep of the specific 5m level ───────────────────────────────
     if (this.state === STATES.WATCHING) {
-      const sweep = this._detectSweep(candles1m, isShort);
+      const sweep = this._detectSweep(candles1m);
       if (!sweep) {
-        return this._result(`Watching for 1m ${isShort ? 'bear' : 'bull'} sweep [${barsElapsed}/${MAX_1M_BARS}m]`);
+        return this._result(
+          `Watching for sweep of 5m H:${this.targetHigh?.toFixed(2)} L:${this.targetLow?.toFixed(2)} [${barsElapsed}/${MAX_1M_BARS}m]`
+        );
       }
       this.sweep1m     = sweep;
+      this.direction   = sweep.dir === 'bear' ? 'SHORT' : 'LONG';
       this.sweepBarIdx = candles1m.length - 1;
       this.state       = STATES.SWEPT;
     }
 
-    // ── STEP 2: Look for 1m MSS (structure shift in signal direction) ────────
+    // ── STEP 2: 1m MSS after sweep ───────────────────────────────────────────
     if (this.state === STATES.SWEPT) {
+      const isShort = this.direction === 'SHORT';
       const mss = this._detectMSS(candles1m, isShort);
       if (!mss) {
         const b = (candles1m.length - 1) - this.sweepBarIdx;
-        return this._result(`1m sweep ✓ — waiting for 1m MSS [${b}m]`);
+        return this._result(`Sweep ✓ (${this.direction}) — waiting for 1m MSS [${b}m]`);
       }
       this.mss1m     = mss;
       this.mssBarIdx = candles1m.length - 1;
       this.state     = STATES.MSS;
     }
 
-    // ── STEP 3: Look for 1m displacement + FVG ──────────────────────────────
+    // ── STEP 3: FVG from the displacement candle ─────────────────────────────
     if (this.state === STATES.MSS) {
+      const isShort = this.direction === 'SHORT';
       const fvg = this._detectFVG(candles1m, isShort);
       if (!fvg) {
         const b = (candles1m.length - 1) - this.mssBarIdx;
-        return this._result(`1m MSS ✓ (${this.mss1m.type}) — waiting for 1m FVG [${b}m]`);
+        return this._result(`MSS ✓ (${this.mss1m.type}) — waiting for 1m FVG [${b}m]`);
       }
       this.fvg1m = fvg;
-      this.state = STATES.RETEST;
-      return this._result(`1m FVG ✓ ${fvg.bottom.toFixed(2)}–${fvg.top.toFixed(2)} — waiting for retest`);
+      this.state = STATES.ENTRY_WATCH;
+      return this._result(`FVG ✓ ${fvg.bottom.toFixed(2)}–${fvg.top.toFixed(2)} — entry at ${fvg.entryLevel.toFixed(2)}`);
     }
 
-    // ── STEP 4: Wait for price to retest AND hold the FVG zone ─────────────
-    // We don't enter on the first wick into the FVG. We wait for a candle that:
-    //   SHORT: rallies up into the FVG AND closes back below the FVG top
-    //          (shows the FVG is acting as resistance — sellers stepped in)
-    //   LONG:  pulls back into the FVG AND closes back above the FVG bottom
-    //          (shows the FVG is acting as support — buyers stepped in)
-    // This filters out "blow-through" retests where price just falls through.
-    if (this.state === STATES.RETEST) {
-      const latest = candles1m[candles1m.length - 1];
-      const fvg    = this.fvg1m;
+    // ── STEP 4: Wait for price to reach the FVG start (limit level) ─────────
+    if (this.state === STATES.ENTRY_WATCH) {
+      const isShort = this.direction === 'SHORT';
+      const latest  = candles1m[candles1m.length - 1];
+      const fvg     = this.fvg1m;
 
-      const retestHeld = isShort
-        ? latest.high >= fvg.bottom && latest.close < fvg.top    // wick into FVG, close below FVG top
-        : latest.low  <= fvg.top   && latest.close > fvg.bottom; // wick into FVG, close above FVG bottom
+      // SHORT: price rallies back up to c2.high (FVG bottom), wick enters zone
+      // LONG:  price pulls back down to c2.low (FVG top), wick enters zone
+      const reached = isShort
+        ? latest.high >= fvg.entryLevel
+        : latest.low  <= fvg.entryLevel;
 
-      if (!retestHeld) {
-        return this._result(`Waiting for FVG retest+hold ${fvg.bottom.toFixed(2)}–${fvg.top.toFixed(2)}`);
+      if (!reached) {
+        return this._result(`Waiting for price to reach FVG start @ ${fvg.entryLevel.toFixed(2)}`);
       }
 
       const signal = this._buildSignal(isShort, latest);
       if (!signal) {
         this._reset();
-        return this._result(`FVG retest held but risk < ${MIN_RISK_PTS}pts — skipping`);
+        return this._result(`FVG reached but risk < ${MIN_RISK_PTS}pts — skipping`);
       }
 
       this.signal = signal;
@@ -132,94 +129,80 @@ class Engine1m {
     return this._result('Scanning 1m...');
   }
 
-  // ─── 1m sweep detection ────────────────────────────────────────────────────
-  // Requires a CONFIRMED 1m swing pivot (N candles each side), not just highest high.
-  // For SHORT: wick above a confirmed swing HIGH → close back below
-  // For LONG:  wick below a confirmed swing LOW  → close back above
-  _detectSweep(candles, isShort) {
-    if (candles.length < 8) return null;
-    const window = candles.slice(-40);
-    const last   = window[window.length - 1];
-    const LOOK   = 2;  // bars each side to confirm swing
-
-    if (isShort) {
-      // Find confirmed swing highs (higher than LOOK bars each side)
-      let bestLevel = -Infinity;
-      for (let i = LOOK; i < window.length - LOOK - 1; i++) {
-        const c = window[i];
-        let isHigh = true;
-        for (let j = 1; j <= LOOK; j++) {
-          if (c.high <= window[i - j].high || c.high <= window[i + j].high) { isHigh = false; break; }
-        }
-        if (isHigh) bestLevel = Math.max(bestLevel, c.high);
+  // ─── Sweep of specific 5m targetHigh or targetLow ─────────────────────────
+  _detectSweep(candles) {
+    if (candles.length < 3) return null;
+    // Check each of the last 5 candles for a sweep (catches missed ticks)
+    const window = candles.slice(-5);
+    for (let i = window.length - 1; i >= 0; i--) {
+      const bar = window[i];
+      // Bear sweep: wick above targetHigh, close back below
+      if (this.targetHigh != null && bar.high > this.targetHigh && bar.close < this.targetHigh) {
+        return { dir: 'bear', sweepCandle: bar, sweepHigh: bar.high, level: this.targetHigh };
       }
-      if (bestLevel === -Infinity) return null;
-      // Sweep: wick above the swing high, close back below
-      if (last.high > bestLevel && last.close < bestLevel) {
-        return { dir: 'bear', sweepCandle: last, sweepHigh: last.high, level: bestLevel };
-      }
-    } else {
-      // Find confirmed swing lows
-      let bestLevel = Infinity;
-      for (let i = LOOK; i < window.length - LOOK - 1; i++) {
-        const c = window[i];
-        let isLow = true;
-        for (let j = 1; j <= LOOK; j++) {
-          if (c.low >= window[i - j].low || c.low >= window[i + j].low) { isLow = false; break; }
-        }
-        if (isLow) bestLevel = Math.min(bestLevel, c.low);
-      }
-      if (bestLevel === Infinity) return null;
-      if (last.low < bestLevel && last.close > bestLevel) {
-        return { dir: 'bull', sweepCandle: last, sweepLow: last.low, level: bestLevel };
+      // Bull sweep: wick below targetLow, close back above
+      if (this.targetLow != null && bar.low < this.targetLow && bar.close > this.targetLow) {
+        return { dir: 'bull', sweepCandle: bar, sweepLow: bar.low, level: this.targetLow };
       }
     }
     return null;
   }
 
-  // ─── 1m MSS ────────────────────────────────────────────────────────────────
+  // ─── 1m MSS: displacement break of recent internal swing ──────────────────
   _detectMSS(candles, isShort) {
     const window = candles.slice(-20);
     if (window.length < 5) return null;
     const last = window[window.length - 1];
     const prev = window[window.length - 2];
 
-    if (isShort) {
-      // BOS down: close below a confirmed swing low
+    // Displacement: body must be meaningful
+    const range = last.high - last.low;
+    if (range === 0) return null;
+    const body = Math.abs(last.close - last.open);
+    if (body / range < DISPLACEMENT_RATIO) return null;
+
+    if (isShort && last.close < last.open) {
+      // BOS down: close below a recent swing low
       let swingLow = Infinity;
-      for (let i = 1; i < window.length - 2; i++) {
+      for (let i = 1; i < window.length - 1; i++) {
         const c = window[i];
         if (c.low < window[i - 1].low && c.low < window[i + 1].low)
           swingLow = Math.min(swingLow, c.low);
       }
-      if (swingLow < Infinity && last.close < swingLow && last.close < last.open)
+      if (swingLow < Infinity && last.close < swingLow)
         return { type: 'BOS_DOWN', level: swingLow, mssCandle: last };
       // CHoCH: close below previous candle's low
-      if (last.close < prev.low && last.close < last.open)
+      if (last.close < prev.low)
         return { type: 'CHoCH', level: prev.low, mssCandle: last };
-    } else {
+    }
+
+    if (!isShort && last.close > last.open) {
       let swingHigh = -Infinity;
-      for (let i = 1; i < window.length - 2; i++) {
+      for (let i = 1; i < window.length - 1; i++) {
         const c = window[i];
         if (c.high > window[i - 1].high && c.high > window[i + 1].high)
           swingHigh = Math.max(swingHigh, c.high);
       }
-      if (swingHigh > -Infinity && last.close > swingHigh && last.close > last.open)
+      if (swingHigh > -Infinity && last.close > swingHigh)
         return { type: 'BOS_UP', level: swingHigh, mssCandle: last };
-      if (last.close > prev.high && last.close > last.open)
+      if (last.close > prev.high)
         return { type: 'CHoCH', level: prev.high, mssCandle: last };
     }
+
     return null;
   }
 
-  // ─── 1m FVG + displacement ─────────────────────────────────────────────────
+  // ─── 1m FVG: 3-candle imbalance from displacement candle ──────────────────
+  // entryLevel = START of FVG (first price touched on retest)
+  //   SHORT: c2.high (bottom of bear FVG — price rallies up to here)
+  //   LONG:  c2.low  (top of bull FVG — price pulls back down to here)
   _detectFVG(candles, isShort) {
-    const window = candles.slice(-30);
+    const window = candles.slice(-15);
     const fvgs   = [];
 
     for (let i = 1; i < window.length - 1; i++) {
       const c0 = window[i - 1];
-      const c1 = window[i];
+      const c1 = window[i];       // displacement candle
       const c2 = window[i + 1];
 
       const range = c1.high - c1.low;
@@ -231,66 +214,79 @@ class Engine1m {
       if (isShort && c1.close < c1.open && c2.high < c0.low) {
         const size = c0.low - c2.high;
         if (size >= FVG_MIN_SIZE_1M)
-          fvgs.push({ dir: 'bear', top: c0.low, bottom: c2.high, mid: (c0.low + c2.high) / 2, size, time: c1.time });
+          fvgs.push({
+            dir:        'bear',
+            top:        c0.low,
+            bottom:     c2.high,
+            mid:        (c0.low + c2.high) / 2,
+            entryLevel: c2.high,   // START: bottom of bear FVG
+            size,
+            time: c1.time,
+          });
       }
+
       if (!isShort && c1.close > c1.open && c2.low > c0.high) {
         const size = c2.low - c0.high;
         if (size >= FVG_MIN_SIZE_1M)
-          fvgs.push({ dir: 'bull', top: c2.low, bottom: c0.high, mid: (c2.low + c0.high) / 2, size, time: c1.time });
+          fvgs.push({
+            dir:        'bull',
+            top:        c2.low,
+            bottom:     c0.high,
+            mid:        (c2.low + c0.high) / 2,
+            entryLevel: c2.low,    // START: top of bull FVG
+            size,
+            time: c1.time,
+          });
       }
     }
 
     return fvgs.length ? fvgs[fvgs.length - 1] : null;
   }
 
-  // ─── Build entry signal once price retests and holds FVG ────────────────────
-  // Entry = FVG midpoint
-  // SL    = beyond the WORST of (sweep wick extreme, FVG edge) + buffer
-  //         This ensures SL is outside the entire structure, not just the wick
-  // TP1   = 2R, TP2 = 3.5R
-  _buildSignal(isShort, retestCandle) {
-    const entry  = this.fvg1m.mid;
-    const sweep  = this.sweep1m;
+  // ─── Build entry signal ────────────────────────────────────────────────────
+  _buildSignal(isShort, triggerCandle) {
+    const entry    = this.fvg1m.entryLevel;
+    const sweep    = this.sweep1m;
+    const slBuffer = 0.10;
 
-    const slBuffer = 0.10;  // buffer beyond structure
     const sl = isShort
-      ? parseFloat((Math.max(sweep.sweepHigh, this.fvg1m.top) + slBuffer).toFixed(2))
-      : parseFloat((Math.min(sweep.sweepLow, this.fvg1m.bottom) - slBuffer).toFixed(2));
+      ? parseFloat((sweep.sweepHigh + slBuffer).toFixed(2))
+      : parseFloat((sweep.sweepLow  - slBuffer).toFixed(2));
 
     const risk = Math.abs(entry - sl);
-
-    // Reject signals where risk is too small (setup is degenerate)
     if (risk < MIN_RISK_PTS) return null;
 
     const tp1 = isShort
-      ? parseFloat((entry - risk * 2).toFixed(2))
-      : parseFloat((entry + risk * 2).toFixed(2));
-    const tp2 = isShort
-      ? parseFloat((entry - risk * 3.5).toFixed(2))
-      : parseFloat((entry + risk * 3.5).toFixed(2));
+      ? parseFloat((entry - risk * 3).toFixed(2))
+      : parseFloat((entry + risk * 3).toFixed(2));
+
+    // TP2 = opposite 5m level
+    const tp2 = isShort ? this.targetLow : this.targetHigh;
 
     return {
-      instrument: this.instrument,
-      direction:  this.direction,
-      entry:      parseFloat(entry.toFixed(2)),
+      instrument:  this.instrument,
+      direction:   this.direction,
+      entry:       parseFloat(entry.toFixed(2)),
       sl,
       tp1,
-      tp2,
-      riskPts:    parseFloat(risk.toFixed(2)),
-      sweep5m:    this.sweep5m.levelName,
-      fvg5m:      this.fvg5m ? `${this.fvg5m.bottom.toFixed(2)}–${this.fvg5m.top.toFixed(2)}` : 'n/a',
-      sweep1m:    `wick to ${isShort ? sweep.sweepHigh.toFixed(2) : sweep.sweepLow.toFixed(2)}`,
-      mss1m:      `${this.mss1m.type} @ ${this.mss1m.level.toFixed(2)}`,
-      fvg1m:      `${this.fvg1m.bottom.toFixed(2)}–${this.fvg1m.top.toFixed(2)}`,
-      retestTime: retestCandle.time,
-      timestamp:  new Date().toISOString(),
+      tp2:         tp2 != null ? parseFloat(tp2.toFixed(2)) : null,
+      riskPts:     parseFloat(risk.toFixed(2)),
+      sweep5mH:    this.targetHigh,
+      sweep5mL:    this.targetLow,
+      sweep1m:     `wick to ${isShort ? sweep.sweepHigh.toFixed(2) : sweep.sweepLow.toFixed(2)}`,
+      mss1m:       `${this.mss1m.type} @ ${this.mss1m.level.toFixed(2)}`,
+      fvg1m:       `${this.fvg1m.bottom.toFixed(2)}–${this.fvg1m.top.toFixed(2)}`,
+      entryLevel:  `FVG start @ ${entry.toFixed(2)}`,
+      triggerTime: triggerCandle.time,
+      timestamp:   new Date().toISOString(),
     };
   }
 
   _reset() {
     this.active      = false;
     this.direction   = null;
-    this.fvg5m       = null;
+    this.targetHigh  = null;
+    this.targetLow   = null;
     this.sweep5m     = null;
     this.sweep1m     = null;
     this.mss1m       = null;

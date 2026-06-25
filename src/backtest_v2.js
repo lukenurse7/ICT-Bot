@@ -188,8 +188,7 @@ async function runBacktest() {
       dayState.gotFVG = true;
 
       if (DEBUG) console.log(`\n    ★ 5m PERMISSION GRANTED at ${nyHHMM(bar.time)} NY — switching to 1m`);
-      if (DEBUG) console.log(`      Direction: ${r5.permission.direction}`);
-      if (DEBUG) console.log(`      5m FVG: ${r5.permission.fvg.bottom.toFixed(2)}–${r5.permission.fvg.top.toFixed(2)}`);
+      if (DEBUG) console.log(`      5m H: ${r5.permission.targetHigh?.toFixed(2)}  L: ${r5.permission.targetLow?.toFixed(2)}`);
 
       engine1m.activate(r5.permission);
 
