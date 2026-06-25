@@ -34,11 +34,13 @@ const PIVOT_BARS = 3;
 
 // ─── Displacement filter ──────────────────────────────────────────────────────
 // A displacement candle body must be this fraction of the candle's total range
-const DISPLACEMENT_BODY_RATIO = 0.6;
+// Lowered to 0.4 — DIA/QQQ are ETFs with smaller candle bodies than futures
+const DISPLACEMENT_BODY_RATIO = 0.4;
 
 // ─── FVG minimum size ─────────────────────────────────────────────────────────
 // FVG must be at least this many points wide to count
-const FVG_MIN_SIZE = 1.0;
+// Lowered to 0.05 — ETF candles are much smaller than index futures
+const FVG_MIN_SIZE = 0.05;
 
 // ─── Scan interval ───────────────────────────────────────────────────────────
 const SCAN_INTERVAL_MS = 60 * 1000; // 60 seconds

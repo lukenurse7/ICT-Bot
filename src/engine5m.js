@@ -18,7 +18,7 @@
 const { latestPivots }                              = require('./swings');
 const { DISPLACEMENT_BODY_RATIO, FVG_MIN_SIZE }     = require('./config');
 
-const MAX_CANDLES_AFTER = parseInt(process.env.MAX_CANDLES_AFTER || '10');
+const MAX_CANDLES_AFTER = parseInt(process.env.MAX_CANDLES_AFTER || '20');
 
 const STATES = {
   IDLE:               'IDLE',
@@ -209,7 +209,7 @@ class Engine5m {
 
   // ─── FVG + displacement: 3-candle imbalance with strong body ────────────────
   _detectFVG(candles) {
-    const window = candles.slice(-30);
+    const window = candles.slice(-50);
     const dir    = this.sweep.dir;
     const fvgs   = [];
 
