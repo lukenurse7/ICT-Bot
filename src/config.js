@@ -38,8 +38,7 @@ const DISPLACEMENT_BODY_RATIO = 0.4;
 
 // ─── FVG minimum size ─────────────────────────────────────────────────────────
 // FVG must be at least this many points wide to count
-// DJ30 index moves in 10s of points — minimum meaningful FVG is ~5pts
-const FVG_MIN_SIZE = 5;
+const FVG_MIN_SIZE = 0.3;
 
 // ─── Scan interval ───────────────────────────────────────────────────────────
 const SCAN_INTERVAL_MS = 60 * 1000; // 60 seconds

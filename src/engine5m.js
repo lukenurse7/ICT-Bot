@@ -20,11 +20,13 @@ const { DISPLACEMENT_BODY_RATIO, FVG_MIN_SIZE }     = require('./config');
 
 const MAX_CANDLES_AFTER = parseInt(process.env.MAX_CANDLES_AFTER || '20');
 
+// 5m state machine: IDLE → WATCHING → SWEPT → PERMISSION_GRANTED
+// 5m only detects the liquidity sweep of a confirmed pivot.
+// MSS + FVG are 1m tasks handled by Engine1m.
 const STATES = {
   IDLE:               'IDLE',
   WATCHING:           'WATCHING',
   SWEPT:              'SWEPT',
-  MSS_CONFIRMED:      'MSS_CONFIRMED',
   PERMISSION_GRANTED: 'PERMISSION_GRANTED',
 };
 
@@ -39,10 +41,7 @@ class Engine5m {
     this.state        = STATES.IDLE;
     this.sessionKey   = null;
     this.sweep        = null;
-    this.sweepBarIdx  = null;   // candle index when sweep was detected
-    this.mss          = null;
-    this.mssBarIdx    = null;
-    this.fvg          = null;
+    this.sweepBarIdx  = null;
     this.permission   = null;
   }
 
@@ -87,50 +86,16 @@ class Engine5m {
       this.state       = STATES.SWEPT;
     }
 
-    // SWEPT: look for MSS within MAX_CANDLES_AFTER bars
+    // SWEPT → PERMISSION GRANTED immediately
+    // 5m job is done: it detected the sweep of a pivot level inside KZ.
+    // MSS + FVG are 1m tasks — the 1m engine handles everything from here.
     if (this.state === STATES.SWEPT) {
-      const barsSinceSweep = currentBar - this.sweepBarIdx;
-      if (barsSinceSweep > MAX_CANDLES_AFTER) {
-        this._resetSetup(sessionKey);
-        return this._result(candles5m, `Sweep expired (>${MAX_CANDLES_AFTER} bars, no MSS) — resetting`);
-      }
-
-      const mss = this._detectMSS(candles5m);
-      if (!mss) {
-        return this._result(candles5m,
-          `Sweep: ${this.sweep.levelName} (${this.sweep.dir}) — waiting for MSS [${barsSinceSweep}/${MAX_CANDLES_AFTER} bars]`
-        );
-      }
-
-      this.mss       = mss;
-      this.mssBarIdx = currentBar;
-      this.state     = STATES.MSS_CONFIRMED;
-    }
-
-    // MSS CONFIRMED: look for displacement + FVG within MAX_CANDLES_AFTER bars
-    if (this.state === STATES.MSS_CONFIRMED) {
-      const barsSinceMSS = currentBar - this.mssBarIdx;
-      if (barsSinceMSS > MAX_CANDLES_AFTER) {
-        this._resetSetup(sessionKey);
-        return this._result(candles5m, `MSS expired (>${MAX_CANDLES_AFTER} bars, no FVG) — resetting`);
-      }
-
-      const fvg = this._detectFVG(candles5m);
-      if (!fvg) {
-        return this._result(candles5m,
-          `MSS: ${this.mss.type} @ ${this.mss.level.toFixed(2)} — waiting for displacement + FVG [${barsSinceMSS}/${MAX_CANDLES_AFTER} bars]`
-        );
-      }
-
-      this.fvg   = fvg;
       this.state = STATES.PERMISSION_GRANTED;
 
       this.permission = {
         instrument: this.instrument,
         direction:  this.sweep.dir === 'bear' ? 'SHORT' : 'LONG',
         sweep:      this.sweep,
-        mss:        this.mss,
-        fvg:        this.fvg,
         pivots:     { ...this.pivots },
         timestamp:  new Date().toISOString(),
       };
@@ -264,9 +229,6 @@ class Engine5m {
     this.sessionKey  = sessionKey;
     this.sweep       = null;
     this.sweepBarIdx = null;
-    this.mss         = null;
-    this.mssBarIdx   = null;
-    this.fvg         = null;
     this.permission  = null;
     // NOTE: this.pivots is intentionally NOT reset here
   }
@@ -278,14 +240,11 @@ class Engine5m {
       permissionGranted,
       permission:        this.permission,
       sweep:             this.sweep,
-      mss:               this.mss,
-      fvg:               this.fvg,
       waitReason,
       debug: {
         pivotHigh:  this.pivots.lastHigh?.price ?? null,
         pivotLow:   this.pivots.lastLow?.price  ?? null,
         latestBar:  latest?.time ?? null,
-        maxCandles: MAX_CANDLES_AFTER,
       },
     };
   }

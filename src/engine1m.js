@@ -17,11 +17,11 @@
 //
 // Expires after MAX_1M_BARS bars from activation with no signal.
 
-const MIN_RISK_PTS = parseFloat(process.env.MIN_RISK_PTS || '10');    // skip signals with < 10pt risk (DJ30 scale)
+const MIN_RISK_PTS = parseFloat(process.env.MIN_RISK_PTS || '0.5');   // skip signals with < 0.5pt risk
 const MAX_1M_BARS  = parseInt(process.env.MAX_1M_BARS   || '60');     // expire after 60 mins
 
 const DISPLACEMENT_RATIO = 0.35;   // body/range threshold
-const FVG_MIN_SIZE_1M    = 2;      // minimum FVG width — DJ30 moves in 10s of points
+const FVG_MIN_SIZE_1M    = 0.02;   // minimum FVG width in points
 
 const STATES = {
   IDLE:     'IDLE',
@@ -252,7 +252,7 @@ class Engine1m {
     const entry  = this.fvg1m.mid;
     const sweep  = this.sweep1m;
 
-    const slBuffer = 5;   // 5 point buffer beyond structure (DJ30 scale)
+    const slBuffer = 0.10;  // buffer beyond structure
     const sl = isShort
       ? parseFloat((Math.max(sweep.sweepHigh, this.fvg1m.top) + slBuffer).toFixed(2))
       : parseFloat((Math.min(sweep.sweepLow, this.fvg1m.bottom) - slBuffer).toFixed(2));
@@ -278,7 +278,7 @@ class Engine1m {
       tp2,
       riskPts:    parseFloat(risk.toFixed(2)),
       sweep5m:    this.sweep5m.levelName,
-      fvg5m:      `${this.fvg5m.bottom.toFixed(2)}–${this.fvg5m.top.toFixed(2)}`,
+      fvg5m:      this.fvg5m ? `${this.fvg5m.bottom.toFixed(2)}–${this.fvg5m.top.toFixed(2)}` : 'n/a',
       sweep1m:    `wick to ${isShort ? sweep.sweepHigh.toFixed(2) : sweep.sweepLow.toFixed(2)}`,
       mss1m:      `${this.mss1m.type} @ ${this.mss1m.level.toFixed(2)}`,
       fvg1m:      `${this.fvg1m.bottom.toFixed(2)}–${this.fvg1m.top.toFixed(2)}`,

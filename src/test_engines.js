@@ -61,24 +61,10 @@ function test5mEngine() {
   const sweepCandle = c(new Date(ts * 1000).toISOString(), 99.8, 101.0, 99.5, 99.3); ts += step;
   base.push(sweepCandle);
   let r = engine.tick('2024-01-02', base.slice(-51), true);
-  console.log(`After sweep:     state=${r.state}  sweep=${!!r.sweep}`);
-
-  // MSS: bearish close below a recent swing low
-  for (let i = 0; i < 3; i++) { base.push(c(new Date(ts * 1000).toISOString(), 99.2, 99.3, 99.0, 99.1)); ts += step; }
-  // Break the swing — close significantly lower
-  base.push(c(new Date(ts * 1000).toISOString(), 99.0, 99.1, 97.8, 97.9)); ts += step;
-  r = engine.tick('2024-01-02', base.slice(-55), true);
-  console.log(`After MSS:       state=${r.state}  mss=${!!r.mss}`);
-
-  // FVG: 3-candle bear imbalance with displacement
-  base.push(c(new Date(ts * 1000).toISOString(), 98.5, 98.7, 98.3, 98.4)); ts += step; // c0
-  base.push(c(new Date(ts * 1000).toISOString(), 98.3, 98.4, 96.5, 96.6)); ts += step; // c1 displacement bear
-  base.push(c(new Date(ts * 1000).toISOString(), 96.7, 97.0, 96.5, 96.8)); ts += step; // c2: high < c0.low (98.3) ✓
-  r = engine.tick('2024-01-02', base.slice(-58), true);
-  console.log(`After FVG:       state=${r.state}  permissionGranted=${r.permissionGranted}`);
+  console.log(`After sweep:     state=${r.state}  permissionGranted=${r.permissionGranted}`);
   if (r.permissionGranted) {
     console.log(`  Direction: ${r.permission.direction}`);
-    console.log(`  FVG: ${r.permission.fvg.bottom.toFixed(2)}–${r.permission.fvg.top.toFixed(2)}`);
+    console.log(`  Sweep: ${r.permission.sweep.levelName}  dir=${r.permission.direction}`);
     console.log('  ✅ PASS');
     return r.permission;
   } else {
