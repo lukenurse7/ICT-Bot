@@ -4,16 +4,16 @@
 // TwelveData symbols for each instrument
 const INSTRUMENTS = {
   DJ30: {
-    symbol:    'DIA',          // DJ30 ETF — available on TwelveData free tier
+    symbol:    'DJI',          // Dow Jones Industrial Average — actual index on TwelveData
     name:      'DJ30',
-    pipSize:   1,              // minimum move in points
-    maxRiskPts: 80,            // skip signals with stop wider than this
+    pipSize:   1,
+    maxRiskPts: 300,           // DJ30 is ~51,000 pts so SL can be 50-200pts wide
   },
   NAS100: {
-    symbol:    'QQQ',          // NAS100 ETF — available on TwelveData free tier
+    symbol:    'NDX',          // Nasdaq 100 index on TwelveData
     name:      'NAS100',
     pipSize:   1,
-    maxRiskPts: 120,
+    maxRiskPts: 500,
   },
 };
 
@@ -34,13 +34,12 @@ const PIVOT_BARS = 3;
 
 // ─── Displacement filter ──────────────────────────────────────────────────────
 // A displacement candle body must be this fraction of the candle's total range
-// Lowered to 0.4 — DIA/QQQ are ETFs with smaller candle bodies than futures
 const DISPLACEMENT_BODY_RATIO = 0.4;
 
 // ─── FVG minimum size ─────────────────────────────────────────────────────────
 // FVG must be at least this many points wide to count
-// Lowered to 0.05 — ETF candles are much smaller than index futures
-const FVG_MIN_SIZE = 0.05;
+// DJ30 index moves in 10s of points — minimum meaningful FVG is ~5pts
+const FVG_MIN_SIZE = 5;
 
 // ─── Scan interval ───────────────────────────────────────────────────────────
 const SCAN_INTERVAL_MS = 60 * 1000; // 60 seconds

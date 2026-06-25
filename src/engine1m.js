@@ -17,11 +17,11 @@
 //
 // Expires after MAX_1M_BARS bars from activation with no signal.
 
-const MIN_RISK_PTS = parseFloat(process.env.MIN_RISK_PTS || '0.75');  // skip signals with < 0.75pt risk
+const MIN_RISK_PTS = parseFloat(process.env.MIN_RISK_PTS || '10');    // skip signals with < 10pt risk (DJ30 scale)
 const MAX_1M_BARS  = parseInt(process.env.MAX_1M_BARS   || '60');     // expire after 60 mins
 
-const DISPLACEMENT_RATIO = 0.35;   // body/range — ETF 1m candles have small bodies
-const FVG_MIN_SIZE_1M    = 0.02;   // minimum FVG width in points
+const DISPLACEMENT_RATIO = 0.35;   // body/range threshold
+const FVG_MIN_SIZE_1M    = 2;      // minimum FVG width — DJ30 moves in 10s of points
 
 const STATES = {
   IDLE:     'IDLE',
@@ -252,11 +252,9 @@ class Engine1m {
     const entry  = this.fvg1m.mid;
     const sweep  = this.sweep1m;
 
-    const slBuffer = 0.10;
+    const slBuffer = 5;   // 5 point buffer beyond structure (DJ30 scale)
     const sl = isShort
-      // SL above the higher of: sweep wick high OR FVG top
       ? parseFloat((Math.max(sweep.sweepHigh, this.fvg1m.top) + slBuffer).toFixed(2))
-      // SL below the lower of: sweep wick low OR FVG bottom
       : parseFloat((Math.min(sweep.sweepLow, this.fvg1m.bottom) - slBuffer).toFixed(2));
 
     const risk = Math.abs(entry - sl);
