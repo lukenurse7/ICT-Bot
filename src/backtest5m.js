@@ -80,6 +80,13 @@ async function runBacktest() {
     const window = candles.slice(i - WINDOW + 1, i + 1);
     const result = engine.tick(sk, window, inKZ);
 
+    // Print state transitions
+    if (inKZ) {
+      const d = result.debug;
+      const stateStr = `    [${latest.time.slice(11,16)}] ${result.state.padEnd(18)} pivH:${d.pivotHigh?.toFixed(2) ?? '—'} pivL:${d.pivotLow?.toFixed(2) ?? '—'}  ${result.waitReason}`;
+      console.log(stateStr);
+    }
+
     if (result.permissionGranted && !signalFiredToday) {
       signalFiredToday = true;
       totalSignals++;
