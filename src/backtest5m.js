@@ -1,128 +1,119 @@
 'use strict';
 
 // ─── 5m Permission Engine Backtest ───────────────────────────────────────────
-// Replays historical 5m candles day by day through the Engine5m state machine
-// and prints every signal that would have fired, with context to verify quality.
+// Replays all candles in time order through the Engine5m state machine.
+// The engine receives a rolling window of the last 150 candles at each tick
+// (so it always has prior-day context to build confirmed pivots from).
+// Engine state resets at the start of each new NY KZ session.
 
 require('dotenv').config();
-const { fetchCandles }  = require('./data');
-const { Engine5m }      = require('./engine5m');
-const { INSTRUMENTS }   = require('./config');
+const { fetchCandles } = require('./data');
+const { Engine5m }     = require('./engine5m');
 
 const SYMBOL = process.argv[2] === 'NAS100' ? 'QQQ' : 'DIA';
 const NAME   = process.argv[2] === 'NAS100' ? 'NAS100' : 'DJ30';
+const WINDOW = 150;  // rolling candle window passed to engine each tick
 
-// NY Kill Zone hours in UTC — approximate (handles EST/EDT)
-// 08:30 NY = 13:30 UTC (EDT, Mar-Nov) or 14:30 UTC (EST, Nov-Mar)
-// We use 13:30-16:30 UTC to cover both
-const KZ_START_UTC = 13.5;  // 13:30
-const KZ_END_UTC   = 16.5;  // 16:30
+// NY Kill Zone in UTC — 13:30-16:30 covers both EST and EDT
+const KZ_START = 13 * 60 + 30;
+const KZ_END   = 16 * 60 + 30;
 
-function utcHour(timeStr) {
-  return new Date(timeStr).getUTCHours() + new Date(timeStr).getUTCMinutes() / 60;
+function toUTCMins(timeStr) {
+  const d = new Date(timeStr);
+  return d.getUTCHours() * 60 + d.getUTCMinutes();
 }
 
-function dateStr(timeStr) {
-  return timeStr.slice(0, 10);
+function isWeekday(timeStr) {
+  const day = new Date(timeStr).getUTCDay();
+  return day >= 1 && day <= 5;
 }
 
 function isInKZ(timeStr) {
-  const day = new Date(timeStr).getUTCDay();
-  if (day === 0 || day === 6) return false;
-  const h = utcHour(timeStr);
-  return h >= KZ_START_UTC && h < KZ_END_UTC;
+  if (!isWeekday(timeStr)) return false;
+  const m = toUTCMins(timeStr);
+  return m >= KZ_START && m < KZ_END;
+}
+
+// NY date key — UTC date is fine for our KZ window (13:30-16:30 UTC)
+function sessionKey(timeStr) {
+  return timeStr.slice(0, 10);
 }
 
 async function runBacktest() {
   console.log(`\n  ICT 5m Permission Engine — Backtest`);
   console.log(`  Instrument: ${NAME} (${SYMBOL})`);
-  console.log(`  Fetching 5 days of 5m data...\n`);
+  console.log(`  Fetching 10 days of 5m data...\n`);
 
-  // Fetch 5 days worth of 5m candles (5 days * 8h KZ window * 12 candles/h = ~480 candles)
-  const candles = await fetchCandles(SYMBOL, '5min', 500);
+  const candles = await fetchCandles(SYMBOL, '5min', 1000);
 
-  console.log(`  Got ${candles.length} candles from ${candles[0].time} to ${candles[candles.length-1].time}\n`);
+  console.log(`  Got ${candles.length} candles`);
+  console.log(`  From: ${candles[0].time}`);
+  console.log(`  To:   ${candles[candles.length - 1].time}\n`);
   console.log('  ' + '─'.repeat(70));
 
-  // Group candles by date
-  const byDate = {};
-  for (const c of candles) {
-    const d = dateStr(c.time);
-    if (!byDate[d]) byDate[d] = [];
-    byDate[d].push(c);
-  }
+  const engine       = new Engine5m(NAME);
+  let totalSignals   = 0;
+  let currentDay     = null;
+  let signalFiredToday = false;
 
-  const dates = Object.keys(byDate).sort();
-  let totalSignals = 0;
+  // Walk through every candle in time order
+  for (let i = WINDOW; i < candles.length; i++) {
+    const latest = candles[i];
+    const sk     = sessionKey(latest.time);
+    const inKZ   = isInKZ(latest.time);
 
-  for (const date of dates) {
-    const engine = new Engine5m(NAME);
-    const dayCandlesFull = byDate[date];
-
-    // Skip weekends
-    const day = new Date(date).getUTCDay();
-    if (day === 0 || day === 6) continue;
-
-    console.log(`\n  📅 ${date}`);
-
-    let signalFired = false;
-
-    // Replay candles one by one, simulating live scanning
-    for (let i = 10; i <= dayCandlesFull.length; i++) {
-      const slice  = dayCandlesFull.slice(0, i);
-      const latest = slice[slice.length - 1];
-      const inKZ   = isInKZ(latest.time);
-
-      const result = engine.tick(date, slice, inKZ);
-
-      if (result.permissionGranted && !signalFired) {
-        signalFired = true;
-        totalSignals++;
-
-        const perm = result.permission;
-        const sweepCandle = perm.sweep.sweepCandle;
-        const mssCandle   = perm.mss.mssCandle;
-        const fvg         = perm.fvg;
-
-        console.log(`\n  ★ PERMISSION GRANTED — ${perm.direction}`);
-        console.log(`    Time:      ${latest.time}`);
-        console.log(`    Direction: ${perm.direction}`);
-        console.log(`\n    1. SWEEP   ${perm.sweep.levelName}`);
-        console.log(`               Candle: ${sweepCandle.time}`);
-        console.log(`               High: ${sweepCandle.high.toFixed(2)}  Low: ${sweepCandle.low.toFixed(2)}  Close: ${sweepCandle.close.toFixed(2)}`);
-        console.log(`\n    2. MSS     ${perm.mss.type} @ ${perm.mss.level.toFixed(2)}`);
-        console.log(`               Candle: ${mssCandle.time}`);
-        console.log(`               High: ${mssCandle.high.toFixed(2)}  Low: ${mssCandle.low.toFixed(2)}  Close: ${mssCandle.close.toFixed(2)}`);
-        console.log(`\n    3. FVG     ${fvg.bottom.toFixed(2)} – ${fvg.top.toFixed(2)}  (mid ${fvg.mid.toFixed(2)})  size: ${fvg.size.toFixed(2)}`);
-        console.log(`               Direction: ${fvg.dir}  Time: ${fvg.time}`);
-
-        // Show what price did after the signal (next 6 candles = 30 mins)
-        const afterIdx = dayCandlesFull.indexOf(latest);
-        const next6    = dayCandlesFull.slice(afterIdx + 1, afterIdx + 7);
-        if (next6.length) {
-          const highAfter = Math.max(...next6.map(c => c.high));
-          const lowAfter  = Math.min(...next6.map(c => c.low));
-          console.log(`\n    Post-signal (30m): High ${highAfter.toFixed(2)}  Low ${lowAfter.toFixed(2)}`);
-          if (perm.direction === 'SHORT') {
-            const move = fvg.mid - lowAfter;
-            console.log(`    Max move in signal direction: ${move.toFixed(2)} pts ${move > 0 ? '✅' : '❌'}`);
-          } else {
-            const move = highAfter - fvg.mid;
-            console.log(`    Max move in signal direction: ${move.toFixed(2)} pts ${move > 0 ? '✅' : '❌'}`);
-          }
-        }
-        console.log('');
+    // New day — print header, reset signal flag
+    if (sk !== currentDay) {
+      if (currentDay && !signalFiredToday) {
+        console.log('    No signal fired during KZ');
+      }
+      currentDay = sk;
+      signalFiredToday = false;
+      if (isWeekday(latest.time)) {
+        console.log(`\n  📅 ${sk}`);
       }
     }
 
-    if (!signalFired) {
-      console.log('    No signal fired today');
+    if (!isWeekday(latest.time)) continue;
+
+    // Pass rolling window of last WINDOW candles
+    const window = candles.slice(i - WINDOW + 1, i + 1);
+    const result = engine.tick(sk, window, inKZ);
+
+    if (result.permissionGranted && !signalFiredToday) {
+      signalFiredToday = true;
+      totalSignals++;
+
+      const perm        = result.permission;
+      const sweepCandle = perm.sweep.sweepCandle;
+      const mssCandle   = perm.mss.mssCandle;
+      const fvg         = perm.fvg;
+
+      console.log(`\n  ★ ${perm.direction} PERMISSION — ${latest.time}`);
+      console.log(`    Sweep:  ${perm.sweep.levelName}`);
+      console.log(`            wick to ${perm.sweep.dir === 'bear' ? sweepCandle.high.toFixed(2) : sweepCandle.low.toFixed(2)}, close ${sweepCandle.close.toFixed(2)}`);
+      console.log(`    MSS:    ${perm.mss.type} @ ${perm.mss.level.toFixed(2)}, close ${mssCandle.close.toFixed(2)}`);
+      console.log(`    FVG:    ${fvg.bottom.toFixed(2)} – ${fvg.top.toFixed(2)}  mid ${fvg.mid.toFixed(2)}  size ${fvg.size.toFixed(2)}`);
+
+      // What did price do in the next 30 minutes (6 candles)?
+      const next6     = candles.slice(i + 1, i + 7);
+      if (next6.length) {
+        const highAfter = Math.max(...next6.map(c => c.high));
+        const lowAfter  = Math.min(...next6.map(c => c.low));
+        const moveDir   = perm.direction === 'SHORT' ? fvg.mid - lowAfter : highAfter - fvg.mid;
+        const worked    = moveDir > 0 ? '✅' : '❌';
+        console.log(`    After:  30m high ${highAfter.toFixed(2)}  low ${lowAfter.toFixed(2)}  → move ${moveDir.toFixed(2)} pts ${worked}`);
+      }
+      console.log('');
     }
   }
 
+  if (currentDay && !signalFiredToday) {
+    console.log('    No signal fired during KZ');
+  }
+
   console.log('\n  ' + '─'.repeat(70));
-  console.log(`\n  Total signals over period: ${totalSignals}`);
-  console.log(`  Across ${dates.filter(d => { const day = new Date(d).getUTCDay(); return day >= 1 && day <= 5; }).length} trading days\n`);
+  console.log(`\n  Total signals: ${totalSignals}\n`);
 }
 
 runBacktest().catch(e => console.error('Backtest error:', e.message));
