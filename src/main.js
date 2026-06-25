@@ -106,5 +106,9 @@ async function runCycle() {
 
 // Start
 console.log(chalk.bold.white('\n  ICT Signal Engine starting...\n'));
+
+// Send a startup message so we know Telegram is connected
+tg.send('🤖 <b>ICT Signal Engine started</b>\nScanning DJ30 + NAS100 during NY Kill Zone (08:30–11:00 NY time).\nWaiting for next setup...');
+
 runCycle();
 setInterval(runCycle, SCAN_INTERVAL_MS);
