@@ -1,45 +1,49 @@
 'use strict';
 
 // ─── Dual-Timeframe Backtest (5m Permission + 1m Entry) ──────────────────────
-// Fetches 5m + 1m historical data, replays both engines in time order,
-// and prints every entry signal with post-signal outcome.
+// Usage:
+//   node src/backtest_v2.js          → DJ30 (DIA)
+//   node src/backtest_v2.js NAS100   → NAS100 (QQQ)
+//   node src/backtest_v2.js --debug  → full candle-by-candle trace
 
 require('dotenv').config();
 const { fetchCandles } = require('./data');
 const { Engine5m }     = require('./engine5m');
 const { Engine1m }     = require('./engine1m');
 
-const SYMBOL = process.argv[2] === 'NAS100' ? 'QQQ' : 'DIA';
-const NAME   = process.argv[2] === 'NAS100' ? 'NAS100' : 'DJ30';
-const WINDOW_5M = 150;  // rolling context window for 5m engine
+const args    = process.argv.slice(2);
+const DEBUG   = args.includes('--debug');
+const inst    = args.find(a => !a.startsWith('--')) || 'DJ30';
+const SYMBOL  = inst === 'NAS100' ? 'QQQ' : 'DIA';
+const NAME    = inst === 'NAS100' ? 'NAS100' : 'DJ30';
 
-// Use NY timezone — identical to live engine
+const WINDOW_5M    = 150;   // rolling context window fed to 5m engine each tick
+const FETCH_SIZE   = 5000;  // request maximum data; API caps it at plan limit
+
+// ─── Time helpers (New York timezone) ────────────────────────────────────────
 function toNY(timeStr) {
-  const d   = new Date(timeStr);
-  const str = d.toLocaleString('en-US', { timeZone: 'America/New_York' });
+  const str = new Date(timeStr).toLocaleString('en-US', { timeZone: 'America/New_York' });
   const ny  = new Date(str);
   return { h: ny.getHours(), m: ny.getMinutes(), day: ny.getDay(), date: ny };
 }
-
-function isWeekday(timeStr) {
-  const { day } = toNY(timeStr);
-  return day >= 1 && day <= 5;
-}
-
-function inKZ(timeStr) {
-  if (!isWeekday(timeStr)) return false;
-  const { h, m } = toNY(timeStr);
+function isWeekday(t) { const { day } = toNY(t); return day >= 1 && day <= 5; }
+function inKZ(t) {
+  if (!isWeekday(t)) return false;
+  const { h, m } = toNY(t);
   const mins = h * 60 + m;
-  return mins >= 8 * 60 + 30 && mins < 11 * 60;  // 08:30–11:00 NY
+  return mins >= 8 * 60 + 30 && mins < 11 * 60;
 }
-
-function sessionKey(timeStr) {
-  const { date } = toNY(timeStr);
+function sessionKey(t) {
+  const { date } = toNY(t);
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 }
+function nyHHMM(t) {
+  const { h, m } = toNY(t);
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
 
-// Find 1m candles within a time range (from startTime onwards, up to N minutes)
-function get1mWindow(candles1m, startTime, minutes = 60) {
+// ─── 1m candle slice helpers ─────────────────────────────────────────────────
+function get1mSlice(candles1m, startTime, minutes) {
   const start = new Date(startTime).getTime();
   const end   = start + minutes * 60 * 1000;
   return candles1m.filter(c => {
@@ -48,126 +52,225 @@ function get1mWindow(candles1m, startTime, minutes = 60) {
   });
 }
 
-// Check outcome: did price reach TP1 or SL first in the next N candles?
-function checkOutcome(candles1m, signal, afterTime, lookforwardMins = 120) {
-  const window = get1mWindow(candles1m, afterTime, lookforwardMins);
-  if (!window.length) return { result: 'NO_DATA' };
-
+// ─── Outcome check: did TP1 or SL get hit first after entry? ─────────────────
+function checkOutcome(candles1m, signal, fromTime, lookMins = 120) {
+  const window = get1mSlice(candles1m, fromTime, lookMins);
+  if (!window.length) return { result: 'NO_DATA', bars: 0 };
   const isShort = signal.direction === 'SHORT';
-  for (const c of window) {
+  for (let i = 0; i < window.length; i++) {
+    const c = window[i];
     if (isShort) {
-      if (c.low  <= signal.tp1) return { result: 'TP1', bars: window.indexOf(c) + 1 };
-      if (c.high >= signal.sl)  return { result: 'SL',  bars: window.indexOf(c) + 1 };
+      if (c.low  <= signal.tp1) return { result: 'TP1', bars: i + 1 };
+      if (c.high >= signal.sl)  return { result: 'SL',  bars: i + 1 };
     } else {
-      if (c.high >= signal.tp1) return { result: 'TP1', bars: window.indexOf(c) + 1 };
-      if (c.low  <= signal.sl)  return { result: 'SL',  bars: window.indexOf(c) + 1 };
+      if (c.high >= signal.tp1) return { result: 'TP1', bars: i + 1 };
+      if (c.low  <= signal.sl)  return { result: 'SL',  bars: i + 1 };
     }
   }
   return { result: 'OPEN', bars: window.length };
 }
 
+// ─── Main ─────────────────────────────────────────────────────────────────────
 async function runBacktest() {
-  console.log(`\n  ══ ICT Dual-Timeframe Backtest ══`);
-  console.log(`  Instrument: ${NAME} (${SYMBOL})`);
-  console.log(`  Fetching data...\n`);
+  console.log(`\n${'═'.repeat(70)}`);
+  console.log(`  ICT Bot — Dual-Timeframe Backtest`);
+  console.log(`  Instrument : ${NAME} (${SYMBOL})`);
+  console.log(`  Strategy   : NY KZ 08:30–11:00 | Sweep → 5m MSS → 5m FVG → 1m entry`);
+  console.log(`${'═'.repeat(70)}\n`);
+  console.log(`  Fetching data (this may take a moment)...`);
 
-  const [candles5m, candles1m] = await Promise.all([
-    fetchCandles(SYMBOL, '5min', 500),
-    fetchCandles(SYMBOL, '1min', 500),
-  ]);
+  let candles5m, candles1m;
+  try {
+    [candles5m, candles1m] = await Promise.all([
+      fetchCandles(SYMBOL, '5min', FETCH_SIZE),
+      fetchCandles(SYMBOL, '1min', FETCH_SIZE),
+    ]);
+  } catch (e) {
+    console.error(`\n  ✗ Data fetch failed: ${e.message}`);
+    console.error(`  Check your TWELVEDATA_API_KEY in Railway environment variables.\n`);
+    process.exit(1);
+  }
 
-  console.log(`  5m: ${candles5m.length} candles  ${candles5m[0].time} → ${candles5m[candles5m.length-1].time}`);
-  console.log(`  1m: ${candles1m.length} candles  ${candles1m[0].time} → ${candles1m[candles1m.length-1].time}`);
-  console.log(`\n  ${'─'.repeat(65)}`);
+  console.log(`  5m candles : ${candles5m.length}  (${candles5m[0].time.slice(0,10)} → ${candles5m[candles5m.length-1].time.slice(0,10)})`);
+  console.log(`  1m candles : ${candles1m.length}  (${candles1m[0].time.slice(0,10)} → ${candles1m[candles1m.length-1].time.slice(0,10)})`);
+
+  const usable5m = candles5m.length - WINDOW_5M;
+  if (usable5m < 50) {
+    console.error(`\n  ✗ Not enough 5m data. Need at least ${WINDOW_5M + 50} candles, got ${candles5m.length}.`);
+    console.error(`  On TwelveData free plan you only get ~500 candles ≈ 5 trading days.`);
+    console.error(`  Upgrade your plan for longer backtests.\n`);
+    process.exit(1);
+  }
+
+  console.log(`  Backtesting : ${usable5m} 5m bars (≈ ${Math.round(usable5m / 78)} trading days)\n`);
+  console.log(`${'─'.repeat(70)}`);
 
   const engine5m = new Engine5m(NAME);
   const engine1m = new Engine1m(NAME);
 
-  let currentDay           = null;
-  let signalFiredToday     = false;
-  let totalSignals         = 0;
-  let tp1Hits = 0, slHits = 0;
+  // Per-day tracking
+  let currentDay       = null;
+  let dayState         = null;    // accumulates what happened each day
+  const signals        = [];
+  let totalDays        = 0;
 
-  for (let i = WINDOW_5M; i < candles5m.length; i++) {
-    const bar5m = candles5m[i];
-    const sk    = sessionKey(bar5m.time);
-    const kz    = inKZ(bar5m.time);
+  function printDaySummary() {
+    if (!dayState) return;
+    const { date, gotSweep, gotMSS, gotFVG, gotEntry, signal, outcome } = dayState;
 
-    if (sk !== currentDay) {
-      if (currentDay && !signalFiredToday) {
-        console.log(`    No signal`);
-      }
-      currentDay       = sk;
-      signalFiredToday = false;
-      if (isWeekday(bar5m.time)) {
-        process.stdout.write(`\n  📅 ${sk}  `);
+    // Progress icons showing how far the setup got
+    const steps = [
+      gotSweep  ? '✓ Sweep'   : '✗ Sweep',
+      gotMSS    ? '✓ 5m MSS'  : '✗ 5m MSS',
+      gotFVG    ? '✓ 5m FVG'  : '✗ 5m FVG',
+      gotEntry  ? '✓ 1m Entry': '✗ 1m Entry',
+    ].join('  →  ');
+
+    console.log(`  ${steps}`);
+    if (gotEntry && signal) {
+      const dir = signal.direction === 'SHORT' ? '▼ SHORT' : '▲ LONG';
+      console.log(`  ${dir}  Entry:${signal.entry}  SL:${signal.sl}  TP1:${signal.tp1}  Risk:${signal.riskPts}pts`);
+      if (dayState.sweepDesc) console.log(`  5m: ${dayState.sweepDesc} → ${dayState.mssDesc}`);
+      if (dayState.entry1mTime) console.log(`  1m entry at ${nyHHMM(dayState.entry1mTime)} NY`);
+      if (outcome) {
+        const o = outcome.result === 'TP1' ? `  ✅ TP1 HIT in ${outcome.bars} mins`
+                : outcome.result === 'SL'  ? `  ❌ SL  HIT in ${outcome.bars} mins`
+                : `  ⏳ Still open / no data after 2hrs`;
+        console.log(o);
       }
     }
+    console.log('');
+  }
 
-    if (!isWeekday(bar5m.time)) continue;
+  for (let i = WINDOW_5M; i < candles5m.length; i++) {
+    const bar  = candles5m[i];
+    const sk   = sessionKey(bar.time);
+    const kz   = inKZ(bar.time);
+    const wday = isWeekday(bar.time);
 
-    const window5m = candles5m.slice(i - WINDOW_5M + 1, i + 1);
-    const r5       = engine5m.tick(sk, window5m, kz);
+    if (!wday) continue;
 
-    // When 5m grants permission, run 1m engine on 1m candles from that moment
-    if (r5.permissionGranted && r5.permission && !signalFiredToday) {
+    // New day
+    if (sk !== currentDay) {
+      printDaySummary();
+      currentDay = sk;
+      totalDays++;
+      dayState = { date: sk, gotSweep: false, gotMSS: false, gotFVG: false, gotEntry: false, signal: null, outcome: null };
+      console.log(`  ── ${sk} ─────────────────────────────────────────────────`);
+    }
+
+    const win5m = candles5m.slice(i - WINDOW_5M + 1, i + 1);
+    const r5    = engine5m.tick(sk, win5m, kz);
+
+    // Track 5m milestones for the day summary
+    if (r5.sweep  && !dayState.gotSweep) {
+      dayState.gotSweep   = true;
+      dayState.sweepDesc  = r5.sweep.levelName;
+      if (DEBUG) console.log(`    [${nyHHMM(bar.time)}] SWEEP detected: ${r5.sweep.levelName} dir=${r5.sweep.dir}`);
+    }
+    if (r5.mss && !dayState.gotMSS) {
+      dayState.gotMSS  = true;
+      dayState.mssDesc = `${r5.mss.type}@${r5.mss.level.toFixed(2)}`;
+      if (DEBUG) console.log(`    [${nyHHMM(bar.time)}] MSS confirmed: ${r5.mss.type} @ ${r5.mss.level.toFixed(2)}`);
+    }
+    if (r5.fvg && !dayState.gotFVG) {
+      dayState.gotFVG = true;
+      if (DEBUG) console.log(`    [${nyHHMM(bar.time)}] FVG: ${r5.fvg.bottom.toFixed(2)}–${r5.fvg.top.toFixed(2)} size=${r5.fvg.size.toFixed(3)}`);
+    }
+
+    // DEBUG: print every candle in KZ
+    if (DEBUG && kz) {
+      console.log(`    [${nyHHMM(bar.time)}] ${r5.state.padEnd(18)} pH:${r5.debug.pivotHigh?.toFixed(2)??'--'} pL:${r5.debug.pivotLow?.toFixed(2)??'--'}  ${r5.waitReason.slice(0,50)}`);
+    }
+
+    // 5m permission granted — now switch to 1m
+    if (r5.permissionGranted && r5.permission && !dayState.gotEntry) {
+      dayState.gotFVG = true;
+
+      if (DEBUG) console.log(`\n    ★ 5m PERMISSION GRANTED at ${nyHHMM(bar.time)} NY — switching to 1m`);
+      if (DEBUG) console.log(`      Direction: ${r5.permission.direction}`);
+      if (DEBUG) console.log(`      5m FVG: ${r5.permission.fvg.bottom.toFixed(2)}–${r5.permission.fvg.top.toFixed(2)}`);
+
       engine1m.activate(r5.permission);
 
-      // Get 30 prior 1m candles for context + up to 60 mins forward for entry
-      const permTime   = new Date(bar5m.time).getTime();
-      const priorStart = new Date(permTime - 30 * 60 * 1000).toISOString();
-      const prior1m    = get1mWindow(candles1m, priorStart, 30);    // context before permission
-      const fwd1m      = get1mWindow(candles1m, bar5m.time, 60);    // search window after permission
+      // Prior 30 mins of 1m candles for structure context + 60 mins forward to find entry
+      const permMs   = new Date(bar.time).getTime();
+      const prior1m  = get1mSlice(candles1m, new Date(permMs - 30 * 60 * 1000).toISOString(), 30);
+      const fwd1m    = get1mSlice(candles1m, bar.time, 60);
+
+      if (DEBUG) console.log(`      1m context: ${prior1m.length} prior + ${fwd1m.length} forward candles`);
 
       let entrySignal = null;
       for (let j = 1; j <= fwd1m.length; j++) {
-        const slice1m = [...prior1m, ...fwd1m.slice(0, j)];
-        const r1      = engine1m.tick(slice1m);
+        const slice = [...prior1m, ...fwd1m.slice(0, j)];
+        const r1    = engine1m.tick(slice);
+
+        if (DEBUG && r1.state !== 'IDLE') {
+          const cur = fwd1m[j - 1];
+          console.log(`      1m [${nyHHMM(cur.time)}] ${r1.state.padEnd(10)} ${r1.waitReason.slice(0,50)}`);
+        }
+
         if (r1.entryReady && r1.signal) {
           entrySignal = r1.signal;
+          const entryTime = fwd1m[j - 1]?.time;
+          dayState.gotEntry    = true;
+          dayState.signal      = entrySignal;
+          dayState.entry1mTime = entryTime;
           engine1m._reset();
+
+          // Check TP1/SL outcome using all remaining 1m data from entry time
+          dayState.outcome = checkOutcome(candles1m, entrySignal, entryTime || bar.time, 120);
+
+          signals.push({ date: sk, ...entrySignal, outcome: dayState.outcome });
           break;
         }
       }
 
-      if (entrySignal) {
-        signalFiredToday = true;
-        totalSignals++;
-
-        const outcome = checkOutcome(candles1m, entrySignal, bar5m.time, 120);
-        const outcomeStr = outcome.result === 'TP1'
-          ? `✅ TP1 hit (${outcome.bars}m)`
-          : outcome.result === 'SL'
-          ? `❌ SL hit (${outcome.bars}m)`
-          : `⏳ ${outcome.result}`;
-
-        if (outcome.result === 'TP1') tp1Hits++;
-        if (outcome.result === 'SL')  slHits++;
-
-        console.log(`${entrySignal.direction}`);
-        console.log(`    5m: ${r5.permission.sweep.levelName} → ${r5.permission.mss.type}`);
-        console.log(`    1m: ${entrySignal.sweep1m} → ${entrySignal.mss1m}`);
-        console.log(`    Entry ${entrySignal.entry}  SL ${entrySignal.sl}  TP1 ${entrySignal.tp1}  Risk ${entrySignal.riskPts}pts`);
-        console.log(`    Outcome: ${outcomeStr}`);
-      } else {
-        process.stdout.write(`(5m ok, no 1m entry)  `);
+      if (!entrySignal) {
+        if (DEBUG) console.log(`      1m: no entry found in 60 mins after permission`);
       }
     }
   }
 
-  if (currentDay && !signalFiredToday) console.log(`    No signal`);
+  // Print final day
+  printDaySummary();
 
-  const tradingDays = [...new Set(
-    candles5m.filter(c => isWeekday(c.time)).map(c => sessionKey(c.time))
-  )].length;
+  // ─── Summary ─────────────────────────────────────────────────────────────
+  const tp1  = signals.filter(s => s.outcome?.result === 'TP1').length;
+  const sl   = signals.filter(s => s.outcome?.result === 'SL').length;
+  const open = signals.filter(s => s.outcome?.result === 'OPEN' || s.outcome?.result === 'NO_DATA').length;
+  const total = signals.length;
 
-  console.log(`\n  ${'─'.repeat(65)}`);
-  console.log(`\n  Results`);
-  console.log(`  Trading days:  ${tradingDays}`);
-  console.log(`  Total signals: ${totalSignals}`);
-  console.log(`  TP1 hits:      ${tp1Hits}  (${totalSignals ? Math.round(tp1Hits/totalSignals*100) : 0}%)`);
-  console.log(`  SL hits:       ${slHits}  (${totalSignals ? Math.round(slHits/totalSignals*100) : 0}%)`);
+  // Count how many days had each milestone
+  // (We count from signals array + dayState tracking — approximate)
+  console.log(`${'═'.repeat(70)}`);
+  console.log(`  BACKTEST SUMMARY — ${NAME}`);
+  console.log(`${'═'.repeat(70)}`);
+  console.log(`  Trading days in dataset : ${totalDays}`);
+  console.log(`  Days with full entry    : ${total}`);
   console.log('');
+  if (total > 0) {
+    console.log(`  TP1 hit  : ${tp1}  (${Math.round(tp1/total*100)}%)`);
+    console.log(`  SL hit   : ${sl}  (${Math.round(sl/total*100)}%)`);
+    console.log(`  Open/N/A : ${open}`);
+    console.log('');
+    console.log('  Per-signal detail:');
+    for (const s of signals) {
+      const dir = s.direction === 'SHORT' ? '▼' : '▲';
+      const o   = s.outcome?.result === 'TP1' ? '✅ TP1'
+                : s.outcome?.result === 'SL'  ? '❌ SL '
+                : '⏳    ';
+      console.log(`    ${s.date}  ${dir} ${s.direction.padEnd(5)}  Entry:${s.entry}  SL:${s.sl}  TP1:${s.tp1}  Risk:${s.riskPts}pts  ${o} (${s.outcome?.bars ?? '?'}m)`);
+    }
+  } else {
+    console.log(`  No complete signals found.`);
+    console.log(`  Tip: run with --debug flag to see why setups are not completing:`);
+    console.log(`       node src/backtest_v2.js --debug`);
+  }
+  console.log(`\n${'═'.repeat(70)}\n`);
 }
 
-runBacktest().catch(e => console.error('Error:', e.message));
+runBacktest().catch(e => {
+  console.error('\n  Error:', e.message);
+  process.exit(1);
+});
