@@ -169,41 +169,66 @@ class Engine5m {
     return null;
   }
 
-  // ─── MSS: CHoCH using the stored opposite pivot level ───────────────────────
-  // BEAR setup: swept the swing HIGH → MSS = close below the stored swing LOW
-  // BULL setup: swept the swing LOW  → MSS = close above the stored swing HIGH
-  // This is the correct ICT sequence: liquidity taken from one side,
-  // then structure breaks on the OTHER side confirming the reversal.
+  // ─── MSS: break of internal structure in the candles after the sweep ─────────
+  // After the sweep, price forms short-term internal swings.
+  // BEAR: find the most recent internal swing LOW formed since the sweep → close below it
+  // BULL: find the most recent internal swing HIGH formed since the sweep → close above it
+  // Using internal (recent) swings, not the all-day stored pivot, because the stored
+  // pivot can be 10+ points away and would never trigger in a single session.
   _detectMSS(candles) {
-    if (candles.length < 3) return null;
+    // Only look at candles from the sweep bar onwards
+    const window = candles.slice(Math.max(0, this.sweepBarIdx - (candles.length - candles.length)));
+    // Use the last 30 candles as the internal structure window
+    const recent = candles.slice(-30);
+    if (recent.length < 5) return null;
 
-    const last = candles[candles.length - 1];
+    const last = recent[recent.length - 1];
     const dir  = this.sweep.dir;
 
     if (dir === 'bear') {
-      // Need the stored swing LOW (opposite to the swept HIGH)
-      const mssLevel = this.pivots.lastLow?.price;
-      if (!mssLevel) return null;
-      // CHoCH: bearish close below the stored swing low
-      if (last.close < mssLevel && last.close < last.open)
-        return { type: 'CHoCH', level: mssLevel, mssCandle: last };
+      // Find the most recent confirmed internal swing LOW
+      let swingLow = Infinity;
+      let swingLowIdx = -1;
+      for (let i = 1; i < recent.length - 2; i++) {
+        const c = recent[i];
+        if (c.low < recent[i - 1].low && c.low < recent[i + 1].low) {
+          if (c.low < swingLow) { swingLow = c.low; swingLowIdx = i; }
+        }
+      }
+      // CHoCH: bearish candle closes below that internal swing low
+      if (swingLow < Infinity && last.close < swingLow && last.close < last.open)
+        return { type: 'CHoCH', level: swingLow, mssCandle: last };
+      // Fallback: close below the previous candle's low (immediate structure break)
+      const prev = recent[recent.length - 2];
+      if (last.close < prev.low && last.close < last.open)
+        return { type: 'CHoCH', level: prev.low, mssCandle: last };
     }
 
     if (dir === 'bull') {
-      // Need the stored swing HIGH (opposite to the swept LOW)
-      const mssLevel = this.pivots.lastHigh?.price;
-      if (!mssLevel) return null;
-      // CHoCH: bullish close above the stored swing high
-      if (last.close > mssLevel && last.close > last.open)
-        return { type: 'CHoCH', level: mssLevel, mssCandle: last };
+      // Find the most recent confirmed internal swing HIGH
+      let swingHigh = -Infinity;
+      for (let i = 1; i < recent.length - 2; i++) {
+        const c = recent[i];
+        if (c.high > recent[i - 1].high && c.high > recent[i + 1].high)
+          swingHigh = Math.max(swingHigh, c.high);
+      }
+      // CHoCH: bullish candle closes above that internal swing high
+      if (swingHigh > -Infinity && last.close > swingHigh && last.close > last.open)
+        return { type: 'CHoCH', level: swingHigh, mssCandle: last };
+      // Fallback: close above the previous candle's high
+      const prev = recent[recent.length - 2];
+      if (last.close > prev.high && last.close > last.open)
+        return { type: 'CHoCH', level: prev.high, mssCandle: last };
     }
 
     return null;
   }
 
   // ─── FVG + displacement: 3-candle imbalance with strong body ────────────────
+  // Searches the last 15 candles only — FVG must form close to the MSS,
+  // not from a pre-existing gap formed before the sweep.
   _detectFVG(candles) {
-    const window = candles.slice(-50);
+    const window = candles.slice(-15);
     const dir    = this.sweep.dir;
     const fvgs   = [];
 

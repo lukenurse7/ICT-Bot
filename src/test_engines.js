@@ -124,9 +124,14 @@ function test1mEngine(permission5m) {
   // 1m FVG: bear displacement
   candles.push(c(new Date(ts * 1000).toISOString(), 96.0, 96.2, 95.8, 95.9)); ts += step; // c0
   candles.push(c(new Date(ts * 1000).toISOString(), 95.8, 95.9, 94.5, 94.6)); ts += step; // c1 displacement
-  candles.push(c(new Date(ts * 1000).toISOString(), 94.7, 95.0, 94.5, 94.8)); ts += step; // c2: high < c0.low (95.8) ✓
+  candles.push(c(new Date(ts * 1000).toISOString(), 94.7, 95.0, 94.5, 94.8)); ts += step; // c2: high(95.0) < c0.low(95.8) ✓ → FVG: 95.0–95.8 mid=95.4
   r = engine.tick([...candles]);
-  console.log(`After 1m FVG:    state=${r.state}  entryReady=${r.entryReady}`);
+  console.log(`After 1m FVG:    state=${r.state}  ${r.waitReason.slice(0,60)}`);
+
+  // Retest: price rallies back UP into the FVG zone (95.0–95.8), wick enters from below
+  candles.push(c(new Date(ts * 1000).toISOString(), 94.9, 95.5, 94.8, 95.0)); ts += step; // high=95.5 enters FVG ✓
+  r = engine.tick([...candles]);
+  console.log(`After retest:    state=${r.state}  entryReady=${r.entryReady}`);
   if (r.entryReady && r.signal) {
     const s = r.signal;
     console.log(`  Entry: ${s.entry}  SL: ${s.sl}  TP1: ${s.tp1}  Risk: ${s.riskPts}pts`);
