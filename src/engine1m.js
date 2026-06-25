@@ -14,7 +14,7 @@
 //   SL  = sweep extreme + buffer
 //   TP1 = 3R, TP2 = opposite 5m level
 
-const MIN_RISK_PTS = parseFloat(process.env.MIN_RISK_PTS || '0.5');
+const MIN_RISK_PTS = parseFloat(process.env.MIN_RISK_PTS || '2.0');
 const MAX_1M_BARS  = parseInt(process.env.MAX_1M_BARS   || '60');
 
 const DISPLACEMENT_RATIO = 0.35;
@@ -251,10 +251,10 @@ class Engine1m {
     const sweep    = this.sweep1m;
     const slBuffer = 0.10;
 
-    // Use the wider of sweep extreme OR FVG edge — guarantees real distance from entry
+    // SL sits just beyond the sweep wick — that is the previous liquidity level
     const sl = isShort
-      ? parseFloat((Math.max(sweep.sweepHigh, this.fvg1m.top) + slBuffer).toFixed(2))
-      : parseFloat((Math.min(sweep.sweepLow,  this.fvg1m.bottom) - slBuffer).toFixed(2));
+      ? parseFloat((sweep.sweepHigh + slBuffer).toFixed(2))
+      : parseFloat((sweep.sweepLow  - slBuffer).toFixed(2));
 
     const risk = Math.abs(entry - sl);
     if (risk < MIN_RISK_PTS) return null;
