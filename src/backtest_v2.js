@@ -113,12 +113,15 @@ async function runBacktest() {
     if (r5.permissionGranted && r5.permission && !signalFiredToday) {
       engine1m.activate(r5.permission);
 
-      // Get 1m candles from permission time onwards (up to 30 mins)
-      const kzCandles1m = get1mWindow(candles1m, bar5m.time, 30);
+      // Get 30 prior 1m candles for context + up to 60 mins forward for entry
+      const permTime   = new Date(bar5m.time).getTime();
+      const priorStart = new Date(permTime - 30 * 60 * 1000).toISOString();
+      const prior1m    = get1mWindow(candles1m, priorStart, 30);    // context before permission
+      const fwd1m      = get1mWindow(candles1m, bar5m.time, 60);    // search window after permission
 
       let entrySignal = null;
-      for (let j = 5; j <= kzCandles1m.length; j++) {
-        const slice1m = kzCandles1m.slice(0, j);
+      for (let j = 1; j <= fwd1m.length; j++) {
+        const slice1m = [...prior1m, ...fwd1m.slice(0, j)];
         const r1      = engine1m.tick(slice1m);
         if (r1.entryReady && r1.signal) {
           entrySignal = r1.signal;

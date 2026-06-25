@@ -15,9 +15,9 @@
 // TP1: 2R, TP2: 3.5R (structure-based targets added in v3)
 // Expires after MAX_1M_BARS bars with no signal
 
-const MAX_1M_BARS          = parseInt(process.env.MAX_1M_BARS || '30');  // 30 mins
-const DISPLACEMENT_RATIO   = 0.55;   // 1m displacement body/range threshold (slightly relaxed vs 5m)
-const FVG_MIN_SIZE_1M      = 0.05;   // minimum 1m FVG size in points
+const MAX_1M_BARS          = parseInt(process.env.MAX_1M_BARS || '60');  // 60 mins
+const DISPLACEMENT_RATIO   = 0.35;   // 1m ETF candles have smaller bodies
+const FVG_MIN_SIZE_1M      = 0.02;   // minimum 1m FVG size in points
 
 const STATES = {
   IDLE:       'IDLE',
@@ -102,27 +102,46 @@ class Engine1m {
     return this._result('Scanning 1m...');
   }
 
-  // ─── 1m sweep: wick through a recent 1m swing, close back ───────────────────
-  // For SHORT: price wicks UP into/above 5m FVG zone then closes back down
-  // For LONG:  price wicks DOWN into/below 5m FVG zone then closes back up
+  // ─── 1m sweep: wick through a recent 1m swing high/low, close back ──────────
+  // Fully independent of 5m FVG — just finds recent 1m pivot and detects sweep.
+  // For SHORT: find highest 1m swing high in last 30 bars, wick above it + close below
+  // For LONG:  find lowest 1m swing low in last 30 bars, wick below it + close above
   _detectSweep(candles, isShort) {
-    const last10 = candles.slice(-10);
-    const fvg    = this.fvg5m;
+    const window = candles.slice(-30);
+    if (window.length < 5) return null;
 
-    for (let i = last10.length - 1; i >= 1; i--) {
-      const c    = last10[i];
-      const prev = last10[i - 1];
+    const last = window[window.length - 1];
 
-      if (isShort) {
-        // Wick up into FVG zone, close back below FVG bottom
-        if (c.high >= fvg.bottom && c.close < fvg.bottom && c.close < prev.close) {
-          return { dir: 'bear', sweepCandle: c, sweepHigh: c.high, level: fvg.bottom };
-        }
-      } else {
-        // Wick down into FVG zone, close back above FVG top
-        if (c.low <= fvg.top && c.close > fvg.top && c.close > prev.close) {
-          return { dir: 'bull', sweepCandle: c, sweepLow: c.low, level: fvg.top };
-        }
+    if (isShort) {
+      // Find the highest swing high in the window (excluding last 2 unconfirmed bars)
+      let swingHigh = -Infinity;
+      for (let i = 1; i < window.length - 2; i++) {
+        const c = window[i];
+        if (c.high > window[i - 1].high && c.high > window[i + 1].high)
+          swingHigh = Math.max(swingHigh, c.high);
+      }
+      // Also consider the simple highest high of the prior bars as liquidity level
+      if (swingHigh === -Infinity) {
+        for (let i = 0; i < window.length - 1; i++)
+          swingHigh = Math.max(swingHigh, window[i].high);
+      }
+      if (swingHigh > -Infinity && last.high > swingHigh && last.close < swingHigh) {
+        return { dir: 'bear', sweepCandle: last, sweepHigh: last.high, level: swingHigh };
+      }
+    } else {
+      // Find the lowest swing low in the window
+      let swingLow = Infinity;
+      for (let i = 1; i < window.length - 2; i++) {
+        const c = window[i];
+        if (c.low < window[i - 1].low && c.low < window[i + 1].low)
+          swingLow = Math.min(swingLow, c.low);
+      }
+      if (swingLow === Infinity) {
+        for (let i = 0; i < window.length - 1; i++)
+          swingLow = Math.min(swingLow, window[i].low);
+      }
+      if (swingLow < Infinity && last.low < swingLow && last.close > swingLow) {
+        return { dir: 'bull', sweepCandle: last, sweepLow: last.low, level: swingLow };
       }
     }
     return null;
