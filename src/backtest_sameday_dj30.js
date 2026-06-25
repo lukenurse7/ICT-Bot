@@ -1,14 +1,16 @@
 'use strict';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 //  DJ30 ICT — SAME-DAY EXIT BACKTEST  (Jun 2025 → Jun 2026)
-//  Matches the CURRENT live engine exactly:
-//   - Kill zone: 13:30–16:00 UTC
-//   - SL: swing high/low of last 5 candles (matches src/ict.js)
-//   - TP2 ≥2.5R, TP3 ≥3.5R (liquidity-based, fallback to fixed)
-//   - Every trade is FORCE-CLOSED at 21:00 UTC same day if not resolved —
-//     no overnight holds, ever.
-// ═══════════════════════════════════════════════════════════════════════════
+//  Aligned to video checklist:
+//   1. Pre-KZ 5m swing highs/lows (BSL/SSL) marked before 13:30 UTC
+//   2. Sweep of pre-KZ level during kill zone (13:30–16:00 UTC)
+//   3. MSS + displacement on 5m (approximation — 1m not available full-year)
+//   4. FVG in displacement → limit order at zone boundary (no wick confirmation)
+//   5. SL at MSS swing point (not generic swing lookback)
+//   6. TP at opposing pre-KZ liquidity
+//   7. Force-close 21:00 UTC same day
+// ═══════════════════════════════════════════════════════════════════════════════
 
 require('dotenv').config();
 const chalk = require('chalk');
@@ -18,15 +20,17 @@ const path  = require('path');
 const ACCOUNT_START = parseFloat(process.env.ACCOUNT_START || '2000');
 const RISK_PCT      = 0.02;
 const TP1_R         = 1.5;
-const TP2_R         = parseFloat(process.env.TP2_R || '2.5');
-const TP3_R         = parseFloat(process.env.TP3_R || '3.5');
-const MIN_SCORE     = parseFloat(process.env.MIN_SCORE || '80');
-const COOLDOWN      = 36;        // 3h in 5m bars
-const DAY_END_HOUR  = 21;        // force-close at 21:00 UTC (NYSE close window)
+const TP2_R         = parseFloat(process.env.TP2_R || '2.0');
+const TP3_R         = parseFloat(process.env.TP3_R || '2.5');
+const MIN_SCORE     = 75;          // KZ+SWEEP+MSS+FVG = 100; need all 4
+const COOLDOWN      = 36;          // 3h cooldown in 5m bars
+const DAY_END_HOUR  = 21;
+const MIN_RISK_PTS  = parseFloat(process.env.MIN_RISK_PTS || '25');
 
-const CACHE = path.join(__dirname, '..', '.cache');
+const CACHE       = path.join(__dirname, '..', '.cache');
 const PRICE_SCALE = parseFloat(process.env.DJ30_PRICE_SCALE) || 99.7724;
 
+// ─── Data Loading ─────────────────────────────────────────────────────────────
 function loadCached(interval, startYear, startMonth, endYear, endMonth) {
   const all = [];
   let y = startYear, m = startMonth;
@@ -43,255 +47,215 @@ function loadCached(interval, startYear, startMonth, endYear, endMonth) {
   return all
     .filter(c => { if (seen.has(c.time)) return false; seen.add(c.time); return true; })
     .sort((a, b) => new Date(a.time) - new Date(b.time))
-    .map(c => ({
-      time:   c.time,
-      open:   c.open  * PRICE_SCALE,
-      high:   c.high  * PRICE_SCALE,
-      low:    c.low   * PRICE_SCALE,
-      close:  c.close * PRICE_SCALE,
-      volume: c.volume || 0
-    }));
+    .map(c => ({ time: c.time, open: c.open*PRICE_SCALE, high: c.high*PRICE_SCALE,
+                 low: c.low*PRICE_SCALE, close: c.close*PRICE_SCALE, volume: c.volume||0 }));
 }
 
-// Loads the single-file 1m cache (TwelveData caps 1min outputsize at 5000 bars
-// per request, so this only covers a ~3-week window, not the full backtest period).
-function load1mCache() {
-  const files = fs.existsSync(CACHE)
-    ? fs.readdirSync(CACHE).filter(f => f.startsWith('dj30_1min_'))
-    : [];
-  const all = [];
-  for (const f of files) all.push(...JSON.parse(fs.readFileSync(path.join(CACHE, f))));
-  const seen = new Set();
-  return all
-    .filter(c => { if (seen.has(c.time)) return false; seen.add(c.time); return true; })
-    .sort((a, b) => new Date(a.time) - new Date(b.time))
-    .map(c => ({
-      time: c.time,
-      open:  c.open  * PRICE_SCALE,
-      high:  c.high  * PRICE_SCALE,
-      low:   c.low   * PRICE_SCALE,
-      close: c.close * PRICE_SCALE,
-      volume: c.volume || 0
-    }));
-}
+// ─── ICT Engine — Video Checklist Aligned ────────────────────────────────────
 
-function rollup(src, factor) {
-  const out = [];
-  for (let i = 0; i < src.length; i += factor) {
-    const s = src.slice(i, i + factor);
-    if (!s.length) continue;
-    out.push({ time: s[0].time, open: s[0].open,
-      high: Math.max(...s.map(c => c.high)),
-      low:  Math.min(...s.map(c => c.low)),
-      close: s[s.length-1].close,
-      volume: s.reduce((a, c) => a + (c.volume||0), 0) });
-  }
-  return out;
-}
-
-// ─── ICT engine (identical logic to live src/ict.js) ──────────────────────────
-
-function detectSweep(candles15m, candles5m) {
-  const LOOKBACK = 100;
-  const recent5  = candles5m.slice(-LOOKBACK);
-  const last5    = candles5m[candles5m.length - 1];
-  const levels   = [];
-
-  // DJ30/DIA only trades during market hours — there's a multi-hour gap between
-  // sessions. Equal-high/low levels must come from the CURRENT session only;
-  // otherwise stale overnight chop gets treated as live intraday liquidity.
+// Step 1: Liquidity Levels — session-gap filtered intraday swing H/L
+// Same approach as live ict.js: use current session's swing highs (BSL) and lows
+// (SSL), restricted to candles after the most recent >30min gap (session boundary).
+function buildPreKZLevels(candles5m) {
+  const GAP_MS = 30 * 60 * 1000;
   let sessionStart = 0;
-  for (let i = recent5.length - 1; i > 0; i--) {
-    const gapMins = (new Date(recent5[i].time) - new Date(recent5[i-1].time)) / 60000;
-    if (gapMins > 30) { sessionStart = i; break; }
+  for (let i = candles5m.length - 1; i > 0; i--) {
+    const gap = new Date(candles5m[i].time).getTime() - new Date(candles5m[i-1].time).getTime();
+    if (gap > GAP_MS) { sessionStart = i; break; }
   }
-  const session = recent5.slice(sessionStart);
+  const sess = candles5m.slice(sessionStart);
+  if (sess.length < 5) return { levels: [] };
 
-  for (let i = 2; i < session.length - 1; i++) {
-    const c = session[i];
-    const prev = session.slice(Math.max(0, i-10), i);
-    const eqH = prev.find(p => Math.abs(p.high - c.high) / c.high < 0.0005);
-    if (eqH) levels.push({ price: Math.max(c.high, eqH.high), type: 'BSL', name: 'Equal Highs (BSL)' });
-    const eqL = prev.find(p => Math.abs(p.low - c.low) / c.low < 0.0005);
-    if (eqL) levels.push({ price: Math.min(c.low, eqL.low), type: 'SSL', name: 'Equal Lows (SSL)' });
+  const raw = [];
+  for (let i = 1; i < sess.length - 1; i++) {
+    const c = sess[i];
+    if (c.high > sess[i-1].high && c.high > sess[i+1].high)
+      raw.push({ price: c.high, type: 'BSL', name: `Intraday H ${c.time.slice(11,16)}` });
+    if (c.low < sess[i-1].low && c.low < sess[i+1].low)
+      raw.push({ price: c.low,  type: 'SSL', name: `Intraday L ${c.time.slice(11,16)}` });
   }
 
-  const yesterday = candles5m.slice(-300).filter(c => {
-    const h = new Date(c.time).getUTCHours(); return h >= 21 || h < 2;
-  });
-  if (yesterday.length) {
-    levels.push({ price: Math.max(...yesterday.map(c => c.high)), type: 'BSL', name: 'Prev Day High' });
-    levels.push({ price: Math.min(...yesterday.map(c => c.low)),  type: 'SSL', name: 'Prev Day Low' });
+  const levels = [];
+  for (const lvl of raw) {
+    if (!levels.find(d => d.type === lvl.type && Math.abs(d.price - lvl.price) / lvl.price < 0.0005))
+      levels.push(lvl);
   }
+  return { levels };
+}
+
+// Step 2: Sweep of a session swing level (last 12 5m bars)
+function detectSweep(candles5m) {
+  const { levels } = buildPreKZLevels(candles5m);
+  if (!levels.length) return { detected: false };
 
   const results = [];
-  for (const lvl of levels) {
-    if (lvl.type === 'BSL' && last5.high > lvl.price && last5.close < lvl.price)
-      results.push({ dir: 'bear', level: lvl.price, levelName: lvl.name, barsAgo: 0, wick: last5.high });
-    if (lvl.type === 'SSL' && last5.low < lvl.price && last5.close > lvl.price)
-      results.push({ dir: 'bull', level: lvl.price, levelName: lvl.name, barsAgo: 0, wick: last5.low });
-  }
-
-  for (let back = 1; back <= 12; back++) {
+  for (let back = 0; back <= 12; back++) {
     const idx = candles5m.length - 1 - back;
     if (idx < 0) break;
     const c = candles5m[idx];
     for (const lvl of levels) {
       if (lvl.type === 'BSL' && c.high > lvl.price && c.close < lvl.price)
-        results.push({ dir: 'bear', level: lvl.price, levelName: lvl.name, barsAgo: back, wick: c.high });
+        results.push({ dir: 'bear', level: lvl.price, levelName: lvl.name,
+                       barsAgo: back, wick: c.high, sweepCandleIdx: idx, sweepCandleTime: c.time });
       if (lvl.type === 'SSL' && c.low < lvl.price && c.close > lvl.price)
-        results.push({ dir: 'bull', level: lvl.price, levelName: lvl.name, barsAgo: back, wick: c.low });
+        results.push({ dir: 'bull', level: lvl.price, levelName: lvl.name,
+                       barsAgo: back, wick: c.low, sweepCandleIdx: idx, sweepCandleTime: c.time });
     }
   }
-
   if (!results.length) return { detected: false };
   results.sort((a, b) => a.barsAgo - b.barsAgo);
   return { detected: true, ...results[0] };
 }
 
-function detectMSS(candles5m, sweepDir) {
-  const window = candles5m.slice(-20);
-  if (window.length < 5) return { confirmed: false };
+// Step 3: MSS on 5m (approximation of 1m for full-year backtest)
+// Looks for a clear swing-point break with a displacement candle after the sweep.
+function detectMSS5m(candles5m, sweepDir, sweepCandleTime) {
+  const DISP_BODY_RATIO = 0.5; // 50% body/range — displacement candle
+  const MIN_SWING_BARS  = 1;   // 1-bar pivot is sufficient on 5m
+
+  const sweepTs = new Date(sweepCandleTime).getTime();
+  const post    = candles5m.filter(c => new Date(c.time).getTime() > sweepTs).slice(0, 30);
+
+  if (post.length < 5) return { confirmed: false };
 
   if (sweepDir === 'bear') {
-    let swingLow = Infinity;
-    for (let i = 0; i < window.length - 3; i++) {
-      const c = window[i];
-      if (c.low < (window[i-1]?.low ?? Infinity) && c.low < (window[i+1]?.low ?? Infinity))
-        swingLow = Math.min(swingLow, c.low);
+    for (let i = MIN_SWING_BARS; i < post.length - MIN_SWING_BARS; i++) {
+      if (post[i].low >= post[i-1].low || post[i].low >= post[i+1].low) continue;
+      const swingLevel = post[i].low;
+      for (let j = i + 1; j < post.length; j++) {
+        const c    = post[j];
+        if (c.close >= swingLevel) continue;
+        const body  = c.open - c.close;
+        const range = c.high - c.low;
+        if (range > 0 && body / range >= DISP_BODY_RATIO)
+          return { confirmed: true, type: 'MSS_BEAR', swingLevel,
+                   swingTime: post[i].time, dispCandleIdx: j, dispCandle: c, mssTime: c.time };
+      }
     }
-    const last = window[window.length - 1], prev = window[window.length - 2];
-    if (swingLow < Infinity && last.close < swingLow)
-      return { confirmed: true, type: 'BOS_DOWN', level: swingLow };
-    if (last.close < prev.low)
-      return { confirmed: true, type: 'CHoCH', level: prev.low };
   }
 
   if (sweepDir === 'bull') {
-    let swingHigh = -Infinity;
-    for (let i = 0; i < window.length - 3; i++) {
-      const c = window[i];
-      if (c.high > (window[i-1]?.high ?? -Infinity) && c.high > (window[i+1]?.high ?? -Infinity))
-        swingHigh = Math.max(swingHigh, c.high);
+    for (let i = MIN_SWING_BARS; i < post.length - MIN_SWING_BARS; i++) {
+      if (post[i].high <= post[i-1].high || post[i].high <= post[i+1].high) continue;
+      const swingLevel = post[i].high;
+      for (let j = i + 1; j < post.length; j++) {
+        const c    = post[j];
+        if (c.close <= swingLevel) continue;
+        const body  = c.close - c.open;
+        const range = c.high - c.low;
+        if (range > 0 && body / range >= DISP_BODY_RATIO)
+          return { confirmed: true, type: 'MSS_BULL', swingLevel,
+                   swingTime: post[i].time, dispCandleIdx: j, dispCandle: c, mssTime: c.time };
+      }
     }
-    const last = window[window.length - 1], prev = window[window.length - 2];
-    if (swingHigh > -Infinity && last.close > swingHigh)
-      return { confirmed: true, type: 'BOS_UP', level: swingHigh };
-    if (last.close > prev.high)
-      return { confirmed: true, type: 'CHoCH', level: prev.high };
   }
 
   return { confirmed: false };
 }
 
-function detectFVG(candles5m, sweepDir) {
-  const window = candles5m.slice(-30);
+// Step 4: FVG in the 5m displacement window (approximation of 1m FVG)
+// No confirmation wick — just find the zone and set limit at its boundary.
+function detectFVG5m(candles5m, sweepDir, sweepCandleTime, mss) {
+  if (!mss.confirmed) return { found: false };
+
+  const sweepTs = new Date(sweepCandleTime).getTime();
+  const post    = candles5m.filter(c => new Date(c.time).getTime() > sweepTs).slice(0, 30);
+
+  const di    = mss.dispCandleIdx;
+  const start = Math.max(0, di - 3);
+  const end   = Math.min(post.length - 1, di + 3);
+
   const candidates = [];
-  for (let i = 0; i < window.length - 2; i++) {
-    const c0 = window[i], c2 = window[i + 2];
+  for (let i = start; i <= end - 2; i++) {
+    const c0 = post[i], c2 = post[i + 2];
+    if (!c0 || !c2) continue;
     if (sweepDir === 'bear' && c2.high < c0.low) {
       const size = c0.low - c2.high;
-      if (size > 0) candidates.push({ top: c0.low, bottom: c2.high, size });
+      if (size > 0) candidates.push({ top: c0.low, bottom: c2.high, size, zoneFormedAt: c2.time });
     }
     if (sweepDir === 'bull' && c2.low > c0.high) {
       const size = c2.low - c0.high;
-      if (size > 0) candidates.push({ top: c2.low, bottom: c0.high, size });
+      if (size > 0) candidates.push({ top: c2.low, bottom: c0.high, size, zoneFormedAt: c2.time });
     }
   }
+
   if (!candidates.length) return { found: false };
+  const best = candidates.sort((a, b) => b.size - a.size)[0];
 
-  const best = candidates.slice(-3).sort((a, b) => b.size - a.size)[0];
-  const prev = window[window.length - 2];
-  let confirmed = false;
+  // Limit order at FVG boundary:
+  // Bull → limit BUY at top of FVG (price retraces down into gap)
+  // Bear → limit SELL at bottom of FVG (price retraces up into gap)
+  const entryPrice = sweepDir === 'bull' ? best.top : best.bottom;
 
-  if (sweepDir === 'bear') {
-    const wickedIn   = prev.high >= best.bottom;
-    const closedBack = prev.close <= best.top;
-    confirmed = wickedIn && closedBack && (prev.high - best.bottom) >= best.size * 0.5;
-  } else {
-    const wickedIn   = prev.low <= best.top;
-    const closedBack = prev.close >= best.bottom;
-    confirmed = wickedIn && closedBack && (best.top - prev.low) >= best.size * 0.5;
-  }
-
-  return { found: true, top: best.top, bottom: best.bottom, size: best.size, inFVG: confirmed, zoneFormedAt: prev.time };
+  return { found: true, top: best.top, bottom: best.bottom, size: best.size,
+           entryPrice, entryZone: `${best.bottom.toFixed(2)}–${best.top.toFixed(2)}`,
+           zoneFormedAt: best.zoneFormedAt, inFVG: true };
 }
 
-// 1m entry trigger: first 1m candle (after the zone exists) that wicks into the
-// FVG zone and closes back out — the true, immediately-actionable fill, instead of
-// waiting for the whole 5m candle to close (which is often already stale by then).
-function findEntryTrigger1m(candles1m, fvg, sweepDir, notAfter) {
-  if (!fvg.found || !fvg.zoneFormedAt || !candles1m || !candles1m.length) return null;
-  const zoneStart = new Date(fvg.zoneFormedAt).getTime();
-  const cutoff    = notAfter ? new Date(notAfter).getTime() : Infinity;
-  for (const c of candles1m) {
+// Step 5: Simulate limit fill on 5m — find first candle that touches the limit price
+function findLimitFill5m(period5m, fvg, sweepDir, fromTime, dayEnd) {
+  const fromTs = new Date(fromTime).getTime();
+  const endTs  = new Date(dayEnd).getTime();
+  for (const c of period5m) {
     const t = new Date(c.time).getTime();
-    if (t <= zoneStart) continue;
-    if (t > cutoff) break;
-    if (sweepDir === 'bear') {
-      if (c.high >= fvg.bottom && c.close <= fvg.top) return { price: c.close, time: c.time };
-    } else {
-      if (c.low <= fvg.top && c.close >= fvg.bottom) return { price: c.close, time: c.time };
-    }
+    if (t <= fromTs) continue;
+    if (t > endTs)   break;
+    if (sweepDir === 'bull' && c.low  <= fvg.entryPrice) return { price: fvg.entryPrice, time: c.time };
+    if (sweepDir === 'bear' && c.high >= fvg.entryPrice) return { price: fvg.entryPrice, time: c.time };
   }
-  return null;
+  return null; // limit never triggered same day
 }
 
-// TP logic — identical to live src/ict.js: TP2 >= 2.5R, TP3 >= 3.5R
-function liquidityTPs(dir, entry, risk, candles5m, h1Candles) {
-  const isLong  = dir === 'bull';
-  const minTP2  = isLong ? entry + risk * TP2_R : entry - risk * TP2_R;
-  const minTP3  = isLong ? entry + risk * TP3_R : entry - risk * TP3_R;
-  const maxR    = 5.0;
-  const candidates = [];
+// Step 6 & 7: Opposing pre-KZ liquidity for TPs
+function opposingLiquidityTPs(dir, entry, risk, candles5m, nowIso, h1Candles) {
+  const isLong = dir === 'bull';
+  const { levels } = buildPreKZLevels(candles5m);
 
-  const c5 = candles5m.slice(-60);
-  for (let i = 2; i < c5.length - 1; i++) {
-    const c = c5[i], prev = c5.slice(Math.max(0, i-8), i);
-    if (isLong) {
-      const eq = prev.find(p => Math.abs(p.high - c.high) / c.high < 0.001);
-      if (eq) candidates.push({ price: Math.max(c.high, eq.high), desc: '5m equal highs' });
-    } else {
-      const eq = prev.find(p => Math.abs(p.low - c.low) / c.low < 0.001);
-      if (eq) candidates.push({ price: Math.min(c.low, eq.low), desc: '5m equal lows' });
-    }
-  }
-
-  const c1h = h1Candles.slice(-24);
-  for (let i = 2; i < c1h.length - 2; i++) {
-    const c = c1h[i];
-    if (isLong && c.high > c1h[i-1].high && c.high > c1h[i-2].high && c.high > c1h[i+1].high)
-      candidates.push({ price: c.high, desc: '1H swing high' });
-    if (!isLong && c.low < c1h[i-1].low && c.low < c1h[i-2].low && c.low < c1h[i+1].low)
-      candidates.push({ price: c.low, desc: '1H swing low' });
-  }
-
-  const tp2candidates = candidates
-    .filter(t => isLong ? t.price >= minTP2 && t.price < entry + risk * maxR
-                        : t.price <= minTP2 && t.price > entry - risk * maxR)
-    .sort((a, b) => isLong ? a.price - b.price : b.price - a.price);
-  const tp3candidates = candidates
-    .filter(t => isLong ? t.price >= minTP3 && t.price < entry + risk * maxR
-                        : t.price <= minTP3 && t.price > entry - risk * maxR)
+  const opposing = levels
+    .filter(l => isLong
+      ? l.type === 'BSL' && l.price > entry + risk * 1.0
+      : l.type === 'SSL' && l.price < entry - risk * 1.0)
     .sort((a, b) => isLong ? a.price - b.price : b.price - a.price);
 
-  const tp2obj = tp2candidates[0] || { price: isLong ? entry + risk*TP2_R : entry - risk*TP2_R, desc: `Fixed ${TP2_R}R` };
-  const tp3obj = tp3candidates[0] || { price: isLong ? entry + risk*TP3_R : entry - risk*TP3_R, desc: `Fixed ${TP3_R}R` };
-  return { tp2: tp2obj.price, tp2Desc: tp2obj.desc, tp3: tp3obj.price, tp3Desc: tp3obj.desc };
+  const h1w = (h1Candles || []).slice(-24);
+  const h1t = [];
+  for (let i = 2; i < h1w.length - 2; i++) {
+    const c = h1w[i];
+    if (isLong && c.high > h1w[i-1].high && c.high > h1w[i-2].high && c.high > h1w[i+1].high)
+      h1t.push({ price: c.high, name: '1H swing high' });
+    if (!isLong && c.low < h1w[i-1].low && c.low < h1w[i-2].low && c.low < h1w[i+1].low)
+      h1t.push({ price: c.low, name: '1H swing low' });
+  }
+
+  const fallback = r => isLong ? entry + risk * r : entry - risk * r;
+  const pool = [...opposing, ...h1t];
+
+  const tp1cands = pool.filter(t => isLong ? t.price >= fallback(TP1_R) : t.price <= fallback(TP1_R))
+    .sort((a,b) => isLong ? a.price-b.price : b.price-a.price);
+  const tp2cands = pool.filter(t => isLong ? t.price >= fallback(TP2_R) : t.price <= fallback(TP2_R))
+    .sort((a,b) => isLong ? a.price-b.price : b.price-a.price);
+  const tp3cands = pool.filter(t => isLong ? t.price >= fallback(TP3_R) : t.price <= fallback(TP3_R))
+    .sort((a,b) => isLong ? a.price-b.price : b.price-a.price);
+
+  const tp1 = tp1cands[0] || { price: fallback(TP1_R), name: `Fixed ${TP1_R}R` };
+  const tp2 = tp2cands[0] || { price: fallback(TP2_R), name: `Fixed ${TP2_R}R` };
+  const tp3 = tp3cands[0] || { price: fallback(TP3_R), name: `Fixed ${TP3_R}R` };
+
+  return { tp1: tp1.price, tp1Desc: tp1.name||tp1.desc,
+           tp2: tp2.price, tp2Desc: tp2.name||tp2.desc,
+           tp3: tp3.price, tp3Desc: tp3.name||tp3.desc };
 }
 
 function scoreConf(sweep, mss, fvg) {
-  let score = 25;
-  if (sweep.detected) score += 25;
-  if (mss.confirmed)  score += 25;
-  if (fvg.found)       score += 15;
-  if (fvg.inFVG)        score += 10;
-  const grade = score >= 90 ? 'A+' : score >= 80 ? 'A' : score >= 70 ? 'B' : 'C';
+  let score = 25; const tags = ['KZ'];
+  if (sweep.detected) { score += 25; tags.push('SWEEP'); }
+  if (mss.confirmed)  { score += 25; tags.push('MSS'); }
+  if (fvg.found)      { score += 25; tags.push('FVG'); }
+  const grade = score >= 100 ? 'A+' : score >= 75 ? 'A' : 'B';
   return { score: Math.min(score, 100), grade };
 }
 
-// ─── Same-day-only outcome simulation ──────────────────────────────────────────
-// Trade is force-closed at 21:00 UTC same calendar day if neither TP nor SL hit.
+// ─── Same-day outcome simulation ──────────────────────────────────────────────
 function simulateOutcomeSameDay(dir, entry, sl, tp1, tp2, tp3, risk, futureCandles) {
   const isLong = dir === 'bull';
   let tp1Hit = false, currentSL = sl, lastClose = entry, lastTime = null;
@@ -299,10 +263,10 @@ function simulateOutcomeSameDay(dir, entry, sl, tp1, tp2, tp3, risk, futureCandl
   for (const c of futureCandles) {
     lastClose = c.close;
     lastTime  = c.time;
-    const slHit   = isLong ? c.low <= currentSL : c.high >= currentSL;
-    const tp1Hit_ = isLong ? c.high >= tp1 : c.low <= tp1;
-    const tp2Hit  = isLong ? c.high >= tp2 : c.low <= tp2;
-    const tp3Hit  = isLong ? c.high >= tp3 : c.low <= tp3;
+    const slHit   = isLong ? c.low  <= currentSL : c.high >= currentSL;
+    const tp1Hit_ = isLong ? c.high >= tp1       : c.low  <= tp1;
+    const tp2Hit  = isLong ? c.high >= tp2       : c.low  <= tp2;
+    const tp3Hit  = isLong ? c.high >= tp3       : c.low  <= tp3;
 
     if (!tp1Hit) {
       if (slHit)   return { result: 'LOSS',    pnlR: -1, closeTime: c.time };
@@ -316,56 +280,34 @@ function simulateOutcomeSameDay(dir, entry, sl, tp1, tp2, tp3, risk, futureCandl
     }
   }
 
-  // Day ended — force close at last available price
   const rAtClose = ((lastClose - entry) / risk) * (isLong ? 1 : -1);
   if (tp1Hit) {
-    // 50% locked at TP1 already; remaining 50% closes at whatever R it's at (floor TP1_R since SL is at BE)
-    const runnerR = Math.max(rAtClose, TP1_R);
-    return { result: 'EOD_PARTIAL', pnlR: +(0.5*TP1_R + 0.5*runnerR).toFixed(2), closeTime: lastTime };
+    return { result: 'EOD_PARTIAL', pnlR: +(0.5*TP1_R + 0.5*Math.max(rAtClose, TP1_R)).toFixed(2), closeTime: lastTime };
   }
-  // Full position still open, force close at day-end price
   const clamped = Math.max(rAtClose, -1);
   return { result: clamped >= 0 ? 'EOD_WIN' : 'EOD_LOSS', pnlR: +clamped.toFixed(2), closeTime: lastTime };
 }
 
 function isKillZone(iso) {
-  const h = new Date(iso).getUTCHours();
-  const m = new Date(iso).getUTCMinutes();
-  const totalMins = h * 60 + m;
-  return totalMins >= (13*60+30) && totalMins < 16*60;
+  const t = new Date(iso), h = t.getUTCHours(), m = t.getUTCMinutes();
+  return h * 60 + m >= 13*60+30 && h * 60 + m < 16*60;
 }
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 function run() {
   console.clear();
-  console.log('\n' + chalk.bold.white('  ■ DJ30 ICT — SAME-DAY EXIT BACKTEST'));
+  console.log('\n' + chalk.bold.white('  ■ DJ30 ICT — VIDEO CHECKLIST BACKTEST'));
   console.log(chalk.gray('  Period: Jun 2025 → Jun 2026'));
-  console.log(chalk.gray('  £2,000 start | 2% risk per trade | fully compounded'));
-  console.log(chalk.gray('  Kill Zone: 13:30–16:00 UTC | Force-close 21:00 UTC same day | 80% min score\n'));
+  console.log(chalk.gray('  Strategy: Pre-KZ sweep → 5m MSS+disp → FVG limit order → opposing liquidity TP'));
+  console.log(chalk.gray('  £2,000 start | 2% risk | compounded | force-close 21:00 UTC\n'));
 
   const all5m = loadCached('5min', 2025, 5, 2026, 6);
-  const allH1 = loadCached('1h',  2025, 5, 2026, 6);
-  const ENTRY_MODE = process.env.ENTRY_MODE || 'close'; // 'close' = legacy chase, 'wick' = FVG candle close, '1m' = real 1m entry trigger
-  const all1m = ENTRY_MODE === '1m' ? load1mCache() : [];
+  const allH1 = loadCached('1h',   2025, 5, 2026, 6);
 
-  if (!all5m.length) {
-    console.log(chalk.red('  ✗ No 5m data found.'));
-    process.exit(1);
-  }
-  if (ENTRY_MODE === '1m' && !all1m.length) {
-    console.log(chalk.red('  ✗ No 1m data found (run the 1m cache fetch first).'));
-    process.exit(1);
-  }
+  if (!all5m.length) { console.log(chalk.red('  ✗ No 5m data.')); process.exit(1); }
 
-  const all15m = rollup(all5m, 3);
-
-  let START = new Date('2025-06-01T00:00:00Z');
-  let END   = new Date('2026-06-16T23:59:59Z');
-  if (ENTRY_MODE === '1m') {
-    // Real 1m data only covers the cached ~3-week window — restrict the backtest to it.
-    START = new Date(all1m[0].time);
-    END   = new Date(all1m[all1m.length - 1].time);
-  }
+  const START    = new Date('2025-06-01T00:00:00Z');
+  const END      = new Date('2026-06-16T23:59:59Z');
   const period5m = all5m.filter(c => { const t = new Date(c.time); return t >= START && t <= END; });
 
   console.log(chalk.gray(`  5m bars loaded:  ${all5m.length.toLocaleString()}`));
@@ -378,75 +320,54 @@ function run() {
   for (let i = 60; i < period5m.length - 1; i++) {
     const bar = period5m[i];
     if (i - lastBar < COOLDOWN) continue;
-    if (!isKillZone(bar.time)) continue;
+    if (!isKillZone(bar.time))  continue;
 
-    const time = new Date(bar.time);
-    const slice5m  = all5m.filter(c  => new Date(c.time) <= time);
-    const slice15m = all15m.filter(c => new Date(c.time) <= time);
-    const sliceH1  = allH1.filter(c  => new Date(c.time) <= time);
-
+    const time    = new Date(bar.time);
+    const slice5m = all5m.filter(c => new Date(c.time) <= time);
+    const sliceH1 = allH1.filter(c => new Date(c.time) <= time);
     if (slice5m.length < 40 || sliceH1.length < 6) continue;
 
+    const nowIso = bar.time;
     let sweep, mss, fvg, conf;
     try {
-      sweep = detectSweep(slice15m, slice5m);
-      mss   = sweep.detected ? detectMSS(slice5m, sweep.dir) : { confirmed: false };
-      fvg   = (sweep.detected && mss.confirmed) ? detectFVG(slice5m, sweep.dir) : { found: false };
-      conf  = sweep.dir ? scoreConf(sweep, mss, fvg) : { score: 0, grade: 'D' };
+      sweep = detectSweep(slice5m);
+      mss   = sweep.detected ? detectMSS5m(slice5m, sweep.dir, sweep.sweepCandleTime) : { confirmed: false };
+      fvg   = (sweep.detected && mss.confirmed) ? detectFVG5m(slice5m, sweep.dir, sweep.sweepCandleTime, mss) : { found: false };
+      conf  = scoreConf(sweep, mss, fvg);
     } catch (e) { continue; }
 
-    const dir = sweep.dir;
-    if (!dir || !mss.confirmed || !fvg.inFVG || conf.score < MIN_SCORE) continue;
+    if (!sweep.detected || !mss.confirmed || !fvg.found || conf.score < MIN_SCORE) continue;
 
-    const isLong = dir === 'bull';
+    const isLong = sweep.dir === 'bull';
+    const dayEnd = new Date(Date.UTC(time.getUTCFullYear(), time.getUTCMonth(), time.getUTCDate(), DAY_END_HOUR, 0, 0));
 
-    let entry, entryTriggerTime = bar.time;
-    if (ENTRY_MODE === '1m') {
-      // Day-end cutoff so we never "find" a trigger from the next trading day
-      const dayEndCutoff = new Date(Date.UTC(time.getUTCFullYear(), time.getUTCMonth(), time.getUTCDate(), DAY_END_HOUR, 0, 0));
-      const trigger = findEntryTrigger1m(all1m, fvg, dir, dayEndCutoff);
-      if (!trigger) continue; // zone never actually got retraced into on the 1m chart — no real fill
-      entry = trigger.price;
-      entryTriggerTime = trigger.time;
-    } else if (ENTRY_MODE === 'wick') {
-      entry = slice5m[slice5m.length - 2].close; // the candle that wicked into the FVG and closed back — true ICT entry, no extra lag candle
-    } else {
-      entry = bar.close; // legacy: wait one more candle (matches old live src/ict.js)
-    }
+    // Wait for limit fill — price must retrace to FVG boundary on a future 5m candle
+    const fill = findLimitFill5m(period5m, fvg, sweep.dir, fvg.zoneFormedAt, dayEnd);
+    if (!fill) continue; // limit order never triggered same day
 
-    // SL: anchored to the actual liquidity-sweep wick (ICT invalidation point) when SL_MODE=wick,
-    // else legacy swing high/low of last N candles (N tunable via SL_LOOKBACK)
-    const SL_MODE = process.env.SL_MODE || 'swing';
-    let sl;
-    if (SL_MODE === 'wick' && sweep.wick != null) {
-      sl = isLong ? sweep.wick - sweep.wick*0.0005 : sweep.wick + sweep.wick*0.0005;
-    } else {
-      const SL_LOOKBACK = parseInt(process.env.SL_LOOKBACK || '5', 10);
-      const recent5   = slice5m.slice(-SL_LOOKBACK);
-      const swingHigh = Math.max(...recent5.map(c => c.high));
-      const swingLow  = Math.min(...recent5.map(c => c.low));
-      sl = isLong ? swingLow - swingLow*0.0005 : swingHigh + swingHigh*0.0005;
-    }
+    const entry = fill.price;
+
+    // SL at 1m MSS swing point (approximated here as 5m swing, 0.03% buffer)
+    const slBuffer = mss.swingLevel * 0.0003;
+    const sl = isLong ? mss.swingLevel - slBuffer : mss.swingLevel + slBuffer;
 
     if (isLong  && sl >= entry) continue;
     if (!isLong && sl <= entry) continue;
 
     const risk = Math.abs(entry - sl);
-    const MIN_RISK_PTS = parseFloat(process.env.MIN_RISK_PTS || '0');
-    if (risk <= 0 || risk > entry * 0.02 || risk < MIN_RISK_PTS) continue;
+    if (risk < MIN_RISK_PTS || risk > entry * 0.02) continue;
 
-    const tp1 = isLong ? entry + risk * TP1_R : entry - risk * TP1_R;
-    const { tp2, tp2Desc, tp3, tp3Desc } = liquidityTPs(dir, entry, risk, slice5m, sliceH1);
+    const { tp1, tp1Desc, tp2, tp2Desc, tp3, tp3Desc } =
+      opposingLiquidityTPs(sweep.dir, entry, risk, slice5m, nowIso, sliceH1);
 
-    // Force-close window: same UTC calendar day, up to 21:00 UTC
-    const dayEnd = new Date(Date.UTC(time.getUTCFullYear(), time.getUTCMonth(), time.getUTCDate(), DAY_END_HOUR, 0, 0));
-    const entryTime = new Date(entryTriggerTime);
-    const future = period5m.filter(c => { const t = new Date(c.time); return t > entryTime && t <= dayEnd; });
+    const future = period5m.filter(c => {
+      const t = new Date(c.time).getTime();
+      return t > new Date(fill.time).getTime() && t <= dayEnd.getTime();
+    });
 
-    const outcome = simulateOutcomeSameDay(dir, entry, sl, tp1, tp2, tp3, risk, future);
-
-    const riskGBP = balance * RISK_PCT;
-    const pnlGBP  = outcome.pnlR != null ? outcome.pnlR * riskGBP : null;
+    const outcome  = simulateOutcomeSameDay(sweep.dir, entry, sl, tp1, tp2, tp3, risk, future);
+    const riskGBP  = balance * RISK_PCT;
+    const pnlGBP   = outcome.pnlR != null ? outcome.pnlR * riskGBP : null;
 
     if (pnlGBP !== null) {
       balance += pnlGBP;
@@ -456,15 +377,15 @@ function run() {
     }
 
     signals.push({
-      time: bar.time, entryTriggerTime, dir: isLong ? 'BUY' : 'SELL',
+      time: bar.time, fillTime: fill.time, dir: isLong ? 'BUY' : 'SELL',
       entry: +entry.toFixed(2), sl: +sl.toFixed(2),
       tp1: +tp1.toFixed(2), tp2: +tp2.toFixed(2), tp3: +tp3.toFixed(2),
-      riskPts: +risk.toFixed(2),
-      score: conf.score, grade: conf.grade,
-      sweep: sweep.levelName, mssType: mss.type,
-      tp2Desc, tp3Desc,
+      tp1Desc, tp2Desc, tp3Desc,
+      riskPts: +risk.toFixed(2), score: conf.score, grade: conf.grade,
+      sweep: sweep.levelName, mssType: mss.type, mssSwing: +mss.swingLevel.toFixed(2),
+      fvgTop: +fvg.top.toFixed(2), fvgBottom: +fvg.bottom.toFixed(2),
       riskGBP: +riskGBP.toFixed(2),
-      pnlGBP: pnlGBP !== null ? +pnlGBP.toFixed(2) : null,
+      pnlGBP:  pnlGBP !== null ? +pnlGBP.toFixed(2) : null,
       balanceAfter: pnlGBP !== null ? +balance.toFixed(2) : null,
       ...outcome
     });
@@ -472,7 +393,7 @@ function run() {
     lastBar = i;
   }
 
-  // ─── Results ─────────────────────────────────────────────────────────────
+  // ─── Results ──────────────────────────────────────────────────────────────
   const sep    = '═'.repeat(72);
   const closed = signals.filter(s => s.pnlR !== null);
   const wins   = closed.filter(s => s.pnlR > 0);
@@ -485,51 +406,48 @@ function run() {
     : wins.length ? '∞' : 0;
 
   console.log(sep);
-  console.log(chalk.bold.white('  ■ SAME-DAY EXIT RESULTS — DJ30'));
+  console.log(chalk.bold('  ■ SAME-DAY EXIT RESULTS — VIDEO CHECKLIST'));
   console.log(sep);
-  console.log(chalk.gray('  Trades:      ') + chalk.bold.white(closed.length));
-  console.log(chalk.gray('  Wins:        ') + chalk.green(wins.length));
-  console.log(chalk.gray('  Losses:      ') + chalk.red(losses.length));
-  console.log(chalk.gray('  Win rate:    ') + (wr>=70?chalk.bold.green:wr>=50?chalk.yellow:chalk.red)(wr+'%'));
-  console.log(chalk.gray('  Net R:       ') + (totalR>=0?chalk.green(`+${totalR}R`):chalk.red(`${totalR}R`)));
-  console.log(chalk.gray('  Prof. factor:') + chalk.cyan(' '+pf));
+  console.log(`  Trades:      ${closed.length}`);
+  console.log(`  Wins:        ${wins.length}`);
+  console.log(`  Losses:      ${losses.length}`);
+  console.log(`  Win rate:    ${chalk.bold(wr + '%')}`);
+  console.log(`  Net R:       ${totalR >= 0 ? chalk.green('+'+totalR+'R') : chalk.red(totalR+'R')}`);
+  console.log(`  Prof. factor: ${pf}`);
+  console.log();
+  console.log('  ── ACCOUNT (£' + ACCOUNT_START.toLocaleString() + ' start · 2% risk · compounded) ──');
+  console.log(`  Start:       £${ACCOUNT_START.toFixed(2)}`);
+  console.log(`  End:         £${balance.toFixed(2)}`);
+  console.log(`  Net P&L:     ${totalP >= 0 ? chalk.green('+£'+totalP.toFixed(2)) : chalk.red('−£'+Math.abs(totalP).toFixed(2))}`);
+  console.log(`  Return:      ${((balance-ACCOUNT_START)/ACCOUNT_START*100).toFixed(1)}%`);
+  console.log(`  Peak bal:    £${peak.toFixed(2)}`);
+  console.log(`  Max drawdown: ${maxDD.toFixed(1)}%`);
+  console.log();
 
-  console.log('\n' + chalk.bold.white('  ── ACCOUNT (£2,000 start · 2% risk · compounded) ──'));
-  console.log(chalk.gray('  Start:       ') + chalk.white('£2,000.00'));
-  console.log(chalk.gray('  End:         ') + (balance>=ACCOUNT_START?chalk.bold.green:chalk.red)('£'+balance.toFixed(2)));
-  console.log(chalk.gray('  Net P&L:     ') + (totalP>=0?chalk.green('+£'+totalP.toFixed(2)):chalk.red('£'+totalP.toFixed(2))));
-  console.log(chalk.gray('  Return:      ') + (balance>=ACCOUNT_START?chalk.bold.green:chalk.red)(((balance-ACCOUNT_START)/ACCOUNT_START*100).toFixed(1)+'%'));
-  console.log(chalk.gray('  Peak bal:    ') + chalk.white('£'+peak.toFixed(2)));
-  console.log(chalk.gray('  Max drawdown:') + chalk.yellow(' '+maxDD.toFixed(1)+'%'));
+  const types = {};
+  closed.forEach(s => { types[s.result] = (types[s.result]||0)+1; });
+  console.log('  Result types:');
+  Object.entries(types).sort((a,b)=>b[1]-a[1]).forEach(([r,n]) =>
+    console.log(`    ${r.padEnd(16)}${n} trades  (${Math.round(n/closed.length*100)}%)`));
+  console.log();
 
-  console.log(chalk.gray('\n  Result types:'));
-  const byResult = {};
-  closed.forEach(s => { byResult[s.result] = (byResult[s.result]||0) + 1; });
-  Object.entries(byResult).sort((a,b)=>b[1]-a[1]).forEach(([r,n]) => {
-    const c = (r||'').includes('WIN') || (r||'').includes('EOD_WIN') || (r||'').includes('PARTIAL') ? chalk.green : chalk.red;
-    console.log(chalk.gray(`    ${c((r||'?').padEnd(14))}  ${n} trades  (${Math.round(n/closed.length*100)}%)`));
-  });
-
-  // Risk distance stats
-  const risks = closed.map(s => s.riskPts).sort((a,b)=>a-b);
-  console.log(chalk.gray('\n  Risk distance (pts):'));
-  console.log(chalk.gray(`    min: ${risks[0]?.toFixed(0)}  median: ${risks[Math.floor(risks.length/2)]?.toFixed(0)}  mean: ${(risks.reduce((a,b)=>a+b,0)/risks.length).toFixed(0)}  max: ${risks[risks.length-1]?.toFixed(0)}`));
-
-  // Time-to-resolution stats (mins from entry to last candle used)
+  const rpts = closed.map(s => s.riskPts);
+  console.log('  Risk distance (pts):');
+  console.log(`    min: ${Math.min(...rpts).toFixed(0)}  median: ${rpts.sort((a,b)=>a-b)[Math.floor(rpts.length/2)].toFixed(0)}  mean: ${(rpts.reduce((a,v)=>a+v,0)/rpts.length).toFixed(0)}  max: ${Math.max(...rpts).toFixed(0)}`);
   console.log('\n' + sep + '\n');
 
   fs.writeFileSync(
     path.join(__dirname, '..', 'backtest_report_sameday_dj30.json'),
     JSON.stringify({
-      period: 'Jun 2025 → Jun 2026 (same-day exit, force-close 21:00 UTC)',
+      period: 'Jun 2025 → Jun 2026 (video checklist, same-day exit, force-close 21:00 UTC)',
+      strategy: 'Pre-KZ sweep → 5m MSS+displacement → FVG limit order → opposing liquidity TP',
       generatedAt: new Date().toISOString(),
-      settings: { symbol:'DJ30/DIA', start:ACCOUNT_START, riskPct:RISK_PCT*100, minScore:MIN_SCORE, killZone: '13:30-16:00 UTC', forceCloseHour: DAY_END_HOUR },
-      account: {
-        start: ACCOUNT_START, end: +balance.toFixed(2),
-        netGBP: +totalP.toFixed(2),
-        returnPct: +((balance-ACCOUNT_START)/ACCOUNT_START*100).toFixed(1),
-        maxDD: +maxDD.toFixed(1), peak: +peak.toFixed(2)
-      },
+      settings: { symbol:'DJ30/DIA', start:ACCOUNT_START, riskPct:RISK_PCT*100,
+                  minScore:MIN_SCORE, killZone:'13:30-16:00 UTC', forceCloseHour:DAY_END_HOUR,
+                  note:'5m approximation of 1m MSS+FVG (full 1m history not available for full year)' },
+      account: { start: ACCOUNT_START, end: +balance.toFixed(2), netGBP: +totalP.toFixed(2),
+                 returnPct: +((balance-ACCOUNT_START)/ACCOUNT_START*100).toFixed(1),
+                 maxDD: +maxDD.toFixed(1), peak: +peak.toFixed(2) },
       stats: { trades:closed.length, wins:wins.length, losses:losses.length, wr:wr+'%', netR:totalR, pf },
       signals
     }, null, 2)

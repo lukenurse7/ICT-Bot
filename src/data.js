@@ -63,7 +63,7 @@ async function fetchAllData() {
     fetchCandles('1h',    48),   // 1H swing lows/highs for TP targets
     fetchCandles('15min', 96),   // liquidity sweep detection
     fetchCandles('5min',  120),  // MSS + FVG zone detection
-    fetchCandles('1min',  180),  // pinpoint the actual realistic entry trigger inside the FVG zone
+    fetchCandles('1min',  250),  // 1m candles for MSS + FVG + limit fill detection (~4 hours coverage)
     fetchQuote()
   ]);
   return { daily, h4, h1, candles15m, candles5m, candles1m, quote };
