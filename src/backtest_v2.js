@@ -13,28 +13,29 @@ const SYMBOL = process.argv[2] === 'NAS100' ? 'QQQ' : 'DIA';
 const NAME   = process.argv[2] === 'NAS100' ? 'NAS100' : 'DJ30';
 const WINDOW_5M = 150;  // rolling context window for 5m engine
 
-// KZ window in UTC minutes
-const KZ_START = 13 * 60 + 30;
-const KZ_END   = 16 * 60 + 30;
-
-function utcMins(timeStr) {
-  const d = new Date(timeStr);
-  return d.getUTCHours() * 60 + d.getUTCMinutes();
+// Use NY timezone — identical to live engine
+function toNY(timeStr) {
+  const d   = new Date(timeStr);
+  const str = d.toLocaleString('en-US', { timeZone: 'America/New_York' });
+  const ny  = new Date(str);
+  return { h: ny.getHours(), m: ny.getMinutes(), day: ny.getDay(), date: ny };
 }
 
 function isWeekday(timeStr) {
-  const d = new Date(timeStr).getUTCDay();
-  return d >= 1 && d <= 5;
+  const { day } = toNY(timeStr);
+  return day >= 1 && day <= 5;
 }
 
 function inKZ(timeStr) {
   if (!isWeekday(timeStr)) return false;
-  const m = utcMins(timeStr);
-  return m >= KZ_START && m < KZ_END;
+  const { h, m } = toNY(timeStr);
+  const mins = h * 60 + m;
+  return mins >= 8 * 60 + 30 && mins < 11 * 60;  // 08:30–11:00 NY
 }
 
 function sessionKey(timeStr) {
-  return timeStr.slice(0, 10);
+  const { date } = toNY(timeStr);
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 }
 
 // Find 1m candles within a time range (from startTime onwards, up to N minutes)

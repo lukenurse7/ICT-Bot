@@ -10,16 +10,22 @@ const SYMBOL = process.argv[2] === 'NAS100' ? 'QQQ' : 'DIA';
 const NAME   = process.argv[2] === 'NAS100' ? 'NAS100' : 'DJ30';
 const WINDOW = 150;
 
-const KZ_START = 13 * 60 + 30;
-const KZ_END   = 16 * 60 + 30;
-
-function utcMins(t) {
-  const d = new Date(t);
-  return d.getUTCHours() * 60 + d.getUTCMinutes();
+function toNY(t) {
+  const str = new Date(t).toLocaleString('en-US', { timeZone: 'America/New_York' });
+  const ny  = new Date(str);
+  return { h: ny.getHours(), m: ny.getMinutes(), day: ny.getDay(), date: ny };
 }
-function isWeekday(t) { const d = new Date(t).getUTCDay(); return d >= 1 && d <= 5; }
-function inKZ(t)      { return isWeekday(t) && utcMins(t) >= KZ_START && utcMins(t) < KZ_END; }
-function sk(t)        { return t.slice(0, 10); }
+function isWeekday(t) { return toNY(t).day >= 1 && toNY(t).day <= 5; }
+function inKZ(t)      {
+  if (!isWeekday(t)) return false;
+  const { h, m } = toNY(t);
+  const mins = h * 60 + m;
+  return mins >= 8 * 60 + 30 && mins < 11 * 60;
+}
+function sk(t) {
+  const { date } = toNY(t);
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+}
 
 async function run() {
   const candles = await fetchCandles(SYMBOL, '5min', 500);
