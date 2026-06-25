@@ -53,7 +53,7 @@ function killZoneStatus() {
 
   const totalMins = hours * 60 + minutes;
   const kzStart = 14 * 60;
-  const kzEnd   = 4 * 60;
+  const kzEnd   = 16 * 60;
 
   if (totalMins >= kzStart && totalMins < kzEnd) {
     const remaining = kzEnd - totalMins;
