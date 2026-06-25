@@ -42,9 +42,9 @@ function sessionKey(timeStr) {
 async function runBacktest() {
   console.log(`\n  ICT 5m Permission Engine — Backtest`);
   console.log(`  Instrument: ${NAME} (${SYMBOL})`);
-  console.log(`  Fetching 10 days of 5m data...\n`);
+  console.log(`  Fetching 5 days of 5m data...\n`);
 
-  const candles = await fetchCandles(SYMBOL, '5min', 1000);
+  const candles = await fetchCandles(SYMBOL, '5min', 500);
 
   console.log(`  Got ${candles.length} candles`);
   console.log(`  From: ${candles[0].time}`);

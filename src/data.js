@@ -37,7 +37,7 @@ async function fetchCandles(symbol, interval, size = 120) {
 
   const res = await axios.get(`${BASE}/time_series`, {
     params: { symbol, interval, outputsize: size, apikey: KEY, format: 'JSON', timezone: 'UTC' },
-    timeout: 12000,
+    timeout: 30000,
   });
 
   if (res.data.status === 'error') throw new Error(`TwelveData: ${res.data.message}`);
