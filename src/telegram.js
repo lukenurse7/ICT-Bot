@@ -42,4 +42,26 @@ Direction: <b>${perm.direction}</b> only.`
   );
 }
 
-module.exports = { send, permissionMessage };
+// Entry signal — fired by 1m execution engine
+function entryMessage(sig) {
+  const arrow = sig.direction === 'SHORT' ? '🔴' : '🟢';
+  const time  = new Date().toUTCString().slice(0, 25);
+
+  return (
+`${arrow} <b>${sig.direction} — ${sig.instrument}</b>
+🕐 ${time} UTC
+
+⚡ <b>ENTRY</b>  <code>${sig.entry}</code>
+🛑 <b>SL</b>     <code>${sig.sl}</code>  <i>(${sig.riskPts} pts risk)</i>
+🎯 <b>TP1</b>    <code>${sig.tp1}</code>  <i>(${sig.rr1})</i>
+🎯 <b>TP2</b>    <code>${sig.tp2}</code>  <i>(${sig.rr2})</i>
+
+📋 <b>Setup</b>
+5m sweep:  ${sig.sweep5m}
+1m sweep:  ${sig.sweep1m}
+1m MSS:    ${sig.mss1m}
+1m FVG:    ${sig.fvg1m}`
+  );
+}
+
+module.exports = { send, permissionMessage, entryMessage };

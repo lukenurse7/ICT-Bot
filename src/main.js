@@ -1,10 +1,8 @@
 'use strict';
 
-// ─── ICT NY Kill Zone Signal Engine — Version 1 (5m Permission Only) ──────────
+// ─── ICT NY Kill Zone Signal Engine — Version 2 (5m Permission + 1m Entry) ───
 // Instruments: DJ30 (DIA), NAS100 (QQQ)
-// Strategy:    NY Kill Zone (08:30–11:00 NY) → 5m sweep → 5m MSS → 5m FVG
-// Output:      Telegram alert when permission is granted
-// Next:        Version 2 will add 1m execution layer
+// Flow: NY KZ opens → 5m sweep/MSS/FVG → 1m sweep/MSS/FVG → entry alert
 
 require('dotenv').config();
 const chalk = require('chalk');
@@ -13,26 +11,23 @@ const { INSTRUMENTS, SCAN_INTERVAL_MS, SIGNAL_COOLDOWN_MS } = require('./config'
 const { isNYKillZone, killZoneStatus, currentSessionKey }   = require('./sessions');
 const { fetchAll }                                           = require('./data');
 const { Engine5m }                                          = require('./engine5m');
+const { Engine1m }                                          = require('./engine1m');
 const tg                                                    = require('./telegram');
 
-// One engine + cooldown tracker per instrument
-const engines = {};
-const lastAlert = {};
+// One 5m + one 1m engine per instrument
+const engines5m  = {};
+const engines1m  = {};
+const lastAlert  = {};
 
 for (const key of Object.keys(INSTRUMENTS)) {
-  engines[key]    = new Engine5m(key);
+  engines5m[key]  = new Engine5m(key);
+  engines1m[key]  = new Engine1m(key);
   lastAlert[key]  = 0;
 }
 
-function ts() {
-  return new Date().toUTCString().slice(17, 22) + ' UTC';
-}
+function ts() { return new Date().toUTCString().slice(17, 22) + ' UTC'; }
+function divider() { return chalk.gray('─'.repeat(60)); }
 
-function divider() {
-  return chalk.gray('─'.repeat(60));
-}
-
-// ─── Scan one instrument ──────────────────────────────────────────────────────
 async function scanInstrument(key) {
   const cfg  = INSTRUMENTS[key];
   const inKZ = isNYKillZone();
@@ -46,46 +41,55 @@ async function scanInstrument(key) {
     return;
   }
 
-  // Tick the 5m permission engine
-  const result = engines[key].tick(sk, m5, inKZ);
+  // ── 5m Permission Engine ──────────────────────────────────────────────────
+  const r5 = engines5m[key].tick(sk, m5, inKZ);
 
-  // Print instrument header
-  const chg = quote.changePct >= 0 ? chalk.green(`+${quote.changePct.toFixed(2)}%`) : chalk.red(`${quote.changePct.toFixed(2)}%`);
+  const chg = quote.changePct >= 0
+    ? chalk.green(`+${quote.changePct.toFixed(2)}%`)
+    : chalk.red(`${quote.changePct.toFixed(2)}%`);
+
   console.log(`\n  ${chalk.bold(key)}  ${chalk.white(quote.price.toLocaleString('en-GB', { minimumFractionDigits: 2 }))}  ${chg}`);
-  console.log(`  State: ${chalk.cyan(result.state)}  — ${chalk.gray(result.waitReason)}`);
+  console.log(`  5m: ${chalk.cyan(r5.state)}  — ${chalk.gray(r5.waitReason)}`);
 
-  if (result.sweep) {
-    console.log(`  Sweep: ${chalk.yellow(result.sweep.levelName + ' (' + result.sweep.dir + ')')}`);
-  }
-  if (result.mss) {
-    console.log(`  MSS:   ${chalk.yellow(result.mss.type + ' @ ' + result.mss.level.toFixed(2))}`);
-  }
-  if (result.fvg) {
-    console.log(`  FVG:   ${chalk.yellow(result.fvg.bottom.toFixed(2) + ' – ' + result.fvg.top.toFixed(2))}`);
+  // ── 1m Execution Engine ───────────────────────────────────────────────────
+  // Activate 1m engine when 5m grants permission
+  if (r5.permissionGranted && r5.permission && !engines1m[key].active) {
+    engines1m[key].activate(r5.permission);
+    console.log(chalk.yellow(`  ★ 5m permission granted (${r5.permission.direction}) — 1m engine activated`));
+    await tg.send(tg.permissionMessage(r5.permission));
   }
 
-  // Fire alert if permission granted + cooldown not active
-  if (result.permissionGranted && result.permission) {
-    const now = Date.now();
-    const cooldownActive = (now - lastAlert[key]) < SIGNAL_COOLDOWN_MS;
+  if (engines1m[key].active) {
+    const r1 = engines1m[key].tick(m1);
+    console.log(`  1m: ${chalk.cyan(r1.state)}  — ${chalk.gray(r1.waitReason)}`);
 
-    if (!cooldownActive) {
-      lastAlert[key] = now;
-      console.log('\n' + chalk.bold.green('  ★ PERMISSION GRANTED — sending Telegram alert'));
-      await tg.send(tg.permissionMessage(result.permission));
-    } else {
-      const mins = Math.round((SIGNAL_COOLDOWN_MS - (now - lastAlert[key])) / 60000);
-      console.log(chalk.gray(`  [${key}] Permission already alerted this session (cooldown: ${mins}m remaining)`));
+    if (r1.entryReady && r1.signal) {
+      const now          = Date.now();
+      const onCooldown   = (now - lastAlert[key]) < SIGNAL_COOLDOWN_MS;
+
+      if (!onCooldown) {
+        lastAlert[key] = now;
+        console.log('\n' + chalk.bold.green(`  ▶ ENTRY SIGNAL — ${r1.signal.direction} ${key}`));
+        console.log(chalk.white(`    Entry ${r1.signal.entry}  SL ${r1.signal.sl}  TP1 ${r1.signal.tp1}  TP2 ${r1.signal.tp2}`));
+        await tg.send(tg.entryMessage(r1.signal));
+
+        // Reset 1m engine after firing so it doesn't re-alert
+        engines1m[key]._reset();
+      }
+    }
+
+    // Deactivate 1m engine if it expired
+    if (!engines1m[key].active) {
+      console.log(chalk.gray(`  [${key}] 1m engine expired — waiting for next 5m setup`));
     }
   }
 }
 
-// ─── Main scan loop ───────────────────────────────────────────────────────────
 async function runCycle() {
   console.clear();
   const kz = killZoneStatus();
 
-  console.log('\n' + chalk.bold.white('  ◆ ICT SIGNAL ENGINE  —  v1 (5m Permission)'));
+  console.log('\n' + chalk.bold.white('  ◆ ICT SIGNAL ENGINE  —  v2 (5m + 1m)'));
   console.log(chalk.gray(`  ${ts()}  —  ${kz.label}`));
   console.log(divider());
 
@@ -95,7 +99,6 @@ async function runCycle() {
     console.log(chalk.yellow(`  ${kz.label}`));
   }
 
-  // Scan all instruments in parallel
   await Promise.allSettled(
     Object.keys(INSTRUMENTS).map(key => scanInstrument(key))
   );
@@ -104,11 +107,8 @@ async function runCycle() {
   console.log(chalk.gray(`  Next scan in ${SCAN_INTERVAL_MS / 1000}s — Ctrl+C to stop\n`));
 }
 
-// Start
 console.log(chalk.bold.white('\n  ICT Signal Engine starting...\n'));
-
-// Send a startup message so we know Telegram is connected
-tg.send('🤖 <b>ICT Signal Engine started</b>\nScanning DJ30 + NAS100 during NY Kill Zone (08:30–11:00 NY time).\nWaiting for next setup...');
+tg.send('🤖 <b>ICT Signal Engine v2 started</b>\nScanning DJ30 + NAS100\n5m permission + 1m entry layer active.');
 
 runCycle();
 setInterval(runCycle, SCAN_INTERVAL_MS);
