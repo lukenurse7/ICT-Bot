@@ -169,39 +169,33 @@ class Engine5m {
     return null;
   }
 
-  // ─── MSS: break of structure after sweep ────────────────────────────────────
+  // ─── MSS: CHoCH using the stored opposite pivot level ───────────────────────
+  // BEAR setup: swept the swing HIGH → MSS = close below the stored swing LOW
+  // BULL setup: swept the swing LOW  → MSS = close above the stored swing HIGH
+  // This is the correct ICT sequence: liquidity taken from one side,
+  // then structure breaks on the OTHER side confirming the reversal.
   _detectMSS(candles) {
-    const window = candles.slice(-20);
-    if (window.length < 5) return null;
+    if (candles.length < 3) return null;
 
-    const last = window[window.length - 1];
-    const prev = window[window.length - 2];
+    const last = candles[candles.length - 1];
     const dir  = this.sweep.dir;
 
     if (dir === 'bear') {
-      let swingLow = Infinity;
-      for (let i = 1; i < window.length - 2; i++) {
-        const c = window[i];
-        if (c.low < window[i - 1].low && c.low < window[i + 1].low)
-          swingLow = Math.min(swingLow, c.low);
-      }
-      if (swingLow < Infinity && last.close < swingLow && last.close < last.open)
-        return { type: 'BOS_DOWN', level: swingLow, mssCandle: last };
-      if (last.close < prev.low && last.close < last.open)
-        return { type: 'CHoCH', level: prev.low, mssCandle: last };
+      // Need the stored swing LOW (opposite to the swept HIGH)
+      const mssLevel = this.pivots.lastLow?.price;
+      if (!mssLevel) return null;
+      // CHoCH: bearish close below the stored swing low
+      if (last.close < mssLevel && last.close < last.open)
+        return { type: 'CHoCH', level: mssLevel, mssCandle: last };
     }
 
     if (dir === 'bull') {
-      let swingHigh = -Infinity;
-      for (let i = 1; i < window.length - 2; i++) {
-        const c = window[i];
-        if (c.high > window[i - 1].high && c.high > window[i + 1].high)
-          swingHigh = Math.max(swingHigh, c.high);
-      }
-      if (swingHigh > -Infinity && last.close > swingHigh && last.close > last.open)
-        return { type: 'BOS_UP', level: swingHigh, mssCandle: last };
-      if (last.close > prev.high && last.close > last.open)
-        return { type: 'CHoCH', level: prev.high, mssCandle: last };
+      // Need the stored swing HIGH (opposite to the swept LOW)
+      const mssLevel = this.pivots.lastHigh?.price;
+      if (!mssLevel) return null;
+      // CHoCH: bullish close above the stored swing high
+      if (last.close > mssLevel && last.close > last.open)
+        return { type: 'CHoCH', level: mssLevel, mssCandle: last };
     }
 
     return null;
