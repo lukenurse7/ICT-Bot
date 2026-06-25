@@ -251,9 +251,10 @@ class Engine1m {
     const sweep    = this.sweep1m;
     const slBuffer = 0.10;
 
+    // Use the wider of sweep extreme OR FVG edge — guarantees real distance from entry
     const sl = isShort
-      ? parseFloat((sweep.sweepHigh + slBuffer).toFixed(2))
-      : parseFloat((sweep.sweepLow  - slBuffer).toFixed(2));
+      ? parseFloat((Math.max(sweep.sweepHigh, this.fvg1m.top) + slBuffer).toFixed(2))
+      : parseFloat((Math.min(sweep.sweepLow,  this.fvg1m.bottom) - slBuffer).toFixed(2));
 
     const risk = Math.abs(entry - sl);
     if (risk < MIN_RISK_PTS) return null;
