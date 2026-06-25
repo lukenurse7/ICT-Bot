@@ -96,28 +96,29 @@ class Engine1m {
       return this._result(`1m FVG ✓ ${fvg.bottom.toFixed(2)}–${fvg.top.toFixed(2)} — waiting for retest`);
     }
 
-    // ── STEP 4: Wait for price to RETURN into the FVG zone ──────────────────
-    // This is the actual entry point — a limit order at the FVG midpoint
+    // ── STEP 4: Wait for price to retest AND hold the FVG zone ─────────────
+    // We don't enter on the first wick into the FVG. We wait for a candle that:
+    //   SHORT: rallies up into the FVG AND closes back below the FVG top
+    //          (shows the FVG is acting as resistance — sellers stepped in)
+    //   LONG:  pulls back into the FVG AND closes back above the FVG bottom
+    //          (shows the FVG is acting as support — buyers stepped in)
+    // This filters out "blow-through" retests where price just falls through.
     if (this.state === STATES.RETEST) {
       const latest = candles1m[candles1m.length - 1];
       const fvg    = this.fvg1m;
 
-      // For SHORT: price needs to rally back UP into the FVG (which is above current price)
-      // For LONG:  price needs to pull back DOWN into the FVG (which is below current price)
-      const intoFVG = isShort
-        ? latest.high >= fvg.bottom   // candle wick enters the FVG from below
-        : latest.low  <= fvg.top;     // candle wick enters the FVG from above
+      const retestHeld = isShort
+        ? latest.high >= fvg.bottom && latest.close < fvg.top    // wick into FVG, close below FVG top
+        : latest.low  <= fvg.top   && latest.close > fvg.bottom; // wick into FVG, close above FVG bottom
 
-      if (!intoFVG) {
-        return this._result(`Waiting for retest of FVG ${fvg.bottom.toFixed(2)}–${fvg.top.toFixed(2)}`);
+      if (!retestHeld) {
+        return this._result(`Waiting for FVG retest+hold ${fvg.bottom.toFixed(2)}–${fvg.top.toFixed(2)}`);
       }
 
-      // Price has entered the FVG — build the entry signal
       const signal = this._buildSignal(isShort, latest);
       if (!signal) {
-        // Risk too small — skip this setup
         this._reset();
-        return this._result(`FVG retest reached but risk < ${MIN_RISK_PTS}pts — skipping`);
+        return this._result(`FVG retest held but risk < ${MIN_RISK_PTS}pts — skipping`);
       }
 
       this.signal = signal;
@@ -242,19 +243,21 @@ class Engine1m {
     return fvgs.length ? fvgs[fvgs.length - 1] : null;
   }
 
-  // ─── Build entry signal once price retests FVG ───────────────────────────
-  // Entry = FVG midpoint (limit order level)
-  // SL    = beyond the 1m sweep wick + small buffer
+  // ─── Build entry signal once price retests and holds FVG ────────────────────
+  // Entry = FVG midpoint
+  // SL    = beyond the WORST of (sweep wick extreme, FVG edge) + buffer
+  //         This ensures SL is outside the entire structure, not just the wick
   // TP1   = 2R, TP2 = 3.5R
   _buildSignal(isShort, retestCandle) {
     const entry  = this.fvg1m.mid;
     const sweep  = this.sweep1m;
 
-    // SL is beyond the sweep wick extreme
-    const slBuffer = 0.10;  // 10 cent fixed buffer beyond sweep wick
+    const slBuffer = 0.10;
     const sl = isShort
-      ? parseFloat((sweep.sweepHigh + slBuffer).toFixed(2))
-      : parseFloat((sweep.sweepLow  - slBuffer).toFixed(2));
+      // SL above the higher of: sweep wick high OR FVG top
+      ? parseFloat((Math.max(sweep.sweepHigh, this.fvg1m.top) + slBuffer).toFixed(2))
+      // SL below the lower of: sweep wick low OR FVG bottom
+      : parseFloat((Math.min(sweep.sweepLow, this.fvg1m.bottom) - slBuffer).toFixed(2));
 
     const risk = Math.abs(entry - sl);
 
