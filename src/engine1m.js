@@ -64,10 +64,10 @@ class Engine1m {
           `Watching for sweep of 5m H:${this.targetHigh?.toFixed(2)} L:${this.targetLow?.toFixed(2)} [${barsElapsed}/${MAX_1M_BARS}m]`
         );
       }
-      this.sweep1m     = sweep;
-      this.direction   = sweep.dir === 'bear' ? 'SHORT' : 'LONG';
-      this.sweepBarIdx = candles1m.length - 1;
-      this.state       = STATES.SWEPT;
+      this.sweep1m      = sweep;
+      this.direction    = sweep.dir === 'bear' ? 'SHORT' : 'LONG';
+      this.sweepBarIdx  = candles1m.length - 1;  // MSS + FVG must come AFTER this index
+      this.state        = STATES.SWEPT;
     }
 
     // ── STEP 2: 1m MSS after sweep ───────────────────────────────────────────
@@ -152,7 +152,8 @@ class Engine1m {
 
   // ─── 1m MSS: displacement break of recent internal swing ──────────────────
   _detectMSS(candles, isShort) {
-    const window = candles.slice(-20);
+    // Only look at candles from the sweep bar onwards
+    const window = candles.slice(this.sweepBarIdx);
     if (window.length < 5) return null;
     const last = window[window.length - 1];
     const prev = window[window.length - 2];
@@ -199,7 +200,8 @@ class Engine1m {
   //   SHORT: c2.high (bottom of bear FVG — price rallies up to here)
   //   LONG:  c2.low  (top of bull FVG — price pulls back down to here)
   _detectFVG(candles, isShort) {
-    const window = candles.slice(-15);
+    // Only search candles from MSS bar onwards — FVG must come after the sweep+MSS
+    const window = candles.slice(this.mssBarIdx);
     const fvgs   = [];
 
     for (let i = 1; i < window.length - 1; i++) {
@@ -255,6 +257,10 @@ class Engine1m {
     const sl = isShort
       ? parseFloat((sweep.sweepHigh + slBuffer).toFixed(2))
       : parseFloat((sweep.sweepLow  - slBuffer).toFixed(2));
+
+    // SL must be above entry for SHORT, below for LONG — reject inverted setups
+    if (isShort  && sl <= entry) return null;
+    if (!isShort && sl >= entry) return null;
 
     const risk = Math.abs(entry - sl);
     if (risk < MIN_RISK_PTS) return null;
