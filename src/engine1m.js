@@ -130,18 +130,20 @@ class Engine1m {
   }
 
   // ─── Sweep of specific 5m targetHigh or targetLow ─────────────────────────
+  // Price only needs to TRADE THROUGH the level — close does not need to
+  // reverse back on the same candle. The MSS+FVG that follows confirms
+  // direction. We track which level was taken so later steps know direction.
   _detectSweep(candles) {
     if (candles.length < 3) return null;
-    // Check each of the last 5 candles for a sweep (catches missed ticks)
-    const window = candles.slice(-5);
+    const window = candles.slice(-10);
     for (let i = window.length - 1; i >= 0; i--) {
       const bar = window[i];
-      // Bear sweep: wick above targetHigh, close back below
-      if (this.targetHigh != null && bar.high > this.targetHigh && bar.close < this.targetHigh) {
+      // Bear sweep: wick above targetHigh (close anywhere)
+      if (this.targetHigh != null && bar.high > this.targetHigh) {
         return { dir: 'bear', sweepCandle: bar, sweepHigh: bar.high, level: this.targetHigh };
       }
-      // Bull sweep: wick below targetLow, close back above
-      if (this.targetLow != null && bar.low < this.targetLow && bar.close > this.targetLow) {
+      // Bull sweep: wick below targetLow (close anywhere)
+      if (this.targetLow != null && bar.low < this.targetLow) {
         return { dir: 'bull', sweepCandle: bar, sweepLow: bar.low, level: this.targetLow };
       }
     }
