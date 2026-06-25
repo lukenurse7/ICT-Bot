@@ -111,41 +111,39 @@ function load1m() {
 
 // ─── ICT Engine ───────────────────────────────────────────────────────────────
 
-// Previous session high/low as BSL/SSL (ICT: mark prev session liquidity before KZ)
-// Finds the most recent overnight gap, takes prev session candles, returns H+L as levels.
+// Opening Range = first 6 x 5m bars of the current session (30 min of actual trading).
+// Derived from the session gap so it works regardless of DST (EDT 13:30 UTC / EST 14:30 UTC).
 function buildPreKZLevels(candles5m) {
-  const GAP_MS = 30 * 60 * 1000;
+  if (candles5m.length < 2) return { levels: [] };
 
-  // Find the most recent session boundary (gap > 30 min)
-  let curSessionStart = 0;
+  const GAP_MS = 30 * 60 * 1000;
+  let sessionStart = 0;
   for (let i = candles5m.length - 1; i > 0; i--) {
     const gap = new Date(candles5m[i].time).getTime() - new Date(candles5m[i-1].time).getTime();
-    if (gap > GAP_MS) { curSessionStart = i; break; }
-  }
-  if (curSessionStart === 0) return { levels: [] };
-
-  // Find the previous session boundary
-  let prevSessionStart = 0;
-  for (let i = curSessionStart - 1; i > 0; i--) {
-    const gap = new Date(candles5m[i].time).getTime() - new Date(candles5m[i-1].time).getTime();
-    if (gap > GAP_MS) { prevSessionStart = i; break; }
+    if (gap > GAP_MS) { sessionStart = i; break; }
   }
 
-  // Previous session = prevSessionStart → curSessionStart-1
-  const prevSess = candles5m.slice(prevSessionStart, curSessionStart);
-  if (prevSess.length < 3) return { levels: [] };
+  // OR = first 6 bars of session (6 × 5m = 30 min)
+  const orBars = candles5m.slice(sessionStart, sessionStart + 6);
+  if (orBars.length < 2) return { levels: [] };
 
-  const high = Math.max(...prevSess.map(c => c.high));
-  const low  = Math.min(...prevSess.map(c => c.low));
+  // Only return levels once the OR window has closed
+  // (current bar must be AFTER the 6th OR bar)
+  const orEndTs = new Date(orBars[orBars.length - 1].time).getTime();
+  const curTs   = new Date(candles5m[candles5m.length - 1].time).getTime();
+  if (curTs <= orEndTs) return { levels: [] };
 
-  // Date label from the previous session
-  const dateLabel = prevSess[0].time.slice(0, 10);
+  const high = Math.max(...orBars.map(c => c.high));
+  const low  = Math.min(...orBars.map(c => c.low));
+  const label = orBars[0].time.slice(0, 10);
 
   return {
     levels: [
-      { price: high, type: 'BSL', name: `PrevH ${dateLabel}` },
-      { price: low,  type: 'SSL', name: `PrevL ${dateLabel}` }
-    ]
+      { price: high, type: 'BSL', name: `OR High ${label}` },
+      { price: low,  type: 'SSL', name: `OR Low  ${label}` }
+    ],
+    sessionOpenTime: orBars[0].time,
+    orEndTime:       orBars[orBars.length - 1].time
   };
 }
 
@@ -153,7 +151,7 @@ function detectSweep(candles5m) {
   const { levels } = buildPreKZLevels(candles5m);
   if (!levels.length) return { detected: false };
   const results = [];
-  for (let back = 0; back <= 12; back++) {
+  for (let back = 0; back <= 24; back++) {
     const idx = candles5m.length - 1 - back;
     if (idx < 0) break;
     const c = candles5m[idx];
@@ -238,9 +236,8 @@ function detectFVG1m(candles1m, sweepDir, sweepCandleTime, mss) {
   }
   if (!candidates.length) return { found: false };
   const best = candidates.sort((a,b) => b.size - a.size)[0];
-  // Bull: limit BUY at FVG bottom (c0.high) — wait for retrace into zone
-  // Bear: limit SELL at FVG top (c0.low) — wait for retrace up into zone
-  const entryPrice = sweepDir === 'bull' ? best.bottom : best.top;
+  // Enter at FVG 50% midpoint — price must retrace into the zone but not all the way to bottom
+  const entryPrice = (best.top + best.bottom) / 2;
   return { found:true, top:best.top, bottom:best.bottom, size:best.size,
            entryPrice, zoneFormedAt:best.zoneFormedAt };
 }
@@ -308,7 +305,9 @@ function simulateOutcome(dir, entry, sl, tp1, tp2, tp3, risk, future1m) {
 
 function isKZ(iso) {
   const t = new Date(iso), m = t.getUTCHours()*60+t.getUTCMinutes();
-  return m >= 13*60+30 && m < 16*60;
+  // EDT (summer): NYSE 13:30–20:00 UTC, KZ 13:30–16:00
+  // EST (winter): NYSE 14:30–21:00 UTC, KZ 14:30–17:00
+  return (m >= 13*60+30 && m < 16*60) || (m >= 14*60+30 && m < 17*60);
 }
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
@@ -343,9 +342,13 @@ function run() {
   const processedSetups = new Set();
   const tradedDays = new Set(); // max 1 per day
 
+  // Diagnostic counters
+  let d_kz=0, d_noLevels=0, d_noSweep=0, d_biasFail=0, d_noMSS=0, d_noFVG=0, d_noFill=0, d_slBad=0, d_riskBad=0, d_dupDay=0, d_dupZone=0;
+
   for (let i = 30; i < period5m.length - 1; i++) {
     const bar = period5m[i];
     if (!isKZ(bar.time)) continue;
+    d_kz++;
 
     const time    = new Date(bar.time);
     const slice5m = all5m.filter(c => new Date(c.time) <= time);
@@ -356,26 +359,24 @@ function run() {
 
     let sweep, mss, fvg, conf;
     try {
-      sweep = detectSweep(slice5m);
-      if (!sweep.detected) continue;
+      const { levels } = buildPreKZLevels(slice5m);
+      if (!levels.length) { d_noLevels++; continue; }
 
-      // Skip counter-trend setups
-      if (bias === 'bull' && sweep.dir === 'bear') continue;
-      if (bias === 'bear' && sweep.dir === 'bull') continue;
+      sweep = detectSweep(slice5m);
+      if (!sweep.detected) { d_noSweep++; continue; }
 
       const slice1m = all1m.filter(c => new Date(c.time).getTime() <= time.getTime());
       mss  = detectMSS1m(slice1m, sweep.dir, sweep.sweepCandleTime);
-      if (!mss.confirmed) continue;
+      if (!mss.confirmed) { d_noMSS++; continue; }
 
       fvg  = detectFVG1m(slice1m, sweep.dir, sweep.sweepCandleTime, mss);
-      if (!fvg.found) continue;
+      if (!fvg.found) { d_noFVG++; continue; }
 
       conf = scoreConf(sweep, mss, fvg);
-      if (conf.score < MIN_SCORE) continue;
 
       // Deduplicate — same FVG zone already processed
       const zoneKey = `${fvg.zoneFormedAt}_${fvg.entryPrice.toFixed(0)}`;
-      if (processedSetups.has(zoneKey)) continue;
+      if (processedSetups.has(zoneKey)) { d_dupZone++; continue; }
       processedSetups.add(zoneKey);
 
     } catch(e) { continue; }
@@ -385,23 +386,28 @@ function run() {
 
     // Wait for limit fill on 1m
     const fill = findLimitFill1m(all1m, fvg, sweep.dir, fvg.zoneFormedAt, dayEnd);
-    if (!fill) continue;
+    if (!fill) { d_noFill++; continue; }
 
     const entry     = fill.price;
     const slBuffer  = mss.swingLevel * 0.0003;
     const sl        = isLong ? mss.swingLevel - slBuffer : mss.swingLevel + slBuffer;
 
-    if (isLong && sl >= entry)   continue;
-    if (!isLong && sl <= entry)  continue;
+    if (isLong && sl >= entry)  { d_slBad++; continue; }
+    if (!isLong && sl <= entry) { d_slBad++; continue; }
 
     const dayKey = bar.time.slice(0, 10);
-    if (tradedDays.has(dayKey)) continue; // one trade per day max
+    if (tradedDays.has(dayKey)) { d_dupDay++; continue; } // one trade per day max
 
     const risk = Math.abs(entry - sl);
-    if (risk < MIN_RISK_PTS || risk > MAX_RISK_PTS) continue;
+    if (risk < MIN_RISK_PTS || risk > MAX_RISK_PTS) { d_riskBad++; continue; }
 
     const { tp1, tp1Desc, tp2, tp2Desc, tp3, tp3Desc } =
       opposingLiquidityTPs(sweep.dir, entry, risk, slice5m, nowIso);
+
+    // Require opposing liquidity to be at least 2R away — skip if R:R is too tight
+    const minTP = isLong ? entry + risk * 2.0 : entry - risk * 2.0;
+    if (isLong && tp3 < minTP) { d_riskBad++; continue; }
+    if (!isLong && tp3 > minTP) { d_riskBad++; continue; }
 
     const future1m = all1m.filter(c => {
       const t = new Date(c.time).getTime();
@@ -434,6 +440,21 @@ function run() {
       ...outcome
     });
   }
+
+  // ─── Diagnostics ──────────────────────────────────────────────────────────
+  console.log(chalk.bold('  ■ FUNNEL BREAKDOWN (why setups are filtered)'));
+  console.log(`  KZ bars scanned:       ${d_kz}`);
+  console.log(`  → No prev session lvls: ${d_noLevels}`);
+  console.log(`  → Sweep not detected:   ${d_noSweep}`);
+  console.log(`  → HTF bias conflict:    ${d_biasFail}`);
+  console.log(`  → No 1m MSS:           ${d_noMSS}`);
+  console.log(`  → No FVG found:        ${d_noFVG}`);
+  console.log(`  → Dup zone (skip):     ${d_dupZone}`);
+  console.log(`  → Fill never came:     ${d_noFill}`);
+  console.log(`  → SL wrong side:       ${d_slBad}`);
+  console.log(`  → Risk out of range:   ${d_riskBad}`);
+  console.log(`  → Already traded day:  ${d_dupDay}`);
+  console.log(`  → TRADES TAKEN:        ${signals.length}\n`);
 
   // ─── Results ──────────────────────────────────────────────────────────────
   const sep    = '═'.repeat(72);
