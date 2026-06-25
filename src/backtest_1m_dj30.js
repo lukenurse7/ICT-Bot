@@ -25,7 +25,56 @@ const MAX_PER_DAY   = 1; // one trade per day max (strongest setup wins)
 const CACHE       = path.join(__dirname, '..', '.cache');
 const PRICE_SCALE = parseFloat(process.env.DJ30_PRICE_SCALE) || 99.7724;
 
-// ─── Load 5m data (full year) and 1m data (available period) ─────────────────
+// ─── Load data ────────────────────────────────────────────────────────────────
+function load1h(sy, sm, ey, em) {
+  const all = [];
+  let y = sy, m = sm;
+  while (y < ey || (y === ey && m <= em)) {
+    const s  = `${y}-${String(m).padStart(2,'0')}-01`;
+    const nm = m+1>12?1:m+1, ny = m+1>12?y+1:y;
+    const e  = `${ny}-${String(nm).padStart(2,'0')}-01`;
+    const f  = path.join(CACHE, `dj30_1h_${s}_${e}.json`);
+    if (fs.existsSync(f)) all.push(...JSON.parse(fs.readFileSync(f)));
+    m++; if (m>12){m=1;y++;}
+  }
+  const seen=new Set();
+  return all.filter(c=>{if(seen.has(c.time))return false;seen.add(c.time);return true;})
+    .sort((a,b)=>new Date(a.time)-new Date(b.time))
+    .map(c=>({time:c.time,open:c.open*PRICE_SCALE,high:c.high*PRICE_SCALE,
+              low:c.low*PRICE_SCALE,close:c.close*PRICE_SCALE}));
+}
+
+// HTF bias from 1h swing structure (last 30 bars)
+// Returns 'bull', 'bear', or 'neutral'
+function htfBias(candles1h, nowIso) {
+  const nowTs = new Date(nowIso).getTime();
+  const recent = candles1h.filter(c => new Date(c.time).getTime() < nowTs).slice(-30);
+  if (recent.length < 6) return 'neutral';
+
+  // Find pivot highs and lows (3-bar pattern)
+  const pivotHighs = [], pivotLows = [];
+  for (let i = 1; i < recent.length - 1; i++) {
+    if (recent[i].high > recent[i-1].high && recent[i].high > recent[i+1].high)
+      pivotHighs.push({ price: recent[i].high, idx: i });
+    if (recent[i].low < recent[i-1].low && recent[i].low < recent[i+1].low)
+      pivotLows.push({ price: recent[i].low, idx: i });
+  }
+
+  if (pivotHighs.length < 2 || pivotLows.length < 2) return 'neutral';
+
+  const lastH  = pivotHighs[pivotHighs.length - 1].price;
+  const prevH  = pivotHighs[pivotHighs.length - 2].price;
+  const lastL  = pivotLows[pivotLows.length - 1].price;
+  const prevL  = pivotLows[pivotLows.length - 2].price;
+
+  const hhhl = lastH > prevH && lastL > prevL; // higher highs + higher lows
+  const lhll = lastH < prevH && lastL < prevL; // lower highs + lower lows
+
+  if (hhhl) return 'bull';
+  if (lhll) return 'bear';
+  return 'neutral';
+}
+
 function load5m(sy, sm, ey, em) {
   const all = [];
   let y = sy, m = sm;
@@ -45,11 +94,16 @@ function load5m(sy, sm, ey, em) {
 }
 
 function load1m() {
-  const f = path.join(CACHE, 'dj30_1min_2026-05-28_2026-06-16.json');
-  if (!fs.existsSync(f)) return [];
-  const raw = JSON.parse(fs.readFileSync(f));
+  const all = [];
+  // Load all dj30_1min_*.json cache files (monthly and 2-week chunks)
+  const files = fs.readdirSync(CACHE)
+    .filter(f => f.startsWith('dj30_1min_') && f.endsWith('.json'))
+    .map(f => path.join(CACHE, f));
+  for (const f of files) {
+    try { all.push(...JSON.parse(fs.readFileSync(f))); } catch(e) {}
+  }
   const seen=new Set();
-  return raw.filter(c=>{if(seen.has(c.time))return false;seen.add(c.time);return true;})
+  return all.filter(c=>{if(seen.has(c.time))return false;seen.add(c.time);return true;})
     .sort((a,b)=>new Date(a.time)-new Date(b.time))
     .map(c=>({time:c.time,open:c.open*PRICE_SCALE,high:c.high*PRICE_SCALE,
               low:c.low*PRICE_SCALE,close:c.close*PRICE_SCALE,volume:c.volume||0}));
@@ -251,16 +305,17 @@ function run() {
   console.log(chalk.gray('  Strategy: Prev session H/L sweep → 1m MSS+displacement → 1m FVG limit → opp. liquidity TP'));
   console.log(chalk.gray(`  £${ACCOUNT_START.toLocaleString()} start | 2% risk | compounded | force-close 21:00 UTC\n`));
 
+  const all1h  = load1h(2025, 5, 2026, 6);
   const all5m  = load5m(2025, 5, 2026, 6);
   const all1m  = load1m();
 
-  if (!all1m.length) { console.log(chalk.red('  ✗ No 1m data. Expected .cache/dj30_1min_2026-05-28_2026-06-16.json')); process.exit(1); }
+  if (!all1m.length) { console.log(chalk.red('  ✗ No 1m data. Run: node src/fetch_1m_history.js')); process.exit(1); }
 
   // Period is bounded by 1m data availability
   const START = new Date(all1m[0].time);
   const END   = new Date(all1m[all1m.length-1].time);
 
-  console.log(chalk.gray(`  5m bars: ${all5m.length.toLocaleString()}   1m bars: ${all1m.length.toLocaleString()}`));
+  console.log(chalk.gray(`  1h bars: ${all1h.length.toLocaleString()}   5m bars: ${all5m.length.toLocaleString()}   1m bars: ${all1m.length.toLocaleString()}`));
   console.log(chalk.gray(`  1m period: ${START.toISOString().slice(0,10)} → ${END.toISOString().slice(0,10)}\n`));
 
   // Scan 5m bars to detect setup, then use 1m for entry/exit
@@ -282,10 +337,17 @@ function run() {
     const slice5m = all5m.filter(c => new Date(c.time) <= time);
     const nowIso  = bar.time;
 
+    // HTF bias filter — only take trades aligned with 1h trend
+    const bias = htfBias(all1h, bar.time);
+
     let sweep, mss, fvg, conf;
     try {
       sweep = detectSweep(slice5m);
       if (!sweep.detected) continue;
+
+      // Skip counter-trend setups
+      if (bias === 'bull' && sweep.dir === 'bear') continue;
+      if (bias === 'bear' && sweep.dir === 'bull') continue;
 
       const slice1m = all1m.filter(c => new Date(c.time).getTime() <= time.getTime());
       mss  = detectMSS1m(slice1m, sweep.dir, sweep.sweepCandleTime);
