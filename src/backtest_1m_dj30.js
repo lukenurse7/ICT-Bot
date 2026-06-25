@@ -111,30 +111,42 @@ function load1m() {
 
 // ─── ICT Engine ───────────────────────────────────────────────────────────────
 
-// Session-gap filtered intraday swing levels (same logic as live ict.js)
+// Previous session high/low as BSL/SSL (ICT: mark prev session liquidity before KZ)
+// Finds the most recent overnight gap, takes prev session candles, returns H+L as levels.
 function buildPreKZLevels(candles5m) {
   const GAP_MS = 30 * 60 * 1000;
-  let sessionStart = 0;
+
+  // Find the most recent session boundary (gap > 30 min)
+  let curSessionStart = 0;
   for (let i = candles5m.length - 1; i > 0; i--) {
     const gap = new Date(candles5m[i].time).getTime() - new Date(candles5m[i-1].time).getTime();
-    if (gap > GAP_MS) { sessionStart = i; break; }
+    if (gap > GAP_MS) { curSessionStart = i; break; }
   }
-  const sess = candles5m.slice(sessionStart);
-  if (sess.length < 5) return { levels: [] };
-  const raw = [];
-  for (let i = 1; i < sess.length - 1; i++) {
-    const c = sess[i];
-    if (c.high > sess[i-1].high && c.high > sess[i+1].high)
-      raw.push({ price: c.high, type: 'BSL', name: `Intraday H ${c.time.slice(11,16)}` });
-    if (c.low < sess[i-1].low && c.low < sess[i+1].low)
-      raw.push({ price: c.low,  type: 'SSL', name: `Intraday L ${c.time.slice(11,16)}` });
+  if (curSessionStart === 0) return { levels: [] };
+
+  // Find the previous session boundary
+  let prevSessionStart = 0;
+  for (let i = curSessionStart - 1; i > 0; i--) {
+    const gap = new Date(candles5m[i].time).getTime() - new Date(candles5m[i-1].time).getTime();
+    if (gap > GAP_MS) { prevSessionStart = i; break; }
   }
-  const levels = [];
-  for (const lvl of raw) {
-    if (!levels.find(d => d.type === lvl.type && Math.abs(d.price - lvl.price) / lvl.price < 0.0005))
-      levels.push(lvl);
-  }
-  return { levels };
+
+  // Previous session = prevSessionStart → curSessionStart-1
+  const prevSess = candles5m.slice(prevSessionStart, curSessionStart);
+  if (prevSess.length < 3) return { levels: [] };
+
+  const high = Math.max(...prevSess.map(c => c.high));
+  const low  = Math.min(...prevSess.map(c => c.low));
+
+  // Date label from the previous session
+  const dateLabel = prevSess[0].time.slice(0, 10);
+
+  return {
+    levels: [
+      { price: high, type: 'BSL', name: `PrevH ${dateLabel}` },
+      { price: low,  type: 'SSL', name: `PrevL ${dateLabel}` }
+    ]
+  };
 }
 
 function detectSweep(candles5m) {
