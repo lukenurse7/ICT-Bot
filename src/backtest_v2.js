@@ -75,7 +75,7 @@ async function runBacktest() {
   console.log(`\n${'═'.repeat(70)}`);
   console.log(`  ICT Bot — Dual-Timeframe Backtest`);
   console.log(`  Instrument : ${NAME} (${SYMBOL})`);
-  console.log(`  Strategy   : NY KZ 08:30–11:00 | Sweep → 5m MSS → 5m FVG → 1m entry`);
+  console.log(`  Strategy   : NY KZ 08:30–11:00 | 5m H/L → 1m Sweep → 1m MSS → 1m FVG → Entry`);
   console.log(`${'═'.repeat(70)}\n`);
   console.log(`  Fetching data (this may take a moment)...`);
 
@@ -116,21 +116,22 @@ async function runBacktest() {
 
   function printDaySummary() {
     if (!dayState) return;
-    const { date, gotSweep, gotMSS, gotFVG, gotEntry, signal, outcome } = dayState;
+    const { date, gotPermission, gotSweep, gotMSS, gotFVG, gotEntry, signal, outcome } = dayState;
 
-    // Progress icons showing how far the setup got
+    // Progress icons: 5m levels → 1m sweep → 1m MSS → 1m FVG → Entry
     const steps = [
-      gotSweep  ? '✓ Sweep'   : '✗ Sweep',
-      gotMSS    ? '✓ 5m MSS'  : '✗ 5m MSS',
-      gotFVG    ? '✓ 5m FVG'  : '✗ 5m FVG',
-      gotEntry  ? '✓ 1m Entry': '✗ 1m Entry',
+      gotPermission ? '✓ 5m Levels' : '✗ 5m Levels',
+      gotSweep      ? '✓ 1m Sweep'  : '✗ 1m Sweep',
+      gotMSS        ? '✓ 1m MSS'    : '✗ 1m MSS',
+      gotFVG        ? '✓ 1m FVG'    : '✗ 1m FVG',
+      gotEntry      ? '✓ Entry'      : '✗ Entry',
     ].join('  →  ');
 
     console.log(`  ${steps}`);
     if (gotEntry && signal) {
       const dir = signal.direction === 'SHORT' ? '▼ SHORT' : '▲ LONG';
       console.log(`  ${dir}  Entry:${signal.entry}  SL:${signal.sl}  TP1:${signal.tp1}  Risk:${signal.riskPts}pts`);
-      if (dayState.sweepDesc) console.log(`  5m: ${dayState.sweepDesc} → ${dayState.mssDesc}`);
+      if (signal.sweep1m) console.log(`  1m sweep: ${signal.sweep1m}  MSS: ${signal.mss1m}`);
       if (dayState.entry1mTime) console.log(`  1m entry at ${nyHHMM(dayState.entry1mTime)} NY`);
       if (outcome) {
         const o = outcome.result === 'TP1' ? `  ✅ TP1 HIT in ${outcome.bars} mins`
@@ -155,27 +156,17 @@ async function runBacktest() {
       printDaySummary();
       currentDay = sk;
       totalDays++;
-      dayState = { date: sk, gotSweep: false, gotMSS: false, gotFVG: false, gotEntry: false, signal: null, outcome: null };
+      dayState = { date: sk, gotPermission: false, gotSweep: false, gotMSS: false, gotFVG: false, gotEntry: false, signal: null, outcome: null };
       console.log(`  ── ${sk} ─────────────────────────────────────────────────`);
     }
 
     const win5m = candles5m.slice(i - WINDOW_5M + 1, i + 1);
     const r5    = engine5m.tick(sk, win5m, kz);
 
-    // Track 5m milestones for the day summary
-    if (r5.sweep  && !dayState.gotSweep) {
-      dayState.gotSweep   = true;
-      dayState.sweepDesc  = r5.sweep.levelName;
-      if (DEBUG) console.log(`    [${nyHHMM(bar.time)}] SWEEP detected: ${r5.sweep.levelName} dir=${r5.sweep.dir}`);
-    }
-    if (r5.mss && !dayState.gotMSS) {
-      dayState.gotMSS  = true;
-      dayState.mssDesc = `${r5.mss.type}@${r5.mss.level.toFixed(2)}`;
-      if (DEBUG) console.log(`    [${nyHHMM(bar.time)}] MSS confirmed: ${r5.mss.type} @ ${r5.mss.level.toFixed(2)}`);
-    }
-    if (r5.fvg && !dayState.gotFVG) {
-      dayState.gotFVG = true;
-      if (DEBUG) console.log(`    [${nyHHMM(bar.time)}] FVG: ${r5.fvg.bottom.toFixed(2)}–${r5.fvg.top.toFixed(2)} size=${r5.fvg.size.toFixed(3)}`);
+    // Track 5m permission
+    if (r5.permissionGranted && !dayState.gotPermission) {
+      dayState.gotPermission = true;
+      if (DEBUG) console.log(`    [${nyHHMM(bar.time)}] 5m levels locked: H:${r5.permission.targetHigh?.toFixed(2)} L:${r5.permission.targetLow?.toFixed(2)}`);
     }
 
     // DEBUG: print every candle in KZ
@@ -208,6 +199,14 @@ async function runBacktest() {
           const cur = fwd1m[j - 1];
           console.log(`      1m [${nyHHMM(cur.time)}] ${r1.state.padEnd(10)} ${r1.waitReason.slice(0,50)}`);
         }
+
+        // Track 1m milestones from engine state
+        if (r1.state === 'SWEPT' || r1.state === 'MSS' || r1.state === 'ENTRY_WATCH' || r1.state === 'ENTRY')
+          dayState.gotSweep = true;
+        if (r1.state === 'MSS' || r1.state === 'ENTRY_WATCH' || r1.state === 'ENTRY')
+          dayState.gotMSS = true;
+        if (r1.state === 'ENTRY_WATCH' || r1.state === 'ENTRY')
+          dayState.gotFVG = true;
 
         if (r1.entryReady && r1.signal) {
           entrySignal = r1.signal;
