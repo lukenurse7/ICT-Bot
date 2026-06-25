@@ -1,77 +1,45 @@
 'use strict';
 
 const axios = require('axios');
+require('dotenv').config();
 
 const TOKEN   = process.env.TELEGRAM_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
-const BASE    = `https://api.telegram.org/bot${TOKEN}`;
 
 async function send(text) {
-  if (!TOKEN || !CHAT_ID) return;
+  if (!TOKEN || !CHAT_ID) {
+    console.log('[Telegram] Skipped — TOKEN or CHAT_ID not set in .env');
+    return;
+  }
   try {
-    await axios.post(`${BASE}/sendMessage`, {
+    await axios.post(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
       chat_id:    CHAT_ID,
       text,
-      parse_mode: 'HTML'
+      parse_mode: 'HTML',
     }, { timeout: 8000 });
   } catch (e) {
     console.log('[Telegram] Send failed:', e.message);
   }
 }
 
-function signalMessage(sig) {
-  const isLong = sig.direction === 'BUY' || sig.direction === 'long';
-  const arrow  = isLong ? '🟢' : '🔴';
-  const dir    = isLong ? 'BUY' : 'SELL';
-  const instr  = sig.instrument || sig.symbol || 'XAUUSD';
-  const grade  = sig.grade || '—';
-  const score  = sig.confluence || sig.confluence || '—';
-
-  const sl    = parseFloat(sig.sl).toFixed(2);
-  const tp1   = parseFloat(sig.tp1).toFixed(2);
-  const tp2   = parseFloat(sig.tp2).toFixed(2);
-  const tp3   = parseFloat(sig.tp3).toFixed(2);
-  const rr    = sig.rr1 || sig.rr || '—';
-
-  const setup = sig.setup || {};
-  const sweep = setup.sweep?.levelName || sig.sweep || '';
-  const mss   = setup.mss?.type || sig.mssType || '';
-
+// Permission alert — fired when 5m engine reaches PERMISSION_GRANTED
+// This is Stage 1 only: we tell the trader to switch to 1m and look for entry
+function permissionMessage(perm) {
+  const arrow = perm.direction === 'SHORT' ? '🔴' : '🟢';
   const time  = new Date().toUTCString().slice(0, 25);
 
   return (
-`${arrow} <b>${dir} — ${instr}</b>
-📊 Confluence: <b>${score}%</b>  Grade: <b>${grade}</b>
-🕐 ${time}
+`${arrow} <b>${perm.direction} PERMISSION — ${perm.instrument}</b>
+🕐 ${time} UTC
 
-⚡ <b>ENTRY</b>     MARKET EXECUTION — enter now
-🛑 <b>STOP LOSS</b> <code>$${sl}</code>
-🎯 <b>TP1</b>      <code>$${tp1}</code>  <i>(1:1.5R — close 50%, move SL to BE)</i>
-🎯 <b>TP2</b>      <code>$${tp2}</code>  <i>(close 25%)</i>
-🎯 <b>TP3</b>      <code>$${tp3}</code>  <i>(close final 25%)</i>
+<b>5m Setup Complete</b>
+• Sweep: ${perm.sweep.levelName}
+• MSS:   ${perm.mss.type} @ ${perm.mss.level.toFixed(2)}
+• FVG:   ${perm.fvg.bottom.toFixed(2)} – ${perm.fvg.top.toFixed(2)} (mid ${perm.fvg.mid.toFixed(2)})
 
-📋 <b>Setup</b>
-• Sweep: ${sweep}
-• MSS: ${mss}
-• FVG: ${sig.hasFVG !== undefined ? (sig.hasFVG ? 'Yes ✅' : 'No') : (setup.fvg ? 'Yes ✅' : '—')}`
+<b>Action:</b> Switch to 1m chart — look for 1m sweep → 1m MSS → 1m FVG entry.
+Direction: <b>${perm.direction}</b> only.`
   );
 }
 
-function waitMessage(instr, step, detail) {
-  const steps = { sweep: '1/3', mss: '2/3', fvg: '3/3' };
-  return `⏳ <b>${instr}</b> — Step ${steps[step] || step}\n${detail}`;
-}
-
-function statusMessage(xau) {
-  if (!xau) return;
-  const bias = xau.bias?.toUpperCase().replace(/_/g,' ') || '—';
-  const price = xau.price ? '$' + parseFloat(xau.price).toFixed(2) : '—';
-  return (
-`📡 <b>XAUUSD Scan</b>  ${new Date().toUTCString().slice(17,22)} UTC
-Price: <code>${price}</code>  Bias: <b>${bias}</b>
-Confluence: ${xau.confluence?.score || 0}% (Grade ${xau.confluence?.grade || '—'})
-Status: ${xau.waitReason || 'Monitoring...'}`
-  );
-}
-
-module.exports = { send, signalMessage, waitMessage, statusMessage };
+module.exports = { send, permissionMessage };

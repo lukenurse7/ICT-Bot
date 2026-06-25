@@ -1,18 +1,13 @@
 {
   "name": "ict-signal-bot",
   "version": "1.0.0",
-  "description": "ICT Signal Bot — XAUUSD + DJ30",
-  "main": "src/dashboard.js",
+  "description": "ICT Signal Engine — DJ30 + NAS100 (NY Kill Zone)",
+  "main": "src/main.js",
   "engines": {
     "node": ">=18.0.0"
   },
   "scripts": {
-    "start": "node src/dashboard.js",
-    "bot": "node src/main.js",
-    "xau": "node src/xau_bot.js",
-    "dj30": "node src/bot.js",
-    "backtest": "node src/backtest.js",
-    "backtest:live": "node src/backtest_live.js"
+    "start": "node src/main.js"
   },
   "dependencies": {
     "axios": "^1.6.0",
