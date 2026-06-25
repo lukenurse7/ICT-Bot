@@ -238,7 +238,9 @@ function detectFVG1m(candles1m, sweepDir, sweepCandleTime, mss) {
   }
   if (!candidates.length) return { found: false };
   const best = candidates.sort((a,b) => b.size - a.size)[0];
-  const entryPrice = sweepDir === 'bull' ? best.top : best.bottom;
+  // Bull: limit BUY at FVG bottom (c0.high) — wait for retrace into zone
+  // Bear: limit SELL at FVG top (c0.low) — wait for retrace up into zone
+  const entryPrice = sweepDir === 'bull' ? best.bottom : best.top;
   return { found:true, top:best.top, bottom:best.bottom, size:best.size,
            entryPrice, zoneFormedAt:best.zoneFormedAt };
 }
