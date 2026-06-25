@@ -1,146 +1,167 @@
 'use strict';
 
 // ─── 5m Permission Engine ─────────────────────────────────────────────────────
-// Implements the state machine:
+// State machine with two separate concerns:
 //
-//   IDLE → WATCHING → SWEPT → MSS_CONFIRMED → PERMISSION_GRANTED
+//   CONTEXT (runs all day, always):
+//     - Pivot highs/lows updated on every candle, all session long
+//     - This ensures we always know the most recent swing H/L before KZ opens
 //
-// One engine instance per instrument. State resets when a new NY KZ session
-// starts (i.e. the date changes in NY time).
+//   SETUP (only triggers inside NY Kill Zone):
+//     - Sweep → MSS → FVG
+//     - Resets at the start of each new KZ session
+//     - Does NOT reset the pivot context
 //
-// This engine only grants PERMISSION — it does not calculate entry.
-// The 1m execution engine will handle the actual entry refinement.
+// Relaxed mode: sweep, MSS and FVG must each occur within MAX_CANDLES_AFTER
+// candles of the previous step. Default 10. Prevents stale setups firing.
 
-const { latestPivots }             = require('./swings');
-const { DISPLACEMENT_BODY_RATIO, FVG_MIN_SIZE } = require('./config');
+const { latestPivots }                              = require('./swings');
+const { DISPLACEMENT_BODY_RATIO, FVG_MIN_SIZE }     = require('./config');
+
+const MAX_CANDLES_AFTER = parseInt(process.env.MAX_CANDLES_AFTER || '10');
 
 const STATES = {
-  IDLE:               'IDLE',               // outside KZ or market closed
-  WATCHING:           'WATCHING',           // inside KZ, no sweep yet
-  SWEPT:              'SWEPT',              // liquidity sweep detected, waiting for MSS
-  MSS_CONFIRMED:      'MSS_CONFIRMED',      // MSS confirmed, waiting for FVG
-  PERMISSION_GRANTED: 'PERMISSION_GRANTED', // full setup confirmed — alert
+  IDLE:               'IDLE',
+  WATCHING:           'WATCHING',
+  SWEPT:              'SWEPT',
+  MSS_CONFIRMED:      'MSS_CONFIRMED',
+  PERMISSION_GRANTED: 'PERMISSION_GRANTED',
 };
 
 class Engine5m {
   constructor(instrumentName) {
-    this.instrument  = instrumentName;
-    this.state       = STATES.IDLE;
-    this.sessionKey  = null;   // resets on new NY day
+    this.instrument = instrumentName;
 
-    // Captured setup details (populated as states progress)
-    this.sweep       = null;   // { dir, level, levelName, sweepCandle }
-    this.mss         = null;   // { type, level, mssCandle }
-    this.fvg         = null;   // { dir, top, bottom, mid, size }
-    this.permission  = null;   // final permission object sent to alert
+    // ── Context (persists all day, never reset mid-session) ──────────────────
+    this.pivots     = { lastHigh: null, lastLow: null };
+
+    // ── Setup state (reset at start of each KZ session) ─────────────────────
+    this.state        = STATES.IDLE;
+    this.sessionKey   = null;
+    this.sweep        = null;
+    this.sweepBarIdx  = null;   // candle index when sweep was detected
+    this.mss          = null;
+    this.mssBarIdx    = null;
+    this.fvg          = null;
+    this.permission   = null;
   }
 
-  // Called each scan cycle — returns the current engine result
-  // sessionKey: today's NY date string (used to reset between sessions)
-  // candles5m:  array of 5m OHLC candles, oldest first, fully confirmed
-  // inKZ:       boolean — is the NY KZ currently active?
   tick(sessionKey, candles5m, inKZ) {
-    // Reset if new session started
+    // ── 1. Always update pivot context (all day, every tick) ─────────────────
+    const p = latestPivots(candles5m, 3);
+    if (p.lastHigh) this.pivots.lastHigh = p.lastHigh;
+    if (p.lastLow)  this.pivots.lastLow  = p.lastLow;
+
+    const currentBar = candles5m.length - 1;  // index of latest candle
+
+    // ── 2. Reset SETUP state only when a new KZ session starts ───────────────
     if (sessionKey !== this.sessionKey) {
-      this._reset(sessionKey);
+      this._resetSetup(sessionKey);
     }
 
-    // Outside KZ — idle
+    // ── 3. Outside KZ — idle, but context still updating ─────────────────────
     if (!inKZ) {
-      if (this.state !== STATES.IDLE) this._reset(sessionKey);
-      return this._result('Outside NY Kill Zone — monitoring');
+      if (this.state !== STATES.IDLE) this._resetSetup(sessionKey);
+      return this._result(candles5m, `Outside KZ — pivot H: ${this.pivots.lastHigh?.price.toFixed(2) ?? '—'}  L: ${this.pivots.lastLow?.price.toFixed(2) ?? '—'}`);
     }
 
-    // ── WATCHING: look for pre-NY range and a sweep ──────────────────────────
-    if (this.state === STATES.WATCHING || this.state === STATES.IDLE) {
+    // ── 4. Inside KZ — run the setup state machine ───────────────────────────
+
+    // WATCHING: look for sweep of the known pivot levels
+    if (this.state === STATES.IDLE || this.state === STATES.WATCHING) {
       this.state = STATES.WATCHING;
 
-      const pivots = latestPivots(candles5m, 3);
-      if (!pivots.lastHigh || !pivots.lastLow) {
-        return this._result('Building swing structure — not enough confirmed pivots yet');
+      if (!this.pivots.lastHigh || !this.pivots.lastLow) {
+        return this._result(candles5m, 'KZ active — no confirmed pivots yet, building structure');
       }
 
-      const sweep = this._detectSweep(candles5m, pivots);
+      const sweep = this._detectSweep(candles5m);
       if (!sweep) {
-        return this._result(`Watching for liquidity sweep — last pivot high ${pivots.lastHigh.price.toFixed(2)}, low ${pivots.lastLow.price.toFixed(2)}`);
+        return this._result(candles5m,
+          `Watching for sweep — pivot H: ${this.pivots.lastHigh.price.toFixed(2)}  L: ${this.pivots.lastLow.price.toFixed(2)}`
+        );
       }
 
-      this.sweep = sweep;
-      this.state = STATES.SWEPT;
+      this.sweep       = sweep;
+      this.sweepBarIdx = currentBar;
+      this.state       = STATES.SWEPT;
     }
 
-    // ── SWEPT: look for 5m MSS ───────────────────────────────────────────────
+    // SWEPT: look for MSS within MAX_CANDLES_AFTER bars
     if (this.state === STATES.SWEPT) {
+      const barsSinceSweep = currentBar - this.sweepBarIdx;
+      if (barsSinceSweep > MAX_CANDLES_AFTER) {
+        this._resetSetup(sessionKey);
+        return this._result(candles5m, `Sweep expired (>${MAX_CANDLES_AFTER} bars, no MSS) — resetting`);
+      }
+
       const mss = this._detectMSS(candles5m);
       if (!mss) {
-        return this._result(`Sweep on ${this.sweep.levelName} (${this.sweep.dir.toUpperCase()}) — waiting for 5m MSS`);
+        return this._result(candles5m,
+          `Sweep: ${this.sweep.levelName} (${this.sweep.dir}) — waiting for MSS [${barsSinceSweep}/${MAX_CANDLES_AFTER} bars]`
+        );
       }
 
-      this.mss   = mss;
-      this.state = STATES.MSS_CONFIRMED;
+      this.mss       = mss;
+      this.mssBarIdx = currentBar;
+      this.state     = STATES.MSS_CONFIRMED;
     }
 
-    // ── MSS CONFIRMED: look for displacement + FVG ───────────────────────────
+    // MSS CONFIRMED: look for displacement + FVG within MAX_CANDLES_AFTER bars
     if (this.state === STATES.MSS_CONFIRMED) {
+      const barsSinceMSS = currentBar - this.mssBarIdx;
+      if (barsSinceMSS > MAX_CANDLES_AFTER) {
+        this._resetSetup(sessionKey);
+        return this._result(candles5m, `MSS expired (>${MAX_CANDLES_AFTER} bars, no FVG) — resetting`);
+      }
+
       const fvg = this._detectFVG(candles5m);
       if (!fvg) {
-        return this._result(`MSS confirmed (${this.mss.type}) — waiting for displacement + FVG`);
+        return this._result(candles5m,
+          `MSS: ${this.mss.type} @ ${this.mss.level.toFixed(2)} — waiting for displacement + FVG [${barsSinceMSS}/${MAX_CANDLES_AFTER} bars]`
+        );
       }
 
       this.fvg   = fvg;
       this.state = STATES.PERMISSION_GRANTED;
 
       this.permission = {
-        instrument:  this.instrument,
-        direction:   this.sweep.dir === 'bear' ? 'SHORT' : 'LONG',
-        sweep:       this.sweep,
-        mss:         this.mss,
-        fvg:         this.fvg,
-        timestamp:   new Date().toISOString(),
+        instrument: this.instrument,
+        direction:  this.sweep.dir === 'bear' ? 'SHORT' : 'LONG',
+        sweep:      this.sweep,
+        mss:        this.mss,
+        fvg:        this.fvg,
+        pivots:     { ...this.pivots },
+        timestamp:  new Date().toISOString(),
       };
     }
 
-    // ── PERMISSION GRANTED ───────────────────────────────────────────────────
     if (this.state === STATES.PERMISSION_GRANTED) {
-      return this._result('PERMISSION GRANTED', true);
+      return this._result(candles5m, 'PERMISSION GRANTED', true);
     }
 
-    return this._result('Scanning...');
+    return this._result(candles5m, 'Scanning...');
   }
 
-  // ─── Sweep detection ─────────────────────────────────────────────────────────
-  // A sweep = candle wicks THROUGH a recent pivot level, then CLOSES BACK inside it
-  _detectSweep(candles, pivots) {
-    const last10 = candles.slice(-10);
+  // ─── Sweep: wick through pivot level, close back inside ──────────────────────
+  _detectSweep(candles) {
+    // Check last 5 candles for a sweep of the stored pivot levels
+    const last5 = candles.slice(-5);
 
-    for (let i = last10.length - 1; i >= 0; i--) {
-      const c = last10[i];
+    for (let i = last5.length - 1; i >= 0; i--) {
+      const c = last5[i];
 
-      // Bearish sweep: wick above last pivot high, close back below
-      if (pivots.lastHigh) {
-        const lvl = pivots.lastHigh.price;
+      if (this.pivots.lastHigh) {
+        const lvl = this.pivots.lastHigh.price;
         if (c.high > lvl && c.close < lvl) {
-          return {
-            dir:        'bear',
-            level:      lvl,
-            levelName:  `Pivot High (${lvl.toFixed(2)})`,
-            sweepCandle: c,
-            sweepHigh:  c.high,
-          };
+          return { dir: 'bear', level: lvl, levelName: `Pivot High ${lvl.toFixed(2)}`, sweepCandle: c, sweepHigh: c.high };
         }
       }
 
-      // Bullish sweep: wick below last pivot low, close back above
-      if (pivots.lastLow) {
-        const lvl = pivots.lastLow.price;
+      if (this.pivots.lastLow) {
+        const lvl = this.pivots.lastLow.price;
         if (c.low < lvl && c.close > lvl) {
-          return {
-            dir:        'bull',
-            level:      lvl,
-            levelName:  `Pivot Low (${lvl.toFixed(2)})`,
-            sweepCandle: c,
-            sweepLow:   c.low,
-          };
+          return { dir: 'bull', level: lvl, levelName: `Pivot Low ${lvl.toFixed(2)}`, sweepCandle: c, sweepLow: c.low };
         }
       }
     }
@@ -148,11 +169,7 @@ class Engine5m {
     return null;
   }
 
-  // ─── MSS detection ───────────────────────────────────────────────────────────
-  // After a bearish sweep: price must close below a recent 5m swing low (BOS down)
-  //   or close below the previous candle's low (CHoCH)
-  // After a bullish sweep: price must close above a recent 5m swing high (BOS up)
-  //   or close above the previous candle's high (CHoCH)
+  // ─── MSS: break of structure after sweep ────────────────────────────────────
   _detectMSS(candles) {
     const window = candles.slice(-20);
     if (window.length < 5) return null;
@@ -162,45 +179,35 @@ class Engine5m {
     const dir  = this.sweep.dir;
 
     if (dir === 'bear') {
-      // Find swing lows in the post-sweep window
       let swingLow = Infinity;
       for (let i = 1; i < window.length - 2; i++) {
         const c = window[i];
-        if (c.low < window[i - 1].low && c.low < window[i + 1].low) {
+        if (c.low < window[i - 1].low && c.low < window[i + 1].low)
           swingLow = Math.min(swingLow, c.low);
-        }
       }
-      if (swingLow < Infinity && last.close < swingLow && last.close < last.open) {
+      if (swingLow < Infinity && last.close < swingLow && last.close < last.open)
         return { type: 'BOS_DOWN', level: swingLow, mssCandle: last };
-      }
-      if (last.close < prev.low && last.close < last.open) {
+      if (last.close < prev.low && last.close < last.open)
         return { type: 'CHoCH', level: prev.low, mssCandle: last };
-      }
     }
 
     if (dir === 'bull') {
       let swingHigh = -Infinity;
       for (let i = 1; i < window.length - 2; i++) {
         const c = window[i];
-        if (c.high > window[i - 1].high && c.high > window[i + 1].high) {
+        if (c.high > window[i - 1].high && c.high > window[i + 1].high)
           swingHigh = Math.max(swingHigh, c.high);
-        }
       }
-      if (swingHigh > -Infinity && last.close > swingHigh && last.close > last.open) {
+      if (swingHigh > -Infinity && last.close > swingHigh && last.close > last.open)
         return { type: 'BOS_UP', level: swingHigh, mssCandle: last };
-      }
-      if (last.close > prev.high && last.close > last.open) {
+      if (last.close > prev.high && last.close > last.open)
         return { type: 'CHoCH', level: prev.high, mssCandle: last };
-      }
     }
 
     return null;
   }
 
-  // ─── Displacement + FVG detection ────────────────────────────────────────────
-  // Displacement: the candle body is at least DISPLACEMENT_BODY_RATIO of the total range
-  // FVG: 3-candle imbalance — candle[i-1].low > candle[i+1].high (bear)
-  //                         or candle[i-1].high < candle[i+1].low (bull)
+  // ─── FVG + displacement: 3-candle imbalance with strong body ────────────────
   _detectFVG(candles) {
     const window = candles.slice(-30);
     const dir    = this.sweep.dir;
@@ -211,46 +218,42 @@ class Engine5m {
       const c1 = window[i];
       const c2 = window[i + 1];
 
-      // Check displacement on the middle candle
       const range = c1.high - c1.low;
       if (range === 0) continue;
-      const body = Math.abs(c1.close - c1.open);
-      const displaced = body / range >= DISPLACEMENT_BODY_RATIO;
+      const body       = Math.abs(c1.close - c1.open);
+      const displaced  = body / range >= DISPLACEMENT_BODY_RATIO;
       if (!displaced) continue;
 
-      if (dir === 'bear') {
-        // Bearish displacement: strong down candle
-        if (c1.close < c1.open && c2.high < c0.low) {
-          const size = c0.low - c2.high;
-          if (size >= FVG_MIN_SIZE) {
-            fvgs.push({ dir: 'bear', top: c0.low, bottom: c2.high, mid: (c0.low + c2.high) / 2, size, time: c1.time });
-          }
-        }
-      } else {
-        // Bullish displacement: strong up candle
-        if (c1.close > c1.open && c2.low > c0.high) {
-          const size = c2.low - c0.high;
-          if (size >= FVG_MIN_SIZE) {
-            fvgs.push({ dir: 'bull', top: c2.low, bottom: c0.high, mid: (c2.low + c0.high) / 2, size, time: c1.time });
-          }
-        }
+      if (dir === 'bear' && c1.close < c1.open && c2.high < c0.low) {
+        const size = c0.low - c2.high;
+        if (size >= FVG_MIN_SIZE)
+          fvgs.push({ dir: 'bear', top: c0.low, bottom: c2.high, mid: (c0.low + c2.high) / 2, size, time: c1.time });
+      }
+
+      if (dir === 'bull' && c1.close > c1.open && c2.low > c0.high) {
+        const size = c2.low - c0.high;
+        if (size >= FVG_MIN_SIZE)
+          fvgs.push({ dir: 'bull', top: c2.low, bottom: c0.high, mid: (c2.low + c0.high) / 2, size, time: c1.time });
       }
     }
 
-    // Return the most recent valid FVG
     return fvgs.length ? fvgs[fvgs.length - 1] : null;
   }
 
-  _reset(sessionKey) {
-    this.state      = STATES.IDLE;
-    this.sessionKey = sessionKey;
-    this.sweep      = null;
-    this.mss        = null;
-    this.fvg        = null;
-    this.permission = null;
+  _resetSetup(sessionKey) {
+    this.state       = STATES.IDLE;
+    this.sessionKey  = sessionKey;
+    this.sweep       = null;
+    this.sweepBarIdx = null;
+    this.mss         = null;
+    this.mssBarIdx   = null;
+    this.fvg         = null;
+    this.permission  = null;
+    // NOTE: this.pivots is intentionally NOT reset here
   }
 
-  _result(waitReason, permissionGranted = false) {
+  _result(candles, waitReason, permissionGranted = false) {
+    const latest = candles[candles.length - 1];
     return {
       state:             this.state,
       permissionGranted,
@@ -259,6 +262,12 @@ class Engine5m {
       mss:               this.mss,
       fvg:               this.fvg,
       waitReason,
+      debug: {
+        pivotHigh:  this.pivots.lastHigh?.price ?? null,
+        pivotLow:   this.pivots.lastLow?.price  ?? null,
+        latestBar:  latest?.time ?? null,
+        maxCandles: MAX_CANDLES_AFTER,
+      },
     };
   }
 }
