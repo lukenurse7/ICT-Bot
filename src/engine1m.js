@@ -205,11 +205,13 @@ class Engine1m {
 
   // ─── Build signal ──────────────────────────────────────────────────────────
   _buildSignal(isShort, triggerCandle) {
-    // SL: above the 5m liquidity level (the swept high/low) + buffer
-    // This puts SL beyond the entire liquidity pool, not just the wick
+    // SL: above the actual sweep WICK extreme + buffer
+    // The wick is always at or beyond the 5m level, so this is always wider
+    // than using the level alone — price can't stop you out on the way back
+    const sweepExtreme = isShort ? this.sweep1m.sweepHigh : this.sweep1m.sweepLow;
     const sl = isShort
-      ? parseFloat((this.targetHigh + SL_BUFFER).toFixed(2))
-      : parseFloat((this.targetLow  - SL_BUFFER).toFixed(2));
+      ? parseFloat((sweepExtreme + SL_BUFFER).toFixed(2))
+      : parseFloat((sweepExtreme - SL_BUFFER).toFixed(2));
 
     const entry = this.fvg1m.mid;   // 50% of FVG (consequent encroachment)
     const risk  = Math.abs(entry - sl);
