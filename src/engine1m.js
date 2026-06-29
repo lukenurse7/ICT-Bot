@@ -205,32 +205,39 @@ class Engine1m {
 
   // ─── Build signal ──────────────────────────────────────────────────────────
   _buildSignal(isShort, triggerCandle) {
-    // SL sits beyond the swept 5m level — that is the previous liquidity
+    // SL: above the 5m liquidity level (the swept high/low) + buffer
+    // This puts SL beyond the entire liquidity pool, not just the wick
     const sl = isShort
       ? parseFloat((this.targetHigh + SL_BUFFER).toFixed(2))
       : parseFloat((this.targetLow  - SL_BUFFER).toFixed(2));
 
-    const entry = this.fvg1m.mid;   // consequent encroachment (50% of FVG)
+    const entry = this.fvg1m.mid;   // 50% of FVG (consequent encroachment)
     const risk  = Math.abs(entry - sl);
 
     if (isShort && sl <= entry) return null;   // inverted — reject
     if (!isShort && sl >= entry) return null;
     if (risk < MIN_RISK_PTS) return null;
 
-    const tp1 = isShort
-      ? parseFloat((entry - risk * 3).toFixed(2))
-      : parseFloat((entry + risk * 3).toFixed(2));
+    // Primary TP = opposing 5m liquidity (the natural target)
+    const tp = isShort ? this.targetLow : this.targetHigh;
+    if (tp == null) return null;
 
-    const tp2 = isShort ? this.targetLow : this.targetHigh;
+    const reward = Math.abs(entry - tp);
+    const rr     = parseFloat((reward / risk).toFixed(2));
+
+    // Require minimum 1.5:1 RR to the opposing liquidity
+    if (rr < 1.5) return null;
 
     return {
       instrument:  this.instrument,
       direction:   this.direction,
       entry:       parseFloat(entry.toFixed(2)),
       sl,
-      tp1,
-      tp2:         tp2 != null ? parseFloat(tp2.toFixed(2)) : null,
+      tp1:         parseFloat(tp.toFixed(2)),   // opposing 5m liquidity
+      tp2:         null,
       riskPts:     parseFloat(risk.toFixed(2)),
+      rewardPts:   parseFloat(reward.toFixed(2)),
+      rr,
       sweep5mH:    this.targetHigh,
       sweep5mL:    this.targetLow,
       sweep1m:     `wick to ${isShort ? this.sweep1m.sweepHigh?.toFixed(2) : this.sweep1m.sweepLow?.toFixed(2)}`,
