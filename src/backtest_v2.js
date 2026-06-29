@@ -53,18 +53,20 @@ function get1mSlice(candles1m, startTime, minutes) {
 }
 
 // ─── Outcome check: did TP1 or SL get hit first after entry? ─────────────────
-function checkOutcome(candles1m, signal, fromTime, lookMins = 120) {
+function checkOutcome(candles1m, signal, fromTime, lookMins = 240) {
   const window = get1mSlice(candles1m, fromTime, lookMins);
   if (!window.length) return { result: 'NO_DATA', bars: 0 };
   const isShort = signal.direction === 'SHORT';
   for (let i = 0; i < window.length; i++) {
     const c = window[i];
     if (isShort) {
-      if (c.low  <= signal.tp1) return { result: 'TP1', bars: i + 1 };
       if (c.high >= signal.sl)  return { result: 'SL',  bars: i + 1 };
+      if (c.low  <= signal.tp1) return { result: 'TP1', bars: i + 1 };
+      if (signal.tp2 != null && c.low <= signal.tp2) return { result: 'TP2', bars: i + 1 };
     } else {
-      if (c.high >= signal.tp1) return { result: 'TP1', bars: i + 1 };
       if (c.low  <= signal.sl)  return { result: 'SL',  bars: i + 1 };
+      if (c.high >= signal.tp1) return { result: 'TP1', bars: i + 1 };
+      if (signal.tp2 != null && c.high >= signal.tp2) return { result: 'TP2', bars: i + 1 };
     }
   }
   return { result: 'OPEN', bars: window.length };
@@ -130,13 +132,14 @@ async function runBacktest() {
     console.log(`  ${steps}`);
     if (gotEntry && signal) {
       const dir = signal.direction === 'SHORT' ? '▼ SHORT' : '▲ LONG';
-      console.log(`  ${dir}  Entry:${signal.entry}  SL:${signal.sl}  TP1:${signal.tp1}  Risk:${signal.riskPts}pts`);
-      if (signal.sweep1m) console.log(`  1m sweep: ${signal.sweep1m}  MSS: ${signal.mss1m}`);
+      console.log(`  ${dir}  Entry:${signal.entry}  SL:${signal.sl}  TP1:${signal.tp1}  TP2:${signal.tp2 ?? '—'}  Risk:${signal.riskPts}pts`);
+      if (signal.sweep1m) console.log(`  1m sweep: ${signal.sweep1m}  MSS: ${signal.mss1m}  FVG: ${signal.fvg1m}`);
       if (dayState.entry1mTime) console.log(`  1m entry at ${nyHHMM(dayState.entry1mTime)} NY`);
       if (outcome) {
-        const o = outcome.result === 'TP1' ? `  ✅ TP1 HIT in ${outcome.bars} mins`
-                : outcome.result === 'SL'  ? `  ❌ SL  HIT in ${outcome.bars} mins`
-                : `  ⏳ Still open / no data after 2hrs`;
+        const o = outcome.result === 'TP1'  ? `  ✅ TP1 HIT in ${outcome.bars} mins`
+                : outcome.result === 'TP2'  ? `  ✅ TP2 HIT in ${outcome.bars} mins`
+                : outcome.result === 'SL'   ? `  ❌ SL  HIT in ${outcome.bars} mins`
+                : `  ⏳ Still open after 4hrs`;
         console.log(o);
       }
     }
@@ -217,7 +220,7 @@ async function runBacktest() {
           engine1m._reset();
 
           // Check TP1/SL outcome using all remaining 1m data from entry time
-          dayState.outcome = checkOutcome(candles1m, entrySignal, entryTime || bar.time, 120);
+          dayState.outcome = checkOutcome(candles1m, entrySignal, entryTime || bar.time, 240);
 
           signals.push({ date: sk, ...entrySignal, outcome: dayState.outcome });
           break;
@@ -234,9 +237,10 @@ async function runBacktest() {
   printDaySummary();
 
   // ─── Summary ─────────────────────────────────────────────────────────────
-  const tp1  = signals.filter(s => s.outcome?.result === 'TP1').length;
-  const sl   = signals.filter(s => s.outcome?.result === 'SL').length;
-  const open = signals.filter(s => s.outcome?.result === 'OPEN' || s.outcome?.result === 'NO_DATA').length;
+  const tp1   = signals.filter(s => s.outcome?.result === 'TP1').length;
+  const tp2   = signals.filter(s => s.outcome?.result === 'TP2').length;
+  const sl    = signals.filter(s => s.outcome?.result === 'SL').length;
+  const open  = signals.filter(s => s.outcome?.result === 'OPEN' || s.outcome?.result === 'NO_DATA').length;
   const total = signals.length;
 
   // Count how many days had each milestone
@@ -249,8 +253,9 @@ async function runBacktest() {
   console.log('');
   if (total > 0) {
     console.log(`  TP1 hit  : ${tp1}  (${Math.round(tp1/total*100)}%)`);
+    console.log(`  TP2 hit  : ${tp2}  (${Math.round(tp2/total*100)}%)`);
     console.log(`  SL hit   : ${sl}  (${Math.round(sl/total*100)}%)`);
-    console.log(`  Open/N/A : ${open}`);
+    console.log(`  Open/N/A : ${open}  (check window: 4hrs)`);
     console.log('');
     console.log('  Per-signal detail:');
     for (const s of signals) {
