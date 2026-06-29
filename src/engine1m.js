@@ -218,22 +218,19 @@ class Engine1m {
     if (!isShort && sl >= entry) return null;
     if (risk < MIN_RISK_PTS) return null;
 
-    // Primary TP = opposing 5m liquidity (the natural target)
-    const tp = isShort ? this.targetLow : this.targetHigh;
+    // TP = opposing 5m liquidity (the natural target)
+    const tp     = isShort ? this.targetLow : this.targetHigh;
     if (tp == null) return null;
 
     const reward = Math.abs(entry - tp);
     const rr     = parseFloat((reward / risk).toFixed(2));
-
-    // Require minimum 1.5:1 RR to the opposing liquidity
-    if (rr < 1.5) return null;
 
     return {
       instrument:  this.instrument,
       direction:   this.direction,
       entry:       parseFloat(entry.toFixed(2)),
       sl,
-      tp1:         parseFloat(tp.toFixed(2)),   // opposing 5m liquidity
+      tp1:         parseFloat(tp.toFixed(2)),
       tp2:         null,
       riskPts:     parseFloat(risk.toFixed(2)),
       rewardPts:   parseFloat(reward.toFixed(2)),
