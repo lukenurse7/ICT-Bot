@@ -253,6 +253,9 @@ class Engine1m {
     const rewardPts = Math.abs(entry - tp);
     const rr        = parseFloat((rewardPts / risk).toFixed(2));
 
+    // Skip if RR is below 1.5 — not worth taking
+    if (rr < 1.5) return null;
+
     return {
       instrument:  this.instrument,
       direction:   this.direction,
