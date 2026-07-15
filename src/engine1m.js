@@ -16,10 +16,10 @@
 //   SL  = swept 5m level + SL_BUFFER (above the liquidity for SHORT)
 //   TP1 = 3R, TP2 = opposite 5m level
 
-const MIN_RISK_PTS = parseFloat(process.env.MIN_RISK_PTS || '2.0');  // filter sub-2pt setups
+const MIN_RISK_PTS = parseFloat(process.env.MIN_RISK_PTS || '1.0');  // minimum setup risk
 const MAX_1M_BARS  = parseInt(process.env.MAX_1M_BARS   || '90');
-const SL_BUFFER    = parseFloat(process.env.SL_BUFFER   || '3.0');  // room beyond sweep wick
-const TP_R         = parseFloat(process.env.TP_R        || '2.0');  // TP at 2R
+const SL_BUFFER    = parseFloat(process.env.SL_BUFFER   || '1.5');  // beyond sweep wick
+const TP_R         = parseFloat(process.env.TP_R        || '2.0');  // fallback R multiple
 const SWING_K      = 1;   // bars each side to confirm a 1m swing (1 = responsive, 2 = strict)
 
 const STATES = {
@@ -238,12 +238,20 @@ class Engine1m {
     if (!isShort && sl >= entry) return null;
     if (risk < MIN_RISK_PTS) return null;
 
-    // TP at fixed R multiple — scalp target, not swing
-    const tp = isShort
+    // TP: opposing 5m level (the other side's liquidity) — realistic intraday target
+    // Fallback to 2R if the opposing level is on the wrong side or too close
+    const opposingLevel = isShort ? this.targetLow : this.targetHigh;
+    const rFallback = isShort
       ? parseFloat((entry - risk * TP_R).toFixed(2))
       : parseFloat((entry + risk * TP_R).toFixed(2));
 
-    const rr = TP_R;
+    const tp = (opposingLevel != null &&
+                (isShort ? opposingLevel < entry : opposingLevel > entry))
+      ? parseFloat(opposingLevel.toFixed(2))
+      : rFallback;
+
+    const rewardPts = Math.abs(entry - tp);
+    const rr        = parseFloat((rewardPts / risk).toFixed(2));
 
     return {
       instrument:  this.instrument,
@@ -251,9 +259,9 @@ class Engine1m {
       entry:       parseFloat(entry.toFixed(2)),
       sl,
       tp1:         tp,
-      tp2:         isShort ? this.targetLow : this.targetHigh,  // stretch target
+      tp2:         rFallback,  // 2R as secondary reference
       riskPts:     parseFloat(risk.toFixed(2)),
-      rewardPts:   parseFloat((risk * TP_R).toFixed(2)),
+      rewardPts:   parseFloat(rewardPts.toFixed(2)),
       rr,
       sweep5mH:    this.targetHigh,
       sweep5mL:    this.targetLow,
