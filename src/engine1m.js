@@ -20,7 +20,7 @@ const MIN_RISK_PTS = parseFloat(process.env.MIN_RISK_PTS || '0.5');
 const MAX_1M_BARS  = parseInt(process.env.MAX_1M_BARS   || '90');
 const SL_BUFFER    = parseFloat(process.env.SL_BUFFER   || '1.0');  // tight scalp buffer
 const TP_R         = parseFloat(process.env.TP_R        || '2.0');  // TP at 2R
-const SWING_K      = 2;   // bars each side to confirm a 1m swing
+const SWING_K      = 1;   // bars each side to confirm a 1m swing (1 = responsive, 2 = strict)
 
 const STATES = {
   IDLE:        'IDLE',
@@ -53,8 +53,16 @@ class Engine1m {
 
     const barsElapsed = (candles1m.length - 1) - this.startBar;
     if (barsElapsed > MAX_1M_BARS) {
+      // Don't fully reset — keep watching for another sweep within the same session
+      const savedHigh = this.targetHigh;
+      const savedLow  = this.targetLow;
       this._reset();
-      return this._result(`Expired — no entry in ${MAX_1M_BARS} bars`);
+      this.active      = true;
+      this.targetHigh  = savedHigh;
+      this.targetLow   = savedLow;
+      this.startBar    = candles1m.length - 1;
+      this.state       = STATES.WATCHING;
+      return this._result(`Setup expired — re-watching for new sweep [reset]`);
     }
 
     // ── STEP 1: sweep of specific 5m level ──────────────────────────────────

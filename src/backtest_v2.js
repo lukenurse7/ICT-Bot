@@ -184,14 +184,14 @@ async function runBacktest() {
 
       engine1m.activate(r5.permission);
 
-      // Prior 30 mins of 1m candles for structure context + 60 mins forward to find entry
+      // Prior 30 mins of 1m candles for structure context + full KZ session forward
       const permMs   = new Date(bar.time).getTime();
       const prior1m  = get1mSlice(candles1m, new Date(permMs - 30 * 60 * 1000).toISOString(), 30);
-      const fwd1m    = get1mSlice(candles1m, bar.time, 60);
+      const fwd1m    = get1mSlice(candles1m, bar.time, 150);  // up to 11:00 NY KZ close
 
       if (DEBUG) console.log(`      1m context: ${prior1m.length} prior + ${fwd1m.length} forward candles`);
 
-      let entrySignal = null;
+      let signalCount = 0;
       for (let j = 1; j <= fwd1m.length; j++) {
         const slice = [...prior1m, ...fwd1m.slice(0, j)];
         const r1    = engine1m.tick(slice);
@@ -210,23 +210,26 @@ async function runBacktest() {
           dayState.gotFVG = true;
 
         if (r1.entryReady && r1.signal) {
-          entrySignal = r1.signal;
-          const entryTime = fwd1m[j - 1]?.time;
+          const entrySignal = r1.signal;
+          const entryTime   = fwd1m[j - 1]?.time;
           dayState.gotEntry    = true;
           dayState.signal      = entrySignal;
           dayState.entry1mTime = entryTime;
-          engine1m._reset();
+          signalCount++;
 
           // Check TP1/SL outcome using all remaining 1m data from entry time
-          dayState.outcome = checkOutcome(candles1m, entrySignal, entryTime || bar.time, 240);
+          const outcome = checkOutcome(candles1m, entrySignal, entryTime || bar.time, 240);
+          dayState.outcome = outcome;
 
-          signals.push({ date: sk, ...entrySignal, outcome: dayState.outcome });
-          break;
+          signals.push({ date: sk, ...entrySignal, outcome });
+
+          // Re-activate for another setup in the same session
+          engine1m.activate(r5.permission);
         }
       }
 
-      if (!entrySignal) {
-        if (DEBUG) console.log(`      1m: no entry found in 60 mins after permission`);
+      if (signalCount === 0) {
+        if (DEBUG) console.log(`      1m: no entry found in 150 mins after permission`);
       }
     }
   }
