@@ -16,9 +16,10 @@
 //   SL  = swept 5m level + SL_BUFFER (above the liquidity for SHORT)
 //   TP1 = 3R, TP2 = opposite 5m level
 
-const MIN_RISK_PTS = parseFloat(process.env.MIN_RISK_PTS || '2.0');
+const MIN_RISK_PTS = parseFloat(process.env.MIN_RISK_PTS || '0.5');
 const MAX_1M_BARS  = parseInt(process.env.MAX_1M_BARS   || '90');
-const SL_BUFFER    = parseFloat(process.env.SL_BUFFER   || '5.0');
+const SL_BUFFER    = parseFloat(process.env.SL_BUFFER   || '1.0');  // tight scalp buffer
+const TP_R         = parseFloat(process.env.TP_R        || '2.0');  // TP at 2R
 const SWING_K      = 2;   // bars each side to confirm a 1m swing
 
 const STATES = {
@@ -97,15 +98,19 @@ class Engine1m {
 
     // ── STEP 4: wait for price to retrace into FVG ──────────────────────────
     if (this.state === STATES.ENTRY_WATCH) {
-      const latest = candles1m[candles1m.length - 1];
-      const fvg    = this.fvg1m;
-      const inFVG  = latest.low <= fvg.top && latest.high >= fvg.bottom;
+      const latest  = candles1m[candles1m.length - 1];
+      const fvg     = this.fvg1m;
+      const isShort = this.direction === 'SHORT';
 
-      if (!inFVG) {
-        return this._result(`Waiting for retracement into FVG ${fvg.bottom.toFixed(2)}–${fvg.top.toFixed(2)}`);
+      // Price must reach the proximal edge of the FVG (the entry level)
+      const reached = isShort
+        ? latest.high >= fvg.bottom   // rally up to FVG bottom
+        : latest.low  <= fvg.top;     // pullback down to FVG top
+
+      if (!reached) {
+        return this._result(`Waiting for retracement to FVG ${isShort ? 'bottom' : 'top'} @ ${isShort ? fvg.bottom.toFixed(2) : fvg.top.toFixed(2)}`);
       }
 
-      const isShort = this.direction === 'SHORT';
       const signal  = this._buildSignal(isShort, latest);
       if (!signal) {
         this._reset();
@@ -205,37 +210,41 @@ class Engine1m {
 
   // ─── Build signal ──────────────────────────────────────────────────────────
   _buildSignal(isShort, triggerCandle) {
-    // SL: above the actual sweep WICK extreme + buffer
-    // The wick is always at or beyond the 5m level, so this is always wider
-    // than using the level alone — price can't stop you out on the way back
+    // SL: just beyond the sweep wick extreme — tight scalp placement
     const sweepExtreme = isShort ? this.sweep1m.sweepHigh : this.sweep1m.sweepLow;
     const sl = isShort
       ? parseFloat((sweepExtreme + SL_BUFFER).toFixed(2))
       : parseFloat((sweepExtreme - SL_BUFFER).toFixed(2));
 
-    const entry = this.fvg1m.mid;   // 50% of FVG (consequent encroachment)
-    const risk  = Math.abs(entry - sl);
+    // Entry: proximal edge of FVG (the end closest to current price)
+    // SHORT: price rallies UP into FVG → entry at FVG bottom (c2.high)
+    // LONG:  price drops DOWN into FVG → entry at FVG top (c2.low)
+    const entry = isShort
+      ? this.fvg1m.bottom   // lowest point of bear FVG — first touched on rally
+      : this.fvg1m.top;     // highest point of bull FVG — first touched on pullback
 
-    if (isShort && sl <= entry) return null;   // inverted — reject
+    const risk = Math.abs(entry - sl);
+
+    if (isShort && sl <= entry) return null;
     if (!isShort && sl >= entry) return null;
     if (risk < MIN_RISK_PTS) return null;
 
-    // TP = opposing 5m liquidity (the natural target)
-    const tp     = isShort ? this.targetLow : this.targetHigh;
-    if (tp == null) return null;
+    // TP at fixed R multiple — scalp target, not swing
+    const tp = isShort
+      ? parseFloat((entry - risk * TP_R).toFixed(2))
+      : parseFloat((entry + risk * TP_R).toFixed(2));
 
-    const reward = Math.abs(entry - tp);
-    const rr     = parseFloat((reward / risk).toFixed(2));
+    const rr = TP_R;
 
     return {
       instrument:  this.instrument,
       direction:   this.direction,
       entry:       parseFloat(entry.toFixed(2)),
       sl,
-      tp1:         parseFloat(tp.toFixed(2)),
-      tp2:         null,
+      tp1:         tp,
+      tp2:         isShort ? this.targetLow : this.targetHigh,  // stretch target
       riskPts:     parseFloat(risk.toFixed(2)),
-      rewardPts:   parseFloat(reward.toFixed(2)),
+      rewardPts:   parseFloat((risk * TP_R).toFixed(2)),
       rr,
       sweep5mH:    this.targetHigh,
       sweep5mL:    this.targetLow,
