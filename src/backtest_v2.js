@@ -76,6 +76,7 @@ async function runBacktest() {
   console.log(`  ICT Bot — Dual-Timeframe Backtest`);
   console.log(`  Instrument : ${NAME} (${SYMBOL})`);
   console.log(`  Strategy   : NY KZ 08:30–11:00 | 5m H/L → 1m Sweep → 1m MSS → 1m FVG → Entry`);
+  console.log(`  Config     : TP_R=${process.env.TP_R||'2.0(default)'}  SL_BUFFER=${process.env.SL_BUFFER||'1.0(default)'}  MAX_1M_BARS=${process.env.MAX_1M_BARS||'90(default)'}`);
   console.log(`${'═'.repeat(70)}\n`);
   console.log(`  Fetching data (this may take a moment)...`);
 
