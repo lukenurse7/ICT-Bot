@@ -16,7 +16,7 @@
 //   SL  = swept 5m level + SL_BUFFER (above the liquidity for SHORT)
 //   TP1 = 3R, TP2 = opposite 5m level
 
-const MIN_RISK_PTS = parseFloat(process.env.MIN_RISK_PTS || '1.0');  // minimum setup risk
+const MIN_RISK_PTS = parseFloat(process.env.MIN_RISK_PTS || '1.5');  // skip sub-1.5pt setups
 const MAX_1M_BARS  = parseInt(process.env.MAX_1M_BARS   || '90');
 const SL_BUFFER    = parseFloat(process.env.SL_BUFFER   || '1.5');  // beyond sweep wick
 const TP_R         = parseFloat(process.env.TP_R        || '2.0');  // fallback R multiple
@@ -252,9 +252,6 @@ class Engine1m {
 
     const rewardPts = Math.abs(entry - tp);
     const rr        = parseFloat((rewardPts / risk).toFixed(2));
-
-    // Skip if RR is below 1.5 — not worth taking
-    if (rr < 1.5) return null;
 
     return {
       instrument:  this.instrument,

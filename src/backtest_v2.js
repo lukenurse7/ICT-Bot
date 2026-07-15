@@ -192,9 +192,7 @@ async function runBacktest() {
       if (DEBUG) console.log(`      1m context: ${prior1m.length} prior + ${fwd1m.length} forward candles`);
 
       let signalCount = 0;
-      const MAX_SIGNALS_PER_DAY = 1;
       for (let j = 1; j <= fwd1m.length; j++) {
-        if (signalCount >= MAX_SIGNALS_PER_DAY) break;
         const slice = [...prior1m, ...fwd1m.slice(0, j)];
         const r1    = engine1m.tick(slice);
 
