@@ -188,7 +188,8 @@ class Engine1m {
   // Entry at proximal edge: bottom (SHORT) or top (LONG)
   _detectFVG(candles, isShort) {
     const legStart = Math.max(1, this.sweepBarIdx);
-    const legEnd   = Math.min(candles.length - 2, this.mssBarIdx);
+    // Search slightly past MSS to catch FVGs that form on/just after the MSS candle
+    const legEnd   = Math.min(candles.length - 2, this.mssBarIdx + 10);
 
     // Search most-recent first within the impulse leg
     for (let i = legEnd; i >= legStart; i--) {
