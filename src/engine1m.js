@@ -16,9 +16,9 @@
 //   SL  = swept 5m level + SL_BUFFER (above the liquidity for SHORT)
 //   TP1 = 3R, TP2 = opposite 5m level
 
-const MIN_RISK_PTS = parseFloat(process.env.MIN_RISK_PTS || '0.5');
+const MIN_RISK_PTS = parseFloat(process.env.MIN_RISK_PTS || '2.0');  // filter sub-2pt setups
 const MAX_1M_BARS  = parseInt(process.env.MAX_1M_BARS   || '90');
-const SL_BUFFER    = parseFloat(process.env.SL_BUFFER   || '1.0');  // tight scalp buffer
+const SL_BUFFER    = parseFloat(process.env.SL_BUFFER   || '3.0');  // room beyond sweep wick
 const TP_R         = parseFloat(process.env.TP_R        || '2.0');  // TP at 2R
 const SWING_K      = 1;   // bars each side to confirm a 1m swing (1 = responsive, 2 = strict)
 

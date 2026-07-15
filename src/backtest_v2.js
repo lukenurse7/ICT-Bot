@@ -217,8 +217,8 @@ async function runBacktest() {
           dayState.entry1mTime = entryTime;
           signalCount++;
 
-          // Check TP1/SL outcome using all remaining 1m data from entry time
-          const outcome = checkOutcome(candles1m, entrySignal, entryTime || bar.time, 240);
+          // Check TP1/SL outcome — 8hr window to capture full day resolution
+          const outcome = checkOutcome(candles1m, entrySignal, entryTime || bar.time, 480);
           dayState.outcome = outcome;
 
           signals.push({ date: sk, ...entrySignal, outcome });
@@ -254,7 +254,7 @@ async function runBacktest() {
   if (total > 0) {
     console.log(`  TP hit   : ${tp}  (${Math.round(tp/total*100)}%)  ← opposing 5m liquidity`);
     console.log(`  SL hit   : ${sl}  (${Math.round(sl/total*100)}%)`);
-    console.log(`  Open/N/A : ${open}  (check window: 4hrs)`);
+    console.log(`  Open/N/A : ${open}  (check window: 8hrs)`);
     console.log('');
     console.log('  Per-signal detail:');
     for (const s of signals) {
