@@ -14,7 +14,7 @@ const { Engine1m }     = require('./engine1m');
 const args    = process.argv.slice(2);
 const DEBUG   = args.includes('--debug');
 const inst    = args.find(a => !a.startsWith('--')) || 'DJ30';
-const SYMBOL  = inst === 'NAS100' ? 'NDX' : 'DJI';   // real index data, not ETF proxies
+const SYMBOL  = inst === 'NAS100' ? 'QQQ' : 'DIA';  // ETF proxies — TwelveData free plan
 const NAME    = inst === 'NAS100' ? 'NAS100' : 'DJ30';
 
 const WINDOW_5M    = 150;   // rolling context window fed to 5m engine each tick
@@ -81,7 +81,7 @@ async function runBacktest() {
   console.log(`  ICT Bot — Dual-Timeframe Backtest`);
   console.log(`  Instrument : ${NAME} (${SYMBOL})`);
   console.log(`  Strategy   : NY KZ 08:30–11:00 | 5m H/L → 1m Sweep → 1m MSS → 1m FVG → Entry`);
-  console.log(`  Config     : TP_R=${process.env.TP_R||'2.0(default)'}  SL_BUFFER=${process.env.SL_BUFFER||'1.0(default)'}  MAX_1M_BARS=${process.env.MAX_1M_BARS||'90(default)'}`);
+  console.log(`  Config     : TP_R=${process.env.TP_R||'2.0(default)'}  SL_BUFFER=${process.env.SL_BUFFER||'50(default)'}  MAX_1M_BARS=${process.env.MAX_1M_BARS||'90(default)'}`);
   console.log(`${'═'.repeat(70)}\n`);
   console.log(`  Fetching data (this may take a moment)...`);
 
