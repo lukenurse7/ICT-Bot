@@ -148,4 +148,10 @@ plot(ref5mL, "5m Swing L", color.new(color.green, 70), 1, plot.style_linebr)
 plot(fvgFound ? fvgTop : na, "FVG Top", color.new(color.orange, 60), 1, plot.style_linebr)
 plot(fvgFound ? fvgBot : na, "FVG Bot", color.new(color.orange, 60), 1, plot.style_linebr)
 plot(fvgFound ? fvgMid : na, "FVG Mid", color.new(color.yellow, 40), 1, plot.style_linebr)
+
+// TP and SL lines — visible from entry bar onwards
+plot(entryFired ? entryTP  : na, "TP",    color.new(color.lime,  20), 2, plot.style_linebr)
+plot(entryFired ? entrySL  : na, "SL",    color.new(color.red,   20), 2, plot.style_linebr)
+plot(entryFired ? entryPrice : na, "Entry", color.new(color.white, 40), 1, plot.style_linebr)
+
 bgcolor(inKZ ? color.new(color.blue, 93) : na, title="Kill Zone")
