@@ -14,7 +14,7 @@ const { Engine1m }     = require('./engine1m');
 const args    = process.argv.slice(2);
 const DEBUG   = args.includes('--debug');
 const inst    = args.find(a => !a.startsWith('--')) || 'NAS100';
-const SYMBOL  = inst === 'DJ30' ? 'DIA' : 'NDX';  // NDX = NASDAQ-100 index; DIA = DJ30 ETF proxy
+const SYMBOL  = inst === 'DJ30' ? 'DIA' : 'QQQ';  // ETF proxies with full intraday history
 const NAME    = inst === 'DJ30'  ? 'DJ30' : 'NAS100';
 
 const WINDOW_5M    = 150;   // rolling context window fed to 5m engine each tick
@@ -81,7 +81,7 @@ async function runBacktest() {
   console.log(`  ICT Bot — Dual-Timeframe Backtest`);
   console.log(`  Instrument : ${NAME} (${SYMBOL})`);
   console.log(`  Strategy   : NY KZ 08:30–11:00 | 5m H/L → 1m Sweep → 1m MSS → 1m FVG → Entry`);
-  console.log(`  Config     : TP_R=${process.env.TP_R||'2.0(default)'}  SL_BUFFER=${process.env.SL_BUFFER||'50(default)'}  MAX_1M_BARS=${process.env.MAX_1M_BARS||'90(default)'}`);
+  console.log(`  Config     : TP_R=${process.env.TP_R||'2.0(default)'}  SL_BUFFER=${process.env.SL_BUFFER||'0.50(default)'}  MIN_RISK=${process.env.MIN_RISK_PTS||'0.30(default)'}  MAX_1M_BARS=${process.env.MAX_1M_BARS||'90(default)'}`);
   console.log(`${'═'.repeat(70)}\n`);
   console.log(`  Fetching data (this may take a moment)...`);
 
@@ -182,8 +182,6 @@ async function runBacktest() {
 
     // 5m permission granted — now switch to 1m
     if (r5.permissionGranted && r5.permission && !dayState.gotEntry) {
-      dayState.gotFVG = true;
-
       if (DEBUG) console.log(`\n    ★ 5m PERMISSION GRANTED at ${nyHHMM(bar.time)} NY — switching to 1m`);
       if (DEBUG) console.log(`      5m H: ${r5.permission.targetHigh?.toFixed(2)}  L: ${r5.permission.targetLow?.toFixed(2)}`);
 
