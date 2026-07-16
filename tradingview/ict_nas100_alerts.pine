@@ -117,7 +117,7 @@ if not inKZ or newDay
     entryRisk    := na
 
 // Plots
-justFired = entryFired and ta.change(int(entryFired))
+justFired = entryFired and not entryFired[1]
 plotshape(justFired and sweptBear, "SHORT", shape.triangledown, location.abovebar, color.red,   size=size.normal)
 plotshape(justFired and sweptBull, "LONG",  shape.triangleup,   location.belowbar, color.green, size=size.normal)
 
@@ -130,4 +130,4 @@ dir    = sweptBear ? "SHORT" : "LONG"
 rrVal  = entryRisk > 0 ? math.round(math.abs(entryPrice - entryTP) / entryRisk, 2) : 0.0
 msg    = '{"direction":"' + dir + '","symbol":"NAS100","entry":' + str.tostring(math.round(entryPrice, 2)) + ',"sl":' + str.tostring(math.round(entrySL, 2)) + ',"tp":' + str.tostring(math.round(entryTP, 2)) + ',"risk":' + str.tostring(math.round(entryRisk, 2)) + ',"rr":' + str.tostring(rrVal) + ',"time":"' + str.format_time(time, "yyyy-MM-dd HH:mm", "America/New_York") + ' NY"}'
 
-alertcondition(entryFired and ta.change(int(entryFired)), "ICT Entry Signal", msg)
+alertcondition(entryFired and not entryFired[1], "ICT Entry Signal", msg)
