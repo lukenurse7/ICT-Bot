@@ -54,7 +54,7 @@ function get1mSlice(candles1m, startTime, minutes) {
 
 // ─── Outcome check: did TP1 or SL get hit first after entry? ─────────────────
 // Time-stop: if neither hit within lookMins, close at market (TIME_STOP result)
-function checkOutcome(candles1m, signal, fromTime, lookMins = 180) {
+function checkOutcome(candles1m, signal, fromTime, lookMins = 420) {
   const window = get1mSlice(candles1m, fromTime, lookMins);
   if (!window.length) return { result: 'NO_DATA', bars: 0 };
   const isShort = signal.direction === 'SHORT';
@@ -198,6 +198,7 @@ async function runBacktest() {
 
       let signalCount = 0;
       for (let j = 1; j <= fwd1m.length; j++) {
+        if (signalCount >= 1) break;  // one signal per session
         const slice = [...prior1m, ...fwd1m.slice(0, j)];
         const r1    = engine1m.tick(slice);
 
@@ -222,8 +223,8 @@ async function runBacktest() {
           dayState.entry1mTime = entryTime;
           signalCount++;
 
-          // Check TP1/SL outcome — 8hr window to capture full day resolution
-          const outcome = checkOutcome(candles1m, entrySignal, entryTime || bar.time, 480);
+          // Check TP1/SL outcome — 7hr window covers full trading day from any KZ entry
+          const outcome = checkOutcome(candles1m, entrySignal, entryTime || bar.time, 420);
           dayState.outcome = outcome;
 
           signals.push({ date: sk, ...entrySignal, outcome });
