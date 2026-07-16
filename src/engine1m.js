@@ -16,11 +16,14 @@
 //   SL  = swept 5m level + SL_BUFFER (above the liquidity for SHORT)
 //   TP1 = 3R, TP2 = opposite 5m level
 
-const MIN_RISK_PTS = parseFloat(process.env.MIN_RISK_PTS || '1.5');  // skip sub-1.5pt setups
-const MAX_1M_BARS  = parseInt(process.env.MAX_1M_BARS   || '90');
-const SL_BUFFER    = parseFloat(process.env.SL_BUFFER   || '1.5');  // beyond sweep wick
-const TP_R         = parseFloat(process.env.TP_R        || '2.0');  // fallback R multiple
-const SWING_K      = 1;   // bars each side to confirm a 1m swing (1 = responsive, 2 = strict)
+const MIN_RISK_PTS       = parseFloat(process.env.MIN_RISK_PTS       || '1.5');
+const MAX_1M_BARS        = parseInt(process.env.MAX_1M_BARS          || '90');
+const SL_BUFFER          = parseFloat(process.env.SL_BUFFER          || '1.5');
+const TP_R               = parseFloat(process.env.TP_R               || '2.0');
+const SWING_K            = 1;
+const ATR_PERIOD         = parseInt(process.env.ATR_PERIOD           || '14');
+const DISP_BODY_ATR      = parseFloat(process.env.DISP_BODY_ATR      || '0.4'); // body ≥ X * ATR
+const DISP_RANGE_ATR     = parseFloat(process.env.DISP_RANGE_ATR     || '0.7'); // range ≥ X * ATR
 
 const STATES = {
   IDLE:        'IDLE',
@@ -136,6 +139,29 @@ class Engine1m {
     return this._result('Scanning 1m...');
   }
 
+  // ─── ATR (Wilder's, period bars) ──────────────────────────────────────────
+  _atr(candles, period = ATR_PERIOD) {
+    if (candles.length < 2) return null;
+    const trs = [];
+    for (let i = 1; i < candles.length; i++) {
+      const c = candles[i], p = candles[i - 1];
+      trs.push(Math.max(c.high - c.low, Math.abs(c.high - p.close), Math.abs(c.low - p.close)));
+    }
+    if (trs.length < period) return trs.reduce((a, b) => a + b, 0) / trs.length;
+    // Wilder smoothing
+    let atr = trs.slice(0, period).reduce((a, b) => a + b, 0) / period;
+    for (let i = period; i < trs.length; i++) atr = (atr * (period - 1) + trs[i]) / period;
+    return atr;
+  }
+
+  // ─── Displacement: MSS candle body OR range must meet ATR threshold ────────
+  _hasDisplacement(candle, atr) {
+    if (!atr) return true; // can't measure, allow through
+    const body  = Math.abs(candle.close - candle.open);
+    const range = candle.high - candle.low;
+    return body >= atr * DISP_BODY_ATR || range >= atr * DISP_RANGE_ATR;
+  }
+
   // ─── Confirmed 1m swings (repaint-safe, k bars each side) ─────────────────
   _confirmedSwings(candles) {
     const highs = [], lows = [];
@@ -167,24 +193,22 @@ class Engine1m {
 
   // ─── MSS: confirmed swing before sweep broken by close after sweep ─────────
   _detectMSS(candles, isShort) {
-    // Find confirmed swings in candles up to and including the sweep bar
     const preSweep = candles.slice(0, this.sweepBarIdx + 1);
     const { highs, lows } = this._confirmedSwings(preSweep);
+    const atr = this._atr(candles);
 
     if (isShort) {
-      // Need a confirmed swing LOW before the sweep to break downward
       if (!lows.length) return null;
       const refLevel = lows[lows.length - 1].price;
       for (let i = this.sweepBarIdx + 1; i < candles.length; i++) {
-        if (candles[i].close < refLevel)
+        if (candles[i].close < refLevel && this._hasDisplacement(candles[i], atr))
           return { type: 'BOS_DOWN', level: refLevel, barIdx: i, mssCandle: candles[i] };
       }
     } else {
-      // Need a confirmed swing HIGH before the sweep to break upward
       if (!highs.length) return null;
       const refLevel = highs[highs.length - 1].price;
       for (let i = this.sweepBarIdx + 1; i < candles.length; i++) {
-        if (candles[i].close > refLevel)
+        if (candles[i].close > refLevel && this._hasDisplacement(candles[i], atr))
           return { type: 'BOS_UP', level: refLevel, barIdx: i, mssCandle: candles[i] };
       }
     }
