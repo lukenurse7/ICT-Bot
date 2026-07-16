@@ -12,7 +12,7 @@ kzStart   = input.int(8,      "KZ Start Hour NY")
 kzEnd     = input.int(11,     "KZ End Hour NY")
 showDebug = input.bool(true,  "Show Debug Dots")
 
-// ── NY Kill Zone (1m) ─────────────────────────────────────────
+// ── NY Kill Zone ──────────────────────────────────────────────
 nyHour    = hour(time, "America/New_York")
 nyMin     = minute(time, "America/New_York")
 nyDow     = dayofweek(time, "America/New_York")
@@ -20,15 +20,13 @@ isWeekday = nyDow >= dayofweek.monday and nyDow <= dayofweek.friday
 inKZ      = isWeekday and (nyHour * 60 + nyMin) >= kzStart * 60 and (nyHour * 60 + nyMin) < kzEnd * 60
 newDay    = ta.change(time("D")) != 0
 
-// ── 5m swing highs/lows (liquidity levels to sweep) ──────────
-// Function runs in 5m context via request.security
+// ── 5m swing levels (liquidity to sweep) ─────────────────────
 f_5m_swings() =>
     isH = high > high[1] and high > high[2] and high > high[3]
     isL = low  < low[1]  and low  < low[2]  and low  < low[3]
-    dayReset = ta.change(time("D")) != 0
     var float sH = na
     var float sL = na
-    if dayReset
+    if ta.change(time("D")) != 0
         sH := na
         sL := na
     if isH
@@ -39,17 +37,13 @@ f_5m_swings() =>
 
 [ref5mH, ref5mL] = request.security(syminfo.tickerid, "5", f_5m_swings(), lookahead=barmerge.lookahead_off)
 
-// ── 1m swing detection (for MSS after sweep) ─────────────────
-is1mSwingH = high > high[1] and high > high[2] and high > high[3]
-is1mSwingL = low  < low[1]  and low  < low[2]  and low  < low[3]
-
 // ── Per-session state ─────────────────────────────────────────
 var bool  swept        = false
 var bool  sweptBear    = false
 var bool  sweptBull    = false
-var float sweepWick    = na
+var float sweepWick    = na   // the swept level (5m swing)
+var float mssLevel     = na   // opposite extreme of sweep candle = MSS trigger
 var int   sweepBar     = 0
-var float mssRef       = na
 var bool  mssConfirmed = false
 var float fvgTop       = na
 var float fvgBot       = na
@@ -61,14 +55,13 @@ var float entrySL      = na
 var float entryTP      = na
 var float entryRisk    = na
 
-// Reset on new day
 if newDay
     swept        := false
     sweptBear    := false
     sweptBull    := false
     sweepWick    := na
+    mssLevel     := na
     sweepBar     := 0
-    mssRef       := na
     mssConfirmed := false
     fvgTop       := na
     fvgBot       := na
@@ -80,40 +73,37 @@ if newDay
     entryTP      := na
     entryRisk    := na
 
-// ── Step 1: 1m sweep of 5m swing level inside KZ ─────────────
+// ── Step 1: Sweep of 5m level inside KZ ──────────────────────
 sweepFiredThisBar = false
 if inKZ and not swept and not entryFired
     if not na(ref5mH) and high > ref5mH
         swept             := true
         sweptBear         := true
-        sweepWick         := ref5mH   // use the 5m level as the wick reference
+        sweepWick         := ref5mH
+        mssLevel          := low          // MSS confirms when close < this candle's low
         sweepBar          := bar_index
         sweepFiredThisBar := true
     else if not na(ref5mL) and low < ref5mL
         swept             := true
         sweptBull         := true
         sweepWick         := ref5mL
+        mssLevel          := high         // MSS confirms when close > this candle's high
         sweepBar          := bar_index
         sweepFiredThisBar := true
 
-// ── Step 2: 1m MSS ────────────────────────────────────────────
+// ── Step 2: MSS — close beyond the sweep candle's opposite end ─
 mssFiredThisBar = false
 if swept and not mssConfirmed and bar_index > sweepBar
-    if sweptBear and is1mSwingL
-        mssRef := low
-    if sweptBull and is1mSwingH
-        mssRef := high
-    if not na(mssRef)
-        if sweptBear and close < mssRef
-            mssConfirmed    := true
-            mssFiredThisBar := true
-        if sweptBull and close > mssRef
-            mssConfirmed    := true
-            mssFiredThisBar := true
+    if sweptBear and close < mssLevel
+        mssConfirmed    := true
+        mssFiredThisBar := true
+    if sweptBull and close > mssLevel
+        mssConfirmed    := true
+        mssFiredThisBar := true
 
-// ── Step 3: 1m FVG in impulse leg ────────────────────────────
+// ── Step 3: FVG in the impulse leg ───────────────────────────
 fvgFiredThisBar = false
-if mssConfirmed and not fvgFound and bar_index > sweepBar + 1
+if mssConfirmed and not fvgFound
     if sweptBear and low[2] > high[0]
         fvgTop          := low[2]
         fvgBot          := high[0]
@@ -127,7 +117,7 @@ if mssConfirmed and not fvgFound and bar_index > sweepBar + 1
         fvgFound        := true
         fvgFiredThisBar := true
 
-// ── Step 4: Entry at 50% FVG fill ────────────────────────────
+// ── Step 4: Entry at 50% FVG inside KZ ───────────────────────
 if fvgFound and not entryFired and inKZ and strategy.position_size == 0
     reachedFVG = sweptBear ? high >= fvgMid : low <= fvgMid
     if reachedFVG
@@ -147,22 +137,15 @@ if fvgFound and not entryFired and inKZ and strategy.position_size == 0
 // ── Plots ─────────────────────────────────────────────────────
 justFired = entryFired and not entryFired[1]
 
-// Debug: blue=sweep, yellow=MSS, orange=FVG
 plotshape(showDebug and sweepFiredThisBar, "Sweep", shape.circle,       location.abovebar, color.blue,   size=size.tiny)
 plotshape(showDebug and mssFiredThisBar,   "MSS",   shape.circle,       location.abovebar, color.yellow, size=size.tiny)
 plotshape(showDebug and fvgFiredThisBar,   "FVG",   shape.circle,       location.abovebar, color.orange, size=size.small)
+plotshape(justFired and sweptBear,         "SHORT", shape.triangledown, location.abovebar, color.red,    size=size.normal)
+plotshape(justFired and sweptBull,         "LONG",  shape.triangleup,   location.belowbar, color.green,  size=size.normal)
 
-// Entry signals
-plotshape(justFired and sweptBear, "SHORT", shape.triangledown, location.abovebar, color.red,   size=size.normal)
-plotshape(justFired and sweptBull, "LONG",  shape.triangleup,   location.belowbar, color.green, size=size.normal)
-
-// 5m reference levels
 plot(ref5mH, "5m Swing H", color.new(color.red,   70), 1, plot.style_linebr)
 plot(ref5mL, "5m Swing L", color.new(color.green, 70), 1, plot.style_linebr)
-
-// FVG zone
 plot(fvgFound ? fvgTop : na, "FVG Top", color.new(color.orange, 60), 1, plot.style_linebr)
 plot(fvgFound ? fvgBot : na, "FVG Bot", color.new(color.orange, 60), 1, plot.style_linebr)
 plot(fvgFound ? fvgMid : na, "FVG Mid", color.new(color.yellow, 40), 1, plot.style_linebr)
-
 bgcolor(inKZ ? color.new(color.blue, 93) : na, title="Kill Zone")
