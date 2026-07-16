@@ -155,3 +155,10 @@ plot(entryFired ? entrySL  : na, "SL",    color.new(color.red,   20), 2, plot.st
 plot(entryFired ? entryPrice : na, "Entry", color.new(color.white, 40), 1, plot.style_linebr)
 
 bgcolor(inKZ ? color.new(color.blue, 93) : na, title="Kill Zone")
+
+// ── Telegram webhook alert (same as signals indicator) ────────
+if justFired
+    dir   = sweptBear ? "SHORT" : "LONG"
+    rrVal = entryRisk > 0 ? math.round(math.abs(entryPrice - entryTP) / entryRisk, 2) : 0.0
+    msg   = '{"direction":"' + dir + '","symbol":"NAS100","entry":' + str.tostring(math.round(entryPrice, 2)) + ',"sl":' + str.tostring(math.round(entrySL, 2)) + ',"tp":' + str.tostring(math.round(entryTP, 2)) + ',"risk":' + str.tostring(math.round(entryRisk, 2)) + ',"rr":' + str.tostring(rrVal) + ',"time":"' + str.format_time(time, "yyyy-MM-dd HH:mm", "America/New_York") + ' NY"}'
+    alert(msg, alert.freq_once_per_bar)
