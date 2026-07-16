@@ -1,0 +1,165 @@
+// ICT NAS100 — NY Kill Zone Signal
+// Timeframe: 1m chart
+// Detects: 5m swing sweep → 1m MSS → 1m FVG → entry at 50% FVG
+// ─────────────────────────────────────────────────────────────
+
+//@version=5
+indicator("ICT NAS100 — KZ Signals", overlay=true, max_bars_back=500)
+
+// ── Inputs ────────────────────────────────────────────────────
+slBuffer   = input.float(50.0,  "SL Buffer (pts above/below sweep)")
+minRisk    = input.float(30.0,  "Min Risk (pts)")
+tpR        = input.float(2.0,   "TP Risk Multiple")
+kzStart    = input.int(8,       "Kill Zone Start Hour (NY)")
+kzEnd      = input.int(11,      "Kill Zone End Hour (NY)")
+
+// ── NY Kill Zone ──────────────────────────────────────────────
+nyHour = hour(time, "America/New_York")
+nyMin  = minute(time, "America/New_York")
+nyDow  = dayofweek(time, "America/New_York")
+isWeekday = nyDow >= dayofweek.monday and nyDow <= dayofweek.friday
+inKZ = isWeekday and (nyHour * 60 + nyMin) >= kzStart * 60 and (nyHour * 60 + nyMin) < kzEnd * 60
+
+// ── 5m Swing High / Low (via request.security) ───────────────
+[h5, l5] = request.security(syminfo.tickerid, "5", [
+    ta.highest(high, 20),
+    ta.lowest(low, 20)
+])
+
+// ── Swing detection (1-bar each side) ────────────────────────
+isSwingH = high > high[1] and high > high[2] and high > high[3]
+isSwingL = low  < low[1]  and low  < low[2]  and low  < low[3]
+
+var float swingH = na
+var float swingL = na
+if isSwingH
+    swingH := high
+if isSwingL
+    swingL := low
+
+// ── Track sweep ───────────────────────────────────────────────
+var bool  swept      = false
+var bool  sweptBear  = false   // swept HIGH → looking SHORT
+var bool  sweptBull  = false   // swept LOW  → looking LONG
+var float sweepLevel = na
+var float sweepWick  = na
+var int   sweepBar   = na
+
+if inKZ and not swept
+    if not na(swingH) and high > swingH
+        swept     := true
+        sweptBear := true
+        sweepLevel := swingH
+        sweepWick  := high
+        sweepBar   := bar_index
+    if not na(swingL) and low < swingL
+        swept     := true
+        sweptBull := true
+        sweepLevel := swingL
+        sweepWick  := low
+        sweepBar   := bar_index
+
+// ── Pre-sweep swing for MSS reference ────────────────────────
+var float mssRef   = na
+var bool  mssFound = false
+var int   mssBar   = na
+
+if swept and not mssFound
+    if sweptBear and isSwingL
+        mssRef := low
+    if sweptBull and isSwingH
+        mssRef := high
+
+// ── MSS: close breaks pre-sweep swing after sweep ────────────
+var bool mssConfirmed = false
+
+if swept and not mssConfirmed and not na(mssRef)
+    if bar_index > sweepBar
+        if sweptBear and close < mssRef
+            mssConfirmed := true
+            mssBar       := bar_index
+        if sweptBull and close > mssRef
+            mssConfirmed := true
+            mssBar       := bar_index
+
+// ── FVG detection (3-candle gap after sweep) ──────────────────
+var float fvgTop    = na
+var float fvgBot    = na
+var float fvgMid    = na
+var bool  fvgFound  = false
+
+if mssConfirmed and not fvgFound and bar_index > sweepBar + 1
+    if sweptBear and low[2] > high[0]   // bearish FVG
+        fvgTop   := low[2]
+        fvgBot   := high[0]
+        fvgMid   := (fvgTop + fvgBot) / 2
+        fvgFound := true
+    if sweptBull and high[2] < low[0]   // bullish FVG
+        fvgTop   := low[0]
+        fvgBot   := high[2]
+        fvgMid   := (fvgTop + fvgBot) / 2
+        fvgFound := true
+
+// ── Entry: price retraces into 50% of FVG ────────────────────
+var bool  entryFired = false
+var float entryPrice = na
+var float sl         = na
+var float tp         = na
+
+if fvgFound and not entryFired and inKZ
+    reachedFVG = sweptBear ? high >= fvgMid : low <= fvgMid
+    if reachedFVG
+        entryPrice := fvgMid
+        sl         := sweptBear ? sweepWick + slBuffer : sweepWick - slBuffer
+        risk       = math.abs(entryPrice - sl)
+        if risk >= minRisk
+            tp         := sweptBear ? entryPrice - risk * tpR : entryPrice + risk * tpR
+            entryFired := true
+
+// ── Reset at end of Kill Zone or new day ─────────────────────
+newDay = ta.change(time("D")) != 0
+if not inKZ or newDay
+    swept         := false
+    sweptBear     := false
+    sweptBull     := false
+    sweepLevel    := na
+    sweepWick     := na
+    sweepBar      := na
+    mssRef        := na
+    mssFound      := false
+    mssBar        := na
+    mssConfirmed  := false
+    fvgTop        := na
+    fvgBot        := na
+    fvgMid        := na
+    fvgFound      := false
+    entryFired    := false
+    entryPrice    := na
+    sl            := na
+    tp            := na
+
+// ── Plots ─────────────────────────────────────────────────────
+plotshape(entryFired and sweptBear and ta.change(int(entryFired)),
+    "SHORT Entry", shape.triangledown, location.abovebar, color.red,   size=size.normal)
+plotshape(entryFired and sweptBull and ta.change(int(entryFired)),
+    "LONG Entry",  shape.triangleup,   location.belowbar, color.green, size=size.normal)
+
+plot(fvgFound ? fvgTop : na, "FVG Top", color.new(color.orange, 70), 1, plot.style_linebr)
+plot(fvgFound ? fvgBot : na, "FVG Bot", color.new(color.orange, 70), 1, plot.style_linebr)
+plot(fvgFound ? fvgMid : na, "FVG Mid", color.new(color.yellow, 50), 1, plot.style_linebr)
+
+// ── Alert ─────────────────────────────────────────────────────
+direction = sweptBear ? "SHORT" : "LONG"
+riskPts   = math.round(math.abs(entryPrice - sl), 2)
+rrVal     = math.round(math.abs(entryPrice - tp) / riskPts, 2)
+
+alertMsg = '{"direction":"' + direction +
+    '","symbol":"NAS100"' +
+    ',"entry":' + str.tostring(math.round(entryPrice, 2)) +
+    ',"sl":'    + str.tostring(math.round(sl, 2)) +
+    ',"tp":'    + str.tostring(math.round(tp, 2)) +
+    ',"risk":'  + str.tostring(riskPts) +
+    ',"rr":'    + str.tostring(rrVal) +
+    ',"time":"' + str.format_time(time, "yyyy-MM-dd HH:mm", "America/New_York") + ' NY"}'
+
+alertcondition(entryFired and ta.change(int(entryFired)), "ICT Entry Signal", alertMsg)
