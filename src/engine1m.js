@@ -16,14 +16,14 @@
 //   SL  = swept 5m level + SL_BUFFER (above the liquidity for SHORT)
 //   TP1 = 3R, TP2 = opposite 5m level
 
-const MIN_RISK_PTS       = parseFloat(process.env.MIN_RISK_PTS       || '1.5');
+const MIN_RISK_PTS       = parseFloat(process.env.MIN_RISK_PTS       || '30');  // DJ30 points
 const MAX_1M_BARS        = parseInt(process.env.MAX_1M_BARS          || '90');
-const SL_BUFFER          = parseFloat(process.env.SL_BUFFER          || '1.5');
+const SL_BUFFER          = parseFloat(process.env.SL_BUFFER          || '50');  // DJ30 points beyond sweep wick
 const TP_R               = parseFloat(process.env.TP_R               || '2.0');
 const SWING_K            = 1;
 const ATR_PERIOD         = parseInt(process.env.ATR_PERIOD           || '14');
-const DISP_BODY_ATR      = parseFloat(process.env.DISP_BODY_ATR      || '0.4'); // body ≥ X * ATR
-const DISP_RANGE_ATR     = parseFloat(process.env.DISP_RANGE_ATR     || '0.7'); // range ≥ X * ATR
+const DISP_BODY_ATR      = parseFloat(process.env.DISP_BODY_ATR      || '0.4');
+const DISP_RANGE_ATR     = parseFloat(process.env.DISP_RANGE_ATR     || '0.7');
 
 const STATES = {
   IDLE:        'IDLE',
