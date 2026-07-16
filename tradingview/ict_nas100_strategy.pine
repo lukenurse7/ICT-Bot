@@ -7,7 +7,6 @@ strategy("ICT NAS100 - KZ Strategy", overlay=true, max_bars_back=500,
 // Inputs
 slBuffer  = input.float(50.0, "SL Buffer (pts)")
 minRisk   = input.float(30.0, "Min Risk (pts)")
-tpR       = input.float(2.0,  "TP Risk Multiple")
 kzStart   = input.int(8,      "KZ Start Hour NY")
 kzEnd     = input.int(11,     "KZ End Hour NY")
 showDebug = input.bool(true,  "Show Debug Dots")
@@ -41,8 +40,8 @@ f_5m_swings() =>
 var bool  swept        = false
 var bool  sweptBear    = false
 var bool  sweptBull    = false
-var float sweepWick    = na   // the swept level (5m swing)
-var float mssLevel     = na   // opposite extreme of sweep candle = MSS trigger
+var float sweepWick    = na
+var float mssLevel     = na
 var int   sweepBar     = 0
 var bool  mssConfirmed = false
 var float fvgTop       = na
@@ -52,8 +51,10 @@ var bool  fvgFound     = false
 var bool  entryFired   = false
 var float entryPrice   = na
 var float entrySL      = na
-var float entryTP      = na
+var float entryTP1     = na   // 2R — trail trigger
+var float entryTP2     = na   // 3R — final target
 var float entryRisk    = na
+var bool  trailed      = false
 
 if newDay
     swept        := false
@@ -70,8 +71,10 @@ if newDay
     entryFired   := false
     entryPrice   := na
     entrySL      := na
-    entryTP      := na
+    entryTP1     := na
+    entryTP2     := na
     entryRisk    := na
+    trailed      := false
 
 // ── Step 1: Sweep of 5m level inside KZ ──────────────────────
 sweepFiredThisBar = false
@@ -80,14 +83,14 @@ if inKZ and not swept and not entryFired
         swept             := true
         sweptBear         := true
         sweepWick         := ref5mH
-        mssLevel          := low          // MSS confirms when close < this candle's low
+        mssLevel          := low
         sweepBar          := bar_index
         sweepFiredThisBar := true
     else if not na(ref5mL) and low < ref5mL
         swept             := true
         sweptBull         := true
         sweepWick         := ref5mL
-        mssLevel          := high         // MSS confirms when close > this candle's high
+        mssLevel          := high
         sweepBar          := bar_index
         sweepFiredThisBar := true
 
@@ -125,23 +128,35 @@ if fvgFound and not entryFired and inKZ and strategy.position_size == 0
         entrySL    := sweptBear ? sweepWick + slBuffer : sweepWick - slBuffer
         entryRisk  := math.abs(entryPrice - entrySL)
         if entryRisk >= minRisk
-            entryTP    := sweptBear ? entryPrice - entryRisk * tpR : entryPrice + entryRisk * tpR
+            entryTP1   := sweptBear ? entryPrice - entryRisk * 2 : entryPrice + entryRisk * 2
+            entryTP2   := sweptBear ? entryPrice - entryRisk * 3 : entryPrice + entryRisk * 3
             entryFired := true
             if sweptBear
                 strategy.entry("SHORT", strategy.short, comment="ICT SHORT")
-                strategy.exit("SX", "SHORT", limit=entryTP, stop=entrySL)
+                strategy.exit("SX", "SHORT", limit=entryTP2, stop=entrySL)
             else
                 strategy.entry("LONG", strategy.long, comment="ICT LONG")
-                strategy.exit("LX", "LONG", limit=entryTP, stop=entrySL)
+                strategy.exit("LX", "LONG", limit=entryTP2, stop=entrySL)
+
+// ── Trail: when price tags TP1 (2R), move SL to lock in 2R ──
+exitId = sweptBear ? "SX" : "LX"
+fromId = sweptBear ? "SHORT" : "LONG"
+if strategy.position_size != 0 and entryFired and not trailed
+    taggedTP1 = sweptBear ? low <= entryTP1 : high >= entryTP1
+    if taggedTP1
+        trailed := true
+        strategy.exit(exitId, fromId, limit=entryTP2, stop=entryTP1)
 
 // ── Plots ─────────────────────────────────────────────────────
-justFired = entryFired and not entryFired[1]
+justFired   = entryFired and not entryFired[1]
+justTrailed = trailed and not trailed[1]
 
 plotshape(showDebug and sweepFiredThisBar, "Sweep", shape.circle,       location.abovebar, color.blue,   size=size.tiny)
 plotshape(showDebug and mssFiredThisBar,   "MSS",   shape.circle,       location.abovebar, color.yellow, size=size.tiny)
 plotshape(showDebug and fvgFiredThisBar,   "FVG",   shape.circle,       location.abovebar, color.orange, size=size.small)
 plotshape(justFired and sweptBear,         "SHORT", shape.triangledown, location.abovebar, color.red,    size=size.normal)
 plotshape(justFired and sweptBull,         "LONG",  shape.triangleup,   location.belowbar, color.green,  size=size.normal)
+plotshape(justTrailed,                     "Trail", shape.diamond,      location.abovebar, color.purple, size=size.small)
 
 plot(ref5mH, "5m Swing H", color.new(color.red,   70), 1, plot.style_linebr)
 plot(ref5mL, "5m Swing L", color.new(color.green, 70), 1, plot.style_linebr)
@@ -149,16 +164,16 @@ plot(fvgFound ? fvgTop : na, "FVG Top", color.new(color.orange, 60), 1, plot.sty
 plot(fvgFound ? fvgBot : na, "FVG Bot", color.new(color.orange, 60), 1, plot.style_linebr)
 plot(fvgFound ? fvgMid : na, "FVG Mid", color.new(color.yellow, 40), 1, plot.style_linebr)
 
-// TP and SL lines — visible from entry bar onwards
-plot(entryFired ? entryTP  : na, "TP",    color.new(color.lime,  20), 2, plot.style_linebr)
-plot(entryFired ? entrySL  : na, "SL",    color.new(color.red,   20), 2, plot.style_linebr)
-plot(entryFired ? entryPrice : na, "Entry", color.new(color.white, 40), 1, plot.style_linebr)
+plot(entryFired ? entryTP1   : na, "TP1 (2R)", color.new(color.lime,   40), 1, plot.style_linebr)
+plot(entryFired ? entryTP2   : na, "TP2 (3R)", color.new(color.lime,   10), 2, plot.style_linebr)
+plot(entryFired ? entrySL    : na, "SL",        color.new(color.red,    20), 2, plot.style_linebr)
+plot(entryFired ? entryPrice : na, "Entry",     color.new(color.white,  40), 1, plot.style_linebr)
 
 bgcolor(inKZ ? color.new(color.blue, 93) : na, title="Kill Zone")
 
-// ── Telegram webhook alert (same as signals indicator) ────────
+// ── Telegram webhook alert ────────────────────────────────────
 if justFired
     dir   = sweptBear ? "SHORT" : "LONG"
-    rrVal = entryRisk > 0 ? math.round(math.abs(entryPrice - entryTP) / entryRisk, 2) : 0.0
-    msg   = '{"direction":"' + dir + '","symbol":"NAS100","entry":' + str.tostring(math.round(entryPrice, 2)) + ',"sl":' + str.tostring(math.round(entrySL, 2)) + ',"tp":' + str.tostring(math.round(entryTP, 2)) + ',"risk":' + str.tostring(math.round(entryRisk, 2)) + ',"rr":' + str.tostring(rrVal) + ',"time":"' + str.format_time(time, "yyyy-MM-dd HH:mm", "America/New_York") + ' NY"}'
+    rrVal = entryRisk > 0 ? math.round(math.abs(entryPrice - entryTP2) / entryRisk, 2) : 0.0
+    msg   = '{"direction":"' + dir + '","symbol":"NAS100","entry":' + str.tostring(math.round(entryPrice, 2)) + ',"sl":' + str.tostring(math.round(entrySL, 2)) + ',"tp1":' + str.tostring(math.round(entryTP1, 2)) + ',"tp2":' + str.tostring(math.round(entryTP2, 2)) + ',"risk":' + str.tostring(math.round(entryRisk, 2)) + ',"rr":' + str.tostring(rrVal) + ',"time":"' + str.format_time(time, "yyyy-MM-dd HH:mm", "America/New_York") + ' NY"}'
     alert(msg, alert.freq_once_per_bar)
