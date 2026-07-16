@@ -261,7 +261,7 @@ async function runBacktest() {
   if (total > 0) {
     console.log(`  TP hit     : ${tp}  (${Math.round(tp/total*100)}%)  ← min(opposing 5m level, 2R)`);
     console.log(`  SL hit     : ${sl}  (${Math.round(sl/total*100)}%)`);
-    console.log(`  Time-stop  : ${ts}  (${Math.round(ts/total*100)}%)  ← closed at 3hr mark`);
+    console.log(`  Time-stop  : ${ts}  (${Math.round(ts/total*100)}%)  ← closed end of day (7hr window)`);
     console.log(`  No data    : ${open}`);
     console.log('');
     console.log('  Per-signal detail:');
