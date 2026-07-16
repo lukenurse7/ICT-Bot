@@ -110,13 +110,14 @@ class Engine1m {
       const fvg     = this.fvg1m;
       const isShort = this.direction === 'SHORT';
 
-      // Price must reach the proximal edge of the FVG (the entry level)
+      // Enter at 50% FVG fill (consequent encroachment) — less aggressive than
+      // proximal edge, gives the setup room before committing
       const reached = isShort
-        ? latest.high >= fvg.bottom   // rally up to FVG bottom
-        : latest.low  <= fvg.top;     // pullback down to FVG top
+        ? latest.high >= fvg.mid   // rally up into 50% of bear FVG
+        : latest.low  <= fvg.mid;  // pullback down into 50% of bull FVG
 
       if (!reached) {
-        return this._result(`Waiting for retracement to FVG ${isShort ? 'bottom' : 'top'} @ ${isShort ? fvg.bottom.toFixed(2) : fvg.top.toFixed(2)}`);
+        return this._result(`Waiting for retracement to FVG 50% @ ${fvg.mid.toFixed(2)}`);
       }
 
       const signal  = this._buildSignal(isShort, latest);
@@ -225,12 +226,8 @@ class Engine1m {
       ? parseFloat((sweepExtreme + SL_BUFFER).toFixed(2))
       : parseFloat((sweepExtreme - SL_BUFFER).toFixed(2));
 
-    // Entry: proximal edge of FVG (the end closest to current price)
-    // SHORT: price rallies UP into FVG → entry at FVG bottom (c2.high)
-    // LONG:  price drops DOWN into FVG → entry at FVG top (c2.low)
-    const entry = isShort
-      ? this.fvg1m.bottom   // lowest point of bear FVG — first touched on rally
-      : this.fvg1m.top;     // highest point of bull FVG — first touched on pullback
+    // Entry: 50% FVG fill (consequent encroachment) — more conservative than proximal edge
+    const entry = parseFloat(this.fvg1m.mid.toFixed(2));
 
     const risk = Math.abs(entry - sl);
 
@@ -238,17 +235,22 @@ class Engine1m {
     if (!isShort && sl >= entry) return null;
     if (risk < MIN_RISK_PTS) return null;
 
-    // TP: opposing 5m level (the other side's liquidity) — realistic intraday target
-    // Fallback to 2R if the opposing level is on the wrong side or too close
+    // TP: min(opposing 5m level, 2R) — never wait on an unreachable target
     const opposingLevel = isShort ? this.targetLow : this.targetHigh;
-    const rFallback = isShort
+    const rTarget = isShort
       ? parseFloat((entry - risk * TP_R).toFixed(2))
       : parseFloat((entry + risk * TP_R).toFixed(2));
 
-    const tp = (opposingLevel != null &&
-                (isShort ? opposingLevel < entry : opposingLevel > entry))
-      ? parseFloat(opposingLevel.toFixed(2))
-      : rFallback;
+    // Use opposing level if valid and closer than 2R, otherwise use 2R
+    let tp;
+    if (opposingLevel != null && (isShort ? opposingLevel < entry : opposingLevel > entry)) {
+      // Take whichever is closer to entry (more conservative / faster to hit)
+      tp = isShort
+        ? parseFloat(Math.max(opposingLevel, rTarget).toFixed(2))
+        : parseFloat(Math.min(opposingLevel, rTarget).toFixed(2));
+    } else {
+      tp = rTarget;
+    }
 
     const rewardPts = Math.abs(entry - tp);
     const rr        = parseFloat((rewardPts / risk).toFixed(2));
@@ -259,7 +261,7 @@ class Engine1m {
       entry:       parseFloat(entry.toFixed(2)),
       sl,
       tp1:         tp,
-      tp2:         rFallback,  // 2R as secondary reference
+      tp2:         rTarget,  // 2R as secondary reference
       riskPts:     parseFloat(risk.toFixed(2)),
       rewardPts:   parseFloat(rewardPts.toFixed(2)),
       rr,

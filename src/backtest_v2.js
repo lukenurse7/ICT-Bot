@@ -53,7 +53,8 @@ function get1mSlice(candles1m, startTime, minutes) {
 }
 
 // ─── Outcome check: did TP1 or SL get hit first after entry? ─────────────────
-function checkOutcome(candles1m, signal, fromTime, lookMins = 240) {
+// Time-stop: if neither hit within lookMins, close at market (TIME_STOP result)
+function checkOutcome(candles1m, signal, fromTime, lookMins = 180) {
   const window = get1mSlice(candles1m, fromTime, lookMins);
   if (!window.length) return { result: 'NO_DATA', bars: 0 };
   const isShort = signal.direction === 'SHORT';
@@ -67,7 +68,11 @@ function checkOutcome(candles1m, signal, fromTime, lookMins = 240) {
       if (c.high >= signal.tp1) return { result: 'TP', bars: i + 1 };
     }
   }
-  return { result: 'OPEN', bars: window.length };
+  // Time-stop: closed at end of window, record closing price vs entry
+  const last = window[window.length - 1];
+  const closePrice = last?.close ?? signal.entry;
+  const pnl = isShort ? signal.entry - closePrice : closePrice - signal.entry;
+  return { result: 'TIME_STOP', bars: window.length, closePrice, pnl: parseFloat(pnl.toFixed(2)) };
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -240,6 +245,7 @@ async function runBacktest() {
   // ─── Summary ─────────────────────────────────────────────────────────────
   const tp    = signals.filter(s => s.outcome?.result === 'TP').length;
   const sl    = signals.filter(s => s.outcome?.result === 'SL').length;
+  const ts    = signals.filter(s => s.outcome?.result === 'TIME_STOP').length;
   const open  = signals.filter(s => s.outcome?.result === 'OPEN' || s.outcome?.result === 'NO_DATA').length;
   const total = signals.length;
 
@@ -252,16 +258,18 @@ async function runBacktest() {
   console.log(`  Days with full entry    : ${total}`);
   console.log('');
   if (total > 0) {
-    console.log(`  TP hit   : ${tp}  (${Math.round(tp/total*100)}%)  ← opposing 5m liquidity`);
-    console.log(`  SL hit   : ${sl}  (${Math.round(sl/total*100)}%)`);
-    console.log(`  Open/N/A : ${open}  (check window: 8hrs)`);
+    console.log(`  TP hit     : ${tp}  (${Math.round(tp/total*100)}%)  ← min(opposing 5m level, 2R)`);
+    console.log(`  SL hit     : ${sl}  (${Math.round(sl/total*100)}%)`);
+    console.log(`  Time-stop  : ${ts}  (${Math.round(ts/total*100)}%)  ← closed at 3hr mark`);
+    console.log(`  No data    : ${open}`);
     console.log('');
     console.log('  Per-signal detail:');
     for (const s of signals) {
       const dir = s.direction === 'SHORT' ? '▼' : '▲';
-      const o   = s.outcome?.result === 'TP1' ? '✅ TP1'
-                : s.outcome?.result === 'SL'  ? '❌ SL '
-                : '⏳    ';
+      const o   = s.outcome?.result === 'TP'        ? '✅ TP  '
+                : s.outcome?.result === 'SL'        ? '❌ SL  '
+                : s.outcome?.result === 'TIME_STOP' ? `🕐 TS  `
+                : '⏳     ';
       console.log(`    ${s.date}  ${dir} ${s.direction.padEnd(5)}  Entry:${s.entry}  SL:${s.sl}  TP1:${s.tp1}  Risk:${s.riskPts}pts  ${o} (${s.outcome?.bars ?? '?'}m)`);
     }
   } else {
