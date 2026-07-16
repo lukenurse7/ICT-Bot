@@ -10,6 +10,7 @@ minRisk  = input.float(30.0,  "Min Risk (pts)")
 tpR      = input.float(2.0,   "TP Risk Multiple")
 kzStart  = input.int(8,       "KZ Start Hour NY")
 kzEnd    = input.int(11,      "KZ End Hour NY")
+showDebug = input.bool(true,  "Show Debug Dots")
 
 // NY Kill Zone
 nyHour    = hour(time, "America/New_York")
@@ -19,95 +20,43 @@ isWeekday = nyDow >= dayofweek.monday and nyDow <= dayofweek.friday
 inKZ      = isWeekday and (nyHour * 60 + nyMin) >= kzStart * 60 and (nyHour * 60 + nyMin) < kzEnd * 60
 newDay    = ta.change(time("D")) != 0
 
-// Simple swing detection (same as working indicator)
+// Simple swing detection
 isSwingH = high > high[1] and high > high[2] and high > high[3]
 isSwingL = low  < low[1]  and low  < low[2]  and low  < low[3]
 
 var float swingH = na
 var float swingL = na
+
+// Reset swings each new day so we only use same-session swings
+if newDay
+    swingH := na
+    swingL := na
+
 if isSwingH
     swingH := high
 if isSwingL
     swingL := low
 
-// Sweep tracking
-var bool  swept     = false
-var bool  sweptBear = false
-var bool  sweptBull = false
-var float sweepWick = na
-var int   sweepBar  = 0
-
-if inKZ and not swept
-    if not na(swingH) and high > swingH
-        swept     := true
-        sweptBear := true
-        sweepWick := high
-        sweepBar  := bar_index
-    if not na(swingL) and low < swingL
-        swept     := true
-        sweptBull := true
-        sweepWick := low
-        sweepBar  := bar_index
-
-// MSS
+// Per-session state
+var bool  swept        = false
+var bool  sweptBear    = false
+var bool  sweptBull    = false
+var float sweepWick    = na
+var int   sweepBar     = 0
 var float mssRef       = na
 var bool  mssConfirmed = false
+var float fvgTop       = na
+var float fvgBot       = na
+var float fvgMid       = na
+var bool  fvgFound     = false
+var bool  entryFired   = false
+var float entryPrice   = na
+var float entrySL      = na
+var float entryTP      = na
+var float entryRisk    = na
 
-if swept and not mssConfirmed
-    if sweptBear and isSwingL
-        mssRef := low
-    if sweptBull and isSwingH
-        mssRef := high
-
-if swept and not mssConfirmed and not na(mssRef) and bar_index > sweepBar
-    if sweptBear and close < mssRef
-        mssConfirmed := true
-    if sweptBull and close > mssRef
-        mssConfirmed := true
-
-// FVG
-var float fvgTop   = na
-var float fvgBot   = na
-var float fvgMid   = na
-var bool  fvgFound = false
-
-if mssConfirmed and not fvgFound and bar_index > sweepBar + 1
-    if sweptBear and low[2] > high[0]
-        fvgTop   := low[2]
-        fvgBot   := high[0]
-        fvgMid   := (fvgTop + fvgBot) / 2.0
-        fvgFound := true
-    if sweptBull and high[2] < low[0]
-        fvgTop   := low[0]
-        fvgBot   := high[2]
-        fvgMid   := (fvgTop + fvgBot) / 2.0
-        fvgFound := true
-
-// Entry at 50% FVG
-var bool  entryFired = false
-var float entryPrice = na
-var float entrySL    = na
-var float entryTP    = na
-var float entryRisk  = na
-
-if fvgFound and not entryFired and inKZ and strategy.position_size == 0
-    reachedFVG = sweptBear ? high >= fvgMid : low <= fvgMid
-    if reachedFVG
-        entryPrice := fvgMid
-        entrySL    := sweptBear ? sweepWick + slBuffer : sweepWick - slBuffer
-        entryRisk  := math.abs(entryPrice - entrySL)
-        if entryRisk >= minRisk
-            entryTP    := sweptBear ? entryPrice - entryRisk * tpR : entryPrice + entryRisk * tpR
-            entryFired := true
-            if sweptBear
-                strategy.entry("SHORT", strategy.short, comment="ICT SHORT")
-                strategy.exit("SX", "SHORT", limit=entryTP, stop=entrySL)
-            else
-                strategy.entry("LONG", strategy.long, comment="ICT LONG")
-                strategy.exit("LX", "LONG", limit=entryTP, stop=entrySL)
-
-// Reset at end of KZ or new day
-if not inKZ or newDay
+// Reset each new day (not on every non-KZ bar — just daily)
+if newDay
     swept        := false
     sweptBear    := false
     sweptBull    := false
@@ -125,10 +74,78 @@ if not inKZ or newDay
     entryTP      := na
     entryRisk    := na
 
-// Plots
+// ── Step 1: Sweep inside KZ ───────────────────────────────────
+sweepFiredThisBar = false
+if inKZ and not swept and not entryFired
+    if not na(swingH) and high > swingH and not isSwingH
+        swept            := true
+        sweptBear        := true
+        sweepWick        := high
+        sweepBar         := bar_index
+        sweepFiredThisBar := true
+    else if not na(swingL) and low < swingL and not isSwingL
+        swept            := true
+        sweptBull        := true
+        sweepWick        := low
+        sweepBar         := bar_index
+        sweepFiredThisBar := true
+
+// ── Step 2: MSS ───────────────────────────────────────────────
+mssFiredThisBar = false
+if swept and not mssConfirmed and bar_index > sweepBar
+    if sweptBear and isSwingL
+        mssRef := low
+    if sweptBull and isSwingH
+        mssRef := high
+    if not na(mssRef)
+        if sweptBear and close < mssRef
+            mssConfirmed    := true
+            mssFiredThisBar := true
+        if sweptBull and close > mssRef
+            mssConfirmed    := true
+            mssFiredThisBar := true
+
+// ── Step 3: FVG ───────────────────────────────────────────────
+fvgFiredThisBar = false
+if mssConfirmed and not fvgFound and bar_index > sweepBar + 1
+    if sweptBear and low[2] > high[0]
+        fvgTop          := low[2]
+        fvgBot          := high[0]
+        fvgMid          := (fvgTop + fvgBot) / 2.0
+        fvgFound        := true
+        fvgFiredThisBar := true
+    if sweptBull and high[2] < low[0]
+        fvgTop          := low[0]
+        fvgBot          := high[2]
+        fvgMid          := (fvgTop + fvgBot) / 2.0
+        fvgFound        := true
+        fvgFiredThisBar := true
+
+// ── Step 4: Entry ─────────────────────────────────────────────
+if fvgFound and not entryFired and inKZ and strategy.position_size == 0
+    reachedFVG = sweptBear ? high >= fvgMid : low <= fvgMid
+    if reachedFVG
+        entryPrice := fvgMid
+        entrySL    := sweptBear ? sweepWick + slBuffer : sweepWick - slBuffer
+        entryRisk  := math.abs(entryPrice - entrySL)
+        if entryRisk >= minRisk
+            entryTP    := sweptBear ? entryPrice - entryRisk * tpR : entryPrice + entryRisk * tpR
+            entryFired := true
+            if sweptBear
+                strategy.entry("SHORT", strategy.short, comment="ICT SHORT")
+                strategy.exit("SX", "SHORT", limit=entryTP, stop=entrySL)
+            else
+                strategy.entry("LONG", strategy.long, comment="ICT LONG")
+                strategy.exit("LX", "LONG", limit=entryTP, stop=entrySL)
+
+// ── Debug plots ───────────────────────────────────────────────
 justFired = entryFired and not entryFired[1]
-plotshape(justFired and sweptBear, "SHORT", shape.triangledown, location.abovebar, color.red,   size=size.normal)
-plotshape(justFired and sweptBull, "LONG",  shape.triangleup,   location.belowbar, color.green, size=size.normal)
+
+plotshape(showDebug and sweepFiredThisBar, "Sweep", shape.circle,    location.abovebar, color.blue,   size=size.tiny)
+plotshape(showDebug and mssFiredThisBar,   "MSS",   shape.circle,    location.abovebar, color.yellow, size=size.tiny)
+plotshape(showDebug and fvgFiredThisBar,   "FVG",   shape.circle,    location.abovebar, color.orange, size=size.small)
+plotshape(justFired and sweptBear,         "SHORT", shape.triangledown, location.abovebar, color.red,   size=size.normal)
+plotshape(justFired and sweptBull,         "LONG",  shape.triangleup,   location.belowbar, color.green, size=size.normal)
 
 plot(fvgFound ? fvgTop : na, "FVG Top", color.new(color.orange, 60), 1, plot.style_linebr)
 plot(fvgFound ? fvgBot : na, "FVG Bot", color.new(color.orange, 60), 1, plot.style_linebr)
