@@ -64,4 +64,7 @@ function entryMessage(sig) {
   );
 }
 
-module.exports = { send, permissionMessage, entryMessage };
+// Raw send — for webhook-server and any pre-formatted HTML message
+const sendRaw = send;
+
+module.exports = { send, sendRaw, permissionMessage, entryMessage };

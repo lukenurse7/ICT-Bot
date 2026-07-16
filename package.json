@@ -7,7 +7,8 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "start": "node src/main.js",
+    "start": "node src/webhook-server.js",
+    "start:polling": "node src/main.js",
     "backtest": "node src/backtest_v2.js",
     "backtest:nas": "node src/backtest_v2.js NAS100",
     "backtest:debug": "node src/backtest_v2.js --debug",
