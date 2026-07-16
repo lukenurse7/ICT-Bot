@@ -13,9 +13,9 @@ const { Engine1m }     = require('./engine1m');
 
 const args    = process.argv.slice(2);
 const DEBUG   = args.includes('--debug');
-const inst    = args.find(a => !a.startsWith('--')) || 'DJ30';
-const SYMBOL  = inst === 'NAS100' ? 'NDX' : 'DJIA';  // Real indices — TwelveData paid plan
-const NAME    = inst === 'NAS100' ? 'NAS100' : 'DJ30';
+const inst    = args.find(a => !a.startsWith('--')) || 'NAS100';
+const SYMBOL  = inst === 'DJ30' ? 'DIA' : 'NDX';  // NDX = NASDAQ-100 index; DIA = DJ30 ETF proxy
+const NAME    = inst === 'DJ30'  ? 'DJ30' : 'NAS100';
 
 const WINDOW_5M    = 150;   // rolling context window fed to 5m engine each tick
 const FETCH_SIZE   = 5000;  // request maximum data; API caps it at plan limit
