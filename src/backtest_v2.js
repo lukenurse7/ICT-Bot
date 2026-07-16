@@ -14,7 +14,7 @@ const { Engine1m }     = require('./engine1m');
 const args    = process.argv.slice(2);
 const DEBUG   = args.includes('--debug');
 const inst    = args.find(a => !a.startsWith('--')) || 'DJ30';
-const SYMBOL  = inst === 'NAS100' ? 'QQQ' : 'DIA';  // ETF proxies — TwelveData free plan
+const SYMBOL  = inst === 'NAS100' ? 'NDX' : 'DJIA';  // Real indices — TwelveData paid plan
 const NAME    = inst === 'NAS100' ? 'NAS100' : 'DJ30';
 
 const WINDOW_5M    = 150;   // rolling context window fed to 5m engine each tick
