@@ -16,9 +16,9 @@
 //   SL  = swept 5m level + SL_BUFFER (above the liquidity for SHORT)
 //   TP1 = 3R, TP2 = opposite 5m level
 
-const MIN_RISK_PTS       = parseFloat(process.env.MIN_RISK_PTS       || '0.30'); // QQQ dollar points (~$0.30 min risk)
+const MIN_RISK_PTS       = parseFloat(process.env.MIN_RISK_PTS       || '30');   // index points (NAS100/DJ30 scale)
 const MAX_1M_BARS        = parseInt(process.env.MAX_1M_BARS          || '90');
-const SL_BUFFER          = parseFloat(process.env.SL_BUFFER          || '0.50'); // QQQ dollar points beyond sweep wick
+const SL_BUFFER          = parseFloat(process.env.SL_BUFFER          || '50');   // index points beyond sweep wick
 const TP_R               = parseFloat(process.env.TP_R               || '2.0');
 const SWING_K            = 1;
 const ATR_PERIOD         = parseInt(process.env.ATR_PERIOD           || '14');
