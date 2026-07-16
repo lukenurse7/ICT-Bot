@@ -8,7 +8,7 @@ tpR      = input.float(2.0,  "TP Risk Multiple")
 kzStart  = input.int(8,      "KZ Start Hour NY")
 kzEnd    = input.int(11,     "KZ End Hour NY")
 
-// NY Kill Zone
+// ── NY Kill Zone ──────────────────────────────────────────────
 nyHour    = hour(time, "America/New_York")
 nyMin     = minute(time, "America/New_York")
 nyDow     = dayofweek(time, "America/New_York")
@@ -16,95 +16,48 @@ isWeekday = nyDow >= dayofweek.monday and nyDow <= dayofweek.friday
 inKZ      = isWeekday and (nyHour * 60 + nyMin) >= kzStart * 60 and (nyHour * 60 + nyMin) < kzEnd * 60
 newDay    = ta.change(time("D")) != 0
 
-// Swing detection
-isSwingH = high > high[1] and high > high[2] and high > high[3]
-isSwingL = low  < low[1]  and low  < low[2]  and low  < low[3]
+// ── 5m swing levels (liquidity to sweep) ─────────────────────
+f_5m_swings() =>
+    isH = high > high[1] and high > high[2] and high > high[3]
+    isL = low  < low[1]  and low  < low[2]  and low  < low[3]
+    var float sH = na
+    var float sL = na
+    if ta.change(time("D")) != 0
+        sH := na
+        sL := na
+    if isH
+        sH := high
+    if isL
+        sL := low
+    [sH, sL]
 
-var float swingH = na
-var float swingL = na
-if isSwingH
-    swingH := high
-if isSwingL
-    swingL := low
+[ref5mH, ref5mL] = request.security(syminfo.tickerid, "5", f_5m_swings(), lookahead=barmerge.lookahead_off)
 
-// Sweep tracking
-var bool  swept     = false
-var bool  sweptBear = false
-var bool  sweptBull = false
-var float sweepWick = na
-var int   sweepBar  = 0
-
-if inKZ and not swept
-    if not na(swingH) and high > swingH
-        swept     := true
-        sweptBear := true
-        sweepWick := high
-        sweepBar  := bar_index
-    if not na(swingL) and low < swingL
-        swept     := true
-        sweptBull := true
-        sweepWick := low
-        sweepBar  := bar_index
-
-// MSS
-var float mssRef       = na
+// ── Per-session state ─────────────────────────────────────────
+var bool  swept        = false
+var bool  sweptBear    = false
+var bool  sweptBull    = false
+var float sweepWick    = na
+var float mssLevel     = na
+var int   sweepBar     = 0
 var bool  mssConfirmed = false
+var float fvgTop       = na
+var float fvgBot       = na
+var float fvgMid       = na
+var bool  fvgFound     = false
+var bool  entryFired   = false
+var float entryPrice   = na
+var float entrySL      = na
+var float entryTP      = na
+var float entryRisk    = na
 
-if swept and not mssConfirmed
-    if sweptBear and isSwingL
-        mssRef := low
-    if sweptBull and isSwingH
-        mssRef := high
-
-if swept and not mssConfirmed and not na(mssRef) and bar_index > sweepBar
-    if sweptBear and close < mssRef
-        mssConfirmed := true
-    if sweptBull and close > mssRef
-        mssConfirmed := true
-
-// FVG
-var float fvgTop   = na
-var float fvgBot   = na
-var float fvgMid   = na
-var bool  fvgFound = false
-
-if mssConfirmed and not fvgFound and bar_index > sweepBar + 1
-    if sweptBear and low[2] > high[0]
-        fvgTop   := low[2]
-        fvgBot   := high[0]
-        fvgMid   := (fvgTop + fvgBot) / 2.0
-        fvgFound := true
-    if sweptBull and high[2] < low[0]
-        fvgTop   := low[0]
-        fvgBot   := high[2]
-        fvgMid   := (fvgTop + fvgBot) / 2.0
-        fvgFound := true
-
-// Entry at 50% FVG
-var bool  entryFired = false
-var float entryPrice = na
-var float entrySL    = na
-var float entryTP    = na
-var float entryRisk  = na
-
-if fvgFound and not entryFired and inKZ
-    reachedFVG = sweptBear ? high >= fvgMid : low <= fvgMid
-    if reachedFVG
-        entryPrice := fvgMid
-        entrySL    := sweptBear ? sweepWick + slBuffer : sweepWick - slBuffer
-        entryRisk  := math.abs(entryPrice - entrySL)
-        if entryRisk >= minRisk
-            entryTP    := sweptBear ? entryPrice - entryRisk * tpR : entryPrice + entryRisk * tpR
-            entryFired := true
-
-// Reset at end of KZ or new day
-if not inKZ or newDay
+if newDay
     swept        := false
     sweptBear    := false
     sweptBull    := false
     sweepWick    := na
+    mssLevel     := na
     sweepBar     := 0
-    mssRef       := na
     mssConfirmed := false
     fvgTop       := na
     fvgBot       := na
@@ -116,16 +69,69 @@ if not inKZ or newDay
     entryTP      := na
     entryRisk    := na
 
-// Plots
+// ── Step 1: Sweep of 5m level inside KZ ──────────────────────
+if inKZ and not swept and not entryFired
+    if not na(ref5mH) and high > ref5mH
+        swept     := true
+        sweptBear := true
+        sweepWick := ref5mH
+        mssLevel  := low
+        sweepBar  := bar_index
+    else if not na(ref5mL) and low < ref5mL
+        swept     := true
+        sweptBull := true
+        sweepWick := ref5mL
+        mssLevel  := high
+        sweepBar  := bar_index
+
+// ── Step 2: MSS — close beyond sweep candle's opposite end ───
+if swept and not mssConfirmed and bar_index > sweepBar
+    if sweptBear and close < mssLevel
+        mssConfirmed := true
+    if sweptBull and close > mssLevel
+        mssConfirmed := true
+
+// ── Step 3: FVG in impulse leg ────────────────────────────────
+if mssConfirmed and not fvgFound
+    if sweptBear and low[2] > high[0]
+        fvgTop   := low[2]
+        fvgBot   := high[0]
+        fvgMid   := (fvgTop + fvgBot) / 2.0
+        fvgFound := true
+    if sweptBull and high[2] < low[0]
+        fvgTop   := low[0]
+        fvgBot   := high[2]
+        fvgMid   := (fvgTop + fvgBot) / 2.0
+        fvgFound := true
+
+// ── Step 4: Entry signal at 50% FVG inside KZ ────────────────
+if fvgFound and not entryFired and inKZ
+    reachedFVG = sweptBear ? high >= fvgMid : low <= fvgMid
+    if reachedFVG
+        entryPrice := fvgMid
+        entrySL    := sweptBear ? sweepWick + slBuffer : sweepWick - slBuffer
+        entryRisk  := math.abs(entryPrice - entrySL)
+        if entryRisk >= minRisk
+            entryTP    := sweptBear ? entryPrice - entryRisk * tpR : entryPrice + entryRisk * tpR
+            entryFired := true
+
+// ── Plots ─────────────────────────────────────────────────────
 justFired = entryFired and not entryFired[1]
+
 plotshape(justFired and sweptBear, "SHORT", shape.triangledown, location.abovebar, color.red,   size=size.normal)
 plotshape(justFired and sweptBull, "LONG",  shape.triangleup,   location.belowbar, color.green, size=size.normal)
 
+plot(ref5mH, "5m Swing H", color.new(color.red,   70), 1, plot.style_linebr)
+plot(ref5mL, "5m Swing L", color.new(color.green, 70), 1, plot.style_linebr)
 plot(fvgFound ? fvgTop : na, "FVG Top", color.new(color.orange, 70), 1, plot.style_linebr)
 plot(fvgFound ? fvgBot : na, "FVG Bot", color.new(color.orange, 70), 1, plot.style_linebr)
 plot(fvgFound ? fvgMid : na, "FVG Mid", color.new(color.yellow, 50), 1, plot.style_linebr)
+plot(entryFired ? entryTP : na, "TP", color.new(color.lime, 20), 2, plot.style_linebr)
+plot(entryFired ? entrySL : na, "SL", color.new(color.red,  20), 2, plot.style_linebr)
 
-// Alert — fires webhook via alert() which accepts dynamic strings
+bgcolor(inKZ ? color.new(color.blue, 93) : na, title="Kill Zone")
+
+// ── Telegram webhook alert ────────────────────────────────────
 if justFired
     dir   = sweptBear ? "SHORT" : "LONG"
     rrVal = entryRisk > 0 ? math.round(math.abs(entryPrice - entryTP) / entryRisk, 2) : 0.0
