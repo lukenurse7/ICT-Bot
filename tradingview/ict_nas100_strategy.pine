@@ -154,13 +154,8 @@ if fvgFound and not entryFired and inKZ and strategy.position_size == 0
         entrySL    := sweptBear ? sweepWick + slBuffer : sweepWick - slBuffer
         entryRisk  := math.abs(entryPrice - entrySL)
         if entryRisk >= minRisk
-            // TP1: min(2R, opposing 5m level) — whichever is closer to entry
-            rTarget2 = sweptBear ? entryPrice - entryRisk * 2 : entryPrice + entryRisk * 2
-            opposing = sweptBear ? ref5mL : ref5mH
-            entryTP1 := if sweptBear
-                not na(opposing) and opposing > rTarget2 ? opposing : rTarget2
-            else
-                not na(opposing) and opposing < rTarget2 ? opposing : rTarget2
+            // TP1: fixed 2R target
+            entryTP1   := sweptBear ? entryPrice - entryRisk * 2 : entryPrice + entryRisk * 2
             // TP2: pure 3R runner target
             entryTP2   := sweptBear ? entryPrice - entryRisk * 3 : entryPrice + entryRisk * 3
             entryFired := true
