@@ -1,21 +1,17 @@
 //@version=6
-strategy("ICT NAS100 - KZ Strategy v2", overlay=true, max_bars_back=500,
+// BASELINE — 217-trade backtest copy. DO NOT EDIT.
+// Win rate 35%, £2,500 → £3,508 over ~1 year at 2.5% risk.
+strategy("ICT NAS100 - KZ Strategy [BASELINE]", overlay=true, max_bars_back=500,
      default_qty_type=strategy.fixed, default_qty_value=1,
      commission_type=strategy.commission.cash_per_order, commission_value=0,
      process_orders_on_close=false)
 
-// ── Inputs ────────────────────────────────────────────────────
-slBuffer    = input.float(50.0, "SL Buffer (pts)")
-minRisk     = input.float(30.0, "Min Risk (pts)")
-kzStart     = input.int(8,      "KZ Start Hour NY")
-kzEnd       = input.int(11,     "KZ End Hour NY")
-showDebug   = input.bool(true,  "Show Debug Dots")
-atrLen      = input.int(14,     "ATR Length")
-dispBody    = input.float(0.4,  "Displacement Body ATR mult")
-dispRange   = input.float(0.7,  "Displacement Range ATR mult")
-maxBarsOpen = input.int(90,     "Max bars in trade (time-stop)")
+slBuffer  = input.float(50.0, "SL Buffer (pts)")
+minRisk   = input.float(30.0, "Min Risk (pts)")
+kzStart   = input.int(8,      "KZ Start Hour NY")
+kzEnd     = input.int(11,     "KZ End Hour NY")
+showDebug = input.bool(true,  "Show Debug Dots")
 
-// ── NY Kill Zone ──────────────────────────────────────────────
 nyHour    = hour(time, "America/New_York")
 nyMin     = minute(time, "America/New_York")
 nyDow     = dayofweek(time, "America/New_York")
@@ -23,10 +19,6 @@ isWeekday = nyDow >= dayofweek.monday and nyDow <= dayofweek.friday
 inKZ      = isWeekday and (nyHour * 60 + nyMin) >= kzStart * 60 and (nyHour * 60 + nyMin) < kzEnd * 60
 newDay    = ta.change(time("D")) != 0
 
-// ── ATR (displacement filter) ─────────────────────────────────
-atrVal = ta.atr(atrLen)
-
-// ── 5m swing levels (liquidity to sweep) ─────────────────────
 f_5m_swings() =>
     isH = high > high[1] and high > high[2] and high > high[3]
     isL = low  < low[1]  and low  < low[2]  and low  < low[3]
@@ -43,7 +35,6 @@ f_5m_swings() =>
 
 [ref5mH, ref5mL] = request.security(syminfo.tickerid, "5", f_5m_swings(), lookahead=barmerge.lookahead_off)
 
-// ── Per-session state ─────────────────────────────────────────
 var bool  swept        = false
 var bool  sweptBear    = false
 var bool  sweptBull    = false
@@ -62,7 +53,6 @@ var float entryTP1     = na
 var float entryTP2     = na
 var float entryRisk    = na
 var bool  trailed      = false
-var int   entryBar     = 0
 
 if newDay
     swept        := false
@@ -83,9 +73,7 @@ if newDay
     entryTP2     := na
     entryRisk    := na
     trailed      := false
-    entryBar     := 0
 
-// ── Step 1: Sweep of 5m level inside KZ ──────────────────────
 sweepFiredThisBar = false
 if inKZ and not swept and not entryFired
     if not na(ref5mH) and high > ref5mH
@@ -103,22 +91,15 @@ if inKZ and not swept and not entryFired
         sweepBar          := bar_index
         sweepFiredThisBar := true
 
-// ── Step 2: MSS with displacement filter ─────────────────────
-// MSS only confirms if the breaking candle has real momentum:
-// body >= dispBody * ATR  OR  range >= dispRange * ATR
 mssFiredThisBar = false
 if swept and not mssConfirmed and bar_index > sweepBar
-    candleBody  = math.abs(close - open)
-    candleRange = high - low
-    hasDisp     = candleBody >= dispBody * atrVal or candleRange >= dispRange * atrVal
-    if sweptBear and close < mssLevel and hasDisp
+    if sweptBear and close < mssLevel
         mssConfirmed    := true
         mssFiredThisBar := true
-    if sweptBull and close > mssLevel and hasDisp
+    if sweptBull and close > mssLevel
         mssConfirmed    := true
         mssFiredThisBar := true
 
-// ── Step 3: FVG in the impulse leg ───────────────────────────
 fvgFiredThisBar = false
 if mssConfirmed and not fvgFound
     if sweptBear and low[2] > high[0]
@@ -134,19 +115,6 @@ if mssConfirmed and not fvgFound
         fvgFound        := true
         fvgFiredThisBar := true
 
-// ── Stale FVG invalidation ────────────────────────────────────
-// If price closes beyond the distal (far) boundary of the FVG,
-// the zone is consumed — reset and watch for a new setup.
-if fvgFound and not entryFired
-    distalBreached = sweptBear ? close > fvgTop : close < fvgBot
-    if distalBreached
-        fvgFound     := false
-        fvgTop       := na
-        fvgBot       := na
-        fvgMid       := na
-        mssConfirmed := false
-
-// ── Step 4: Entry at 50% FVG inside KZ ───────────────────────
 if fvgFound and not entryFired and inKZ and strategy.position_size == 0
     reachedFVG = sweptBear ? high >= fvgMid : low <= fvgMid
     if reachedFVG
@@ -154,17 +122,9 @@ if fvgFound and not entryFired and inKZ and strategy.position_size == 0
         entrySL    := sweptBear ? sweepWick + slBuffer : sweepWick - slBuffer
         entryRisk  := math.abs(entryPrice - entrySL)
         if entryRisk >= minRisk
-            // TP1: min(2R, opposing 5m level) — whichever is closer to entry
-            rTarget2 = sweptBear ? entryPrice - entryRisk * 2 : entryPrice + entryRisk * 2
-            opposing = sweptBear ? ref5mL : ref5mH
-            entryTP1 := if sweptBear
-                not na(opposing) and opposing > rTarget2 ? opposing : rTarget2
-            else
-                not na(opposing) and opposing < rTarget2 ? opposing : rTarget2
-            // TP2: pure 3R runner target
+            entryTP1   := sweptBear ? entryPrice - entryRisk * 2 : entryPrice + entryRisk * 2
             entryTP2   := sweptBear ? entryPrice - entryRisk * 3 : entryPrice + entryRisk * 3
             entryFired := true
-            entryBar   := bar_index
             if sweptBear
                 strategy.entry("SHORT", strategy.short, comment="ICT SHORT")
                 strategy.exit("SX", "SHORT", limit=entryTP2, stop=entrySL)
@@ -172,7 +132,6 @@ if fvgFound and not entryFired and inKZ and strategy.position_size == 0
                 strategy.entry("LONG", strategy.long, comment="ICT LONG")
                 strategy.exit("LX", "LONG", limit=entryTP2, stop=entrySL)
 
-// ── Trail: when price tags TP1 (2R), move SL to lock in 2R ──
 exitId = sweptBear ? "SX" : "LX"
 fromId = sweptBear ? "SHORT" : "LONG"
 if strategy.position_size != 0 and entryFired and not trailed
@@ -181,12 +140,6 @@ if strategy.position_size != 0 and entryFired and not trailed
         trailed := true
         strategy.exit(exitId, fromId, limit=entryTP2, stop=entryTP1)
 
-// ── Time-stop: close trade if open too long ───────────────────
-if strategy.position_size != 0 and entryFired
-    if bar_index - entryBar >= maxBarsOpen
-        strategy.close(fromId, comment="TIME-STOP")
-
-// ── Plots ─────────────────────────────────────────────────────
 justFired   = entryFired and not entryFired[1]
 justTrailed = trailed and not trailed[1]
 
@@ -202,15 +155,8 @@ plot(ref5mL, "5m Swing L", color.new(color.green, 70), 1, plot.style_linebr)
 plot(fvgFound ? fvgTop : na, "FVG Top", color.new(color.orange, 60), 1, plot.style_linebr)
 plot(fvgFound ? fvgBot : na, "FVG Bot", color.new(color.orange, 60), 1, plot.style_linebr)
 plot(fvgFound ? fvgMid : na, "FVG Mid", color.new(color.yellow, 40), 1, plot.style_linebr)
-plot(entryFired ? entryTP1   : na, "TP1",   color.new(color.lime,  40), 1, plot.style_linebr)
-plot(entryFired ? entryTP2   : na, "TP2",   color.new(color.lime,  10), 2, plot.style_linebr)
-plot(entryFired ? entrySL    : na, "SL",    color.new(color.red,   20), 2, plot.style_linebr)
-plot(entryFired ? entryPrice : na, "Entry", color.new(color.white, 40), 1, plot.style_linebr)
+plot(entryFired ? entryTP1   : na, "TP1 (2R)", color.new(color.lime,  40), 1, plot.style_linebr)
+plot(entryFired ? entryTP2   : na, "TP2 (3R)", color.new(color.lime,  10), 2, plot.style_linebr)
+plot(entryFired ? entrySL    : na, "SL",        color.new(color.red,   20), 2, plot.style_linebr)
+plot(entryFired ? entryPrice : na, "Entry",     color.new(color.white, 40), 1, plot.style_linebr)
 bgcolor(inKZ ? color.new(color.blue, 93) : na, title="Kill Zone")
-
-// ── Telegram webhook alert ────────────────────────────────────
-if justFired
-    dir   = sweptBear ? "SHORT" : "LONG"
-    rrVal = entryRisk > 0 ? math.round(math.abs(entryPrice - entryTP2) / entryRisk, 2) : 0.0
-    msg   = '{"direction":"' + dir + '","symbol":"NAS100","entry":' + str.tostring(math.round(entryPrice, 2)) + ',"sl":' + str.tostring(math.round(entrySL, 2)) + ',"tp1":' + str.tostring(math.round(entryTP1, 2)) + ',"tp2":' + str.tostring(math.round(entryTP2, 2)) + ',"risk":' + str.tostring(math.round(entryRisk, 2)) + ',"rr":' + str.tostring(rrVal) + ',"time":"' + str.format_time(time, "yyyy-MM-dd HH:mm", "America/New_York") + ' NY"}'
-    alert(msg, alert.freq_once_per_bar)

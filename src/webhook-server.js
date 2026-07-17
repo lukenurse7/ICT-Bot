@@ -41,7 +41,8 @@ app.post('/webhook', async (req, res) => {
       symbol,      // e.g. "NAS100", "DJ30"
       entry,
       sl,
-      tp,
+      tp1,         // 2R trail trigger (move SL here when hit)
+      tp2,         // 3R final target
       rr,
       risk,
       sweep,
@@ -52,7 +53,7 @@ app.post('/webhook', async (req, res) => {
     } = payload;
 
     // If we got a structured signal, send a formatted Telegram alert
-    if (direction && entry && sl && tp) {
+    if (direction && entry && sl && (tp1 || tp2)) {
       const dir   = direction === 'SHORT' ? '▼ SHORT' : '▲ LONG';
       const emoji = direction === 'SHORT' ? '🔴' : '🟢';
       const inst  = symbol || 'NAS100';
@@ -63,8 +64,9 @@ app.post('/webhook', async (req, res) => {
         ``,
         `📍 <b>Entry:</b>  ${entry}`,
         `🛑 <b>SL:</b>     ${sl}`,
-        `🎯 <b>TP:</b>     ${tp}`,
-        rr   ? `📊 <b>RR:</b>     ${rr}` : '',
+        tp1 ? `🎯 <b>TP1 (2R):</b> ${tp1}  ← move SL here when hit` : '',
+        tp2 ? `🏆 <b>TP2 (3R):</b> ${tp2}  ← final target` : '',
+        rr   ? `📊 <b>RR:</b>     1:${rr}` : '',
         risk ? `⚡ <b>Risk:</b>   ${risk} pts` : '',
         ``,
         sweep ? `• Sweep:  ${sweep}` : '',
