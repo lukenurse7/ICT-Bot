@@ -10,10 +10,10 @@ minRisk     = input.float(30.0, "Min Risk (pts)")
 kzStart     = input.int(8,      "KZ Start Hour NY")
 kzEnd       = input.int(11,     "KZ End Hour NY")
 showDebug   = input.bool(true,  "Show Debug Dots")
-atrLen      = input.int(14,     "ATR Length")
-dispBody    = input.float(0.4,  "Displacement Body ATR mult")
-dispRange   = input.float(0.7,  "Displacement Range ATR mult")
-maxBarsOpen = input.int(90,     "Max bars in trade (time-stop)")
+atrLen        = input.int(14,     "ATR Length")
+dispBody      = input.float(0.4,  "Displacement Body ATR mult")
+dispRange     = input.float(0.7,  "Displacement Range ATR mult")
+useSessionStop = input.bool(true, "Session time-stop (close at 16:00 NY)")
 
 // ── NY Kill Zone ──────────────────────────────────────────────
 nyHour    = hour(time, "America/New_York")
@@ -62,7 +62,7 @@ var float entryTP1     = na
 var float entryTP2     = na
 var float entryRisk    = na
 var bool  trailed      = false
-var int   entryBar     = 0
+var int   entryBar     = 0   // kept for reference, not used for bar-count stop
 
 if newDay
     swept        := false
@@ -176,10 +176,14 @@ if strategy.position_size != 0 and entryFired and not trailed
         trailed := true
         strategy.exit(exitId, fromId, limit=entryTP2, stop=entryTP1)
 
-// ── Time-stop: close trade if open too long ───────────────────
-if strategy.position_size != 0 and entryFired
-    if bar_index - entryBar >= maxBarsOpen
-        strategy.close(fromId, comment="TIME-STOP")
+// ── Session time-stop: close at 16:00 NY (NAS100 cash session close) ─
+// NAS100 CFD/futures liquidity drops sharply after 16:00 NY.
+// Holding through close risks gaps, wide spreads, and overnight risk.
+// Toggle off via input to run clean bar-count comparisons in backtesting.
+nyMinsNow = nyHour * 60 + nyMin
+atSessionClose = nyMinsNow >= 16 * 60 and nyMinsNow < 16 * 60 + 2  // fires once at 16:00–16:01
+if useSessionStop and strategy.position_size != 0 and atSessionClose
+    strategy.close(fromId, comment="SESSION-STOP")
 
 // ── Plots ─────────────────────────────────────────────────────
 justFired   = entryFired and not entryFired[1]
