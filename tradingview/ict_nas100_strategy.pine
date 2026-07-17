@@ -10,10 +10,14 @@ minRisk     = input.float(30.0, "Min Risk (pts)")
 kzStart     = input.int(8,      "KZ Start Hour NY")
 kzEnd       = input.int(11,     "KZ End Hour NY")
 showDebug   = input.bool(true,  "Show Debug Dots")
-atrLen        = input.int(14,     "ATR Length")
-dispBody      = input.float(0.4,  "Displacement Body ATR mult")
-dispRange     = input.float(0.7,  "Displacement Range ATR mult")
-useSessionStop = input.bool(true, "Session time-stop (close at 16:00 NY)")
+atrLen           = input.int(14,    "ATR Length")
+dispBody         = input.float(0.4, "Displacement Body ATR mult")
+dispRange        = input.float(0.7, "Displacement Range ATR mult")
+useSessionStop   = input.bool(true, "Session time-stop (close at 16:00 NY)")
+useVolFilter     = input.bool(true, "Volatility filter (skip bad regimes)")
+volRefDays       = input.int(20,    "Vol reference: ATR avg days")
+volLow           = input.float(0.6, "Vol LOW threshold (skip if ATR < X * avg)")
+volHigh          = input.float(1.8, "Vol HIGH threshold (skip if ATR > X * avg)")
 
 // ── NY Kill Zone ──────────────────────────────────────────────
 nyHour    = hour(time, "America/New_York")
@@ -23,8 +27,12 @@ isWeekday = nyDow >= dayofweek.monday and nyDow <= dayofweek.friday
 inKZ      = isWeekday and (nyHour * 60 + nyMin) >= kzStart * 60 and (nyHour * 60 + nyMin) < kzEnd * 60
 newDay    = ta.change(time("D")) != 0
 
-// ── ATR (displacement filter) ─────────────────────────────────
-atrVal = ta.atr(atrLen)
+// ── ATR (displacement filter + volatility regime) ────────────
+atrVal    = ta.atr(atrLen)
+// Reference ATR: average over volRefDays trading days (≈ days × 390 mins on 1m chart).
+// ta.atr on a much longer period captures the multi-week baseline.
+atrRef    = ta.atr(volRefDays * 390)
+volOK     = not useVolFilter or (atrVal >= volLow * atrRef and atrVal <= volHigh * atrRef)
 
 // ── 5m swing levels (liquidity to sweep) ─────────────────────
 f_5m_swings() =>
@@ -86,8 +94,10 @@ if newDay
     entryBar     := 0
 
 // ── Step 1: Sweep of 5m level inside KZ ──────────────────────
+// volOK gates the entire setup search — if the regime is too quiet
+// (chop) or too extreme (news spike), no sweep is registered at all.
 sweepFiredThisBar = false
-if inKZ and not swept and not entryFired
+if inKZ and not swept and not entryFired and volOK
     if not na(ref5mH) and high > ref5mH
         swept             := true
         sweptBear         := true
